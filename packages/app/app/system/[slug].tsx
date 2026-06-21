@@ -51,14 +51,14 @@ export default function SystemDetail() {
 
   if (error) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.centered} testID="system-detail-error">
         <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
   if (!system) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.centered} testID="system-detail-loading">
         <ActivityIndicator />
       </View>
     );
@@ -67,11 +67,11 @@ export default function SystemDetail() {
   return (
     <>
       <Stack.Screen options={{ title: system.name, headerShown: true }} />
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} testID="system-detail-screen">
         <SystemMapPreview />
 
-        <View style={styles.section}>
-          <Text style={styles.title}>{system.name}</Text>
+        <View style={styles.section} testID="system-meta">
+          <Text style={styles.title} testID="system-name">{system.name}</Text>
           {system.description ? <Text style={styles.body}>{system.description}</Text> : null}
           {system.ownership_source ? (
             <Text style={styles.meta}>Owner: {system.ownership_source}</Text>
@@ -80,6 +80,7 @@ export default function SystemDetail() {
             <Pressable
               onPress={() => Linking.openURL(system.external_url!)}
               style={styles.link}
+              testID="system-external-link"
             >
               <Ionicons name="open-outline" size={14} color="#22c55e" />
               <Text style={styles.linkText}>Official page</Text>
@@ -87,15 +88,16 @@ export default function SystemDetail() {
           ) : null}
         </View>
 
-        <View style={styles.section}>
+        <View style={styles.section} testID="system-trails">
           <Text style={styles.h2}>Trails ({trails.length})</Text>
           {trails.length === 0 ? (
-            <Text style={styles.body}>No trails yet for this system.</Text>
+            <Text style={styles.body} testID="system-trails-empty">No trails yet for this system.</Text>
           ) : (
             trails.map((t) => (
               <Pressable
                 key={t.id}
                 onPress={() => router.push(`/trail/${t.slug}` as never)}
+                testID={`system-trail-card-${t.slug}`}
               >
                 <Card>
                   <View style={styles.row}>

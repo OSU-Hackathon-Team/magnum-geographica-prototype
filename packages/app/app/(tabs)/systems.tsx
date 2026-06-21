@@ -25,17 +25,23 @@ export default function SystemsScreen() {
   }, [q]);
 
   return (
-    <View style={styles.container}>
-      <SearchBar value={q} onChangeText={setQ} placeholder="Filter systems..." />
+    <View style={styles.container} testID="systems-screen">
+      <SearchBar value={q} onChangeText={setQ} placeholder="Filter systems..." testID="systems-search" />
       <FlatList
         data={items}
         keyExtractor={(s) => s.id}
         contentContainerStyle={styles.list}
+        testID="systems-list"
         ListEmptyComponent={
-          <Text style={styles.empty}>{loading ? "Loading..." : "No systems yet."}</Text>
+          <Text style={styles.empty} testID="systems-empty">
+            {loading ? "Loading..." : "No systems yet."}
+          </Text>
         }
         renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/system/${item.slug}` as never)}>
+          <Pressable
+            onPress={() => router.push(`/system/${item.slug}` as never)}
+            testID={`system-card-${item.slug}`}
+          >
             <Card>
               <Text style={styles.name}>{item.name}</Text>
               {item.description ? <Text style={styles.desc}>{item.description}</Text> : null}

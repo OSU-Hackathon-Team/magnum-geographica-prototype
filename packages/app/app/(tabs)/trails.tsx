@@ -23,15 +23,23 @@ export default function TrailsScreen() {
   }, [q]);
 
   return (
-    <View style={styles.container}>
-      <SearchBar value={q} onChangeText={setQ} placeholder="Filter trails..." />
+    <View style={styles.container} testID="trails-screen">
+      <SearchBar value={q} onChangeText={setQ} placeholder="Filter trails..." testID="trails-search" />
       <FlatList
         data={items}
         keyExtractor={(t) => t.id}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>No trails yet.</Text>}
+        testID="trails-list"
+        ListEmptyComponent={
+          <Text style={styles.empty} testID="trails-empty">
+            No trails yet.
+          </Text>
+        }
         renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/trail/${item.slug}` as never)}>
+          <Pressable
+            onPress={() => router.push(`/trail/${item.slug}` as never)}
+            testID={`trail-card-${item.slug}`}
+          >
             <Card>
               <View style={styles.row}>
                 <Text style={styles.name}>{item.name}</Text>

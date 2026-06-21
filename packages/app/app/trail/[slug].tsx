@@ -53,14 +53,14 @@ export default function TrailDetail() {
 
   if (error) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.centered} testID="trail-detail-error">
         <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
   if (!trail) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.centered} testID="trail-detail-loading">
         <ActivityIndicator />
       </View>
     );
@@ -69,27 +69,27 @@ export default function TrailDetail() {
   return (
     <>
       <Stack.Screen options={{ title: trail.name, headerShown: true }} />
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} testID="trail-detail-screen">
         <TrailMapPreview />
 
-        <View style={styles.section}>
+        <View style={styles.section} testID="trail-meta">
           <View style={styles.row}>
-            <Text style={styles.title}>{trail.name}</Text>
+            <Text style={styles.title} testID="trail-name">{trail.name}</Text>
             {trail.difficulty ? <DifficultyBadge difficulty={trail.difficulty} /> : null}
           </View>
-          <View style={styles.statsRow}>
+          <View style={styles.statsRow} testID="trail-stats">
             {trail.length_meters ? (
-              <Text style={styles.stat}>
+              <Text style={styles.stat} testID="trail-length">
                 <IoniconsLabel name="resize" /> {(trail.length_meters / 1000).toFixed(1)} km
               </Text>
             ) : null}
             {trail.elevation_gain_meters ? (
-              <Text style={styles.stat}>
+              <Text style={styles.stat} testID="trail-elevation">
                 <IoniconsLabel name="trending-up" /> {trail.elevation_gain_meters.toFixed(0)} m
               </Text>
             ) : null}
             {trail.verified ? (
-              <Text style={[styles.stat, styles.verified]}>
+              <Text style={[styles.stat, styles.verified]} testID="trail-verified">
                 <IoniconsLabel name="checkmark-circle" /> Verified
               </Text>
             ) : null}
@@ -97,13 +97,13 @@ export default function TrailDetail() {
           {trail.description ? <Text style={styles.body}>{trail.description}</Text> : null}
         </View>
 
-        <View style={styles.section}>
+        <View style={styles.section} testID="trail-segments">
           <Text style={styles.h2}>Segments ({segments.length})</Text>
           {segments.length === 0 ? (
-            <Text style={styles.body}>No segments yet.</Text>
+            <Text style={styles.body} testID="trail-segments-empty">No segments yet.</Text>
           ) : (
             segments.map((s) => (
-              <Card key={s.id}>
+              <Card key={s.id} testID={`trail-segment-${s.id}`}>
                 <View style={styles.row}>
                   <Text style={styles.cardTitle}>
                     {s.name ?? `Segment ${s.sort_order + 1}`}
@@ -111,14 +111,18 @@ export default function TrailDetail() {
                   {s.surface_type ? <SegmentTypeBadge surface={s.surface_type} /> : null}
                 </View>
                 {s.hazards.length > 0 ? (
-                  <Text style={styles.meta}>Hazards: {s.hazards.join(", ")}</Text>
+                  <Text style={styles.meta} testID={`trail-segment-hazards-${s.id}`}>
+                    Hazards: {s.hazards.join(", ")}
+                  </Text>
                 ) : null}
                 <View style={styles.flagsRow}>
                   {s.steep_grade ? <Text style={styles.flag}>Steep</Text> : null}
                   {s.is_road_connector ? <Text style={styles.flag}>Road connector</Text> : null}
                   {s.one_way ? <Text style={styles.flag}>One-way</Text> : null}
                   {s.length_meters ? (
-                    <Text style={styles.flag}>{(s.length_meters / 1000).toFixed(2)} km</Text>
+                    <Text style={styles.flag} testID={`trail-segment-length-${s.id}`}>
+                      {(s.length_meters / 1000).toFixed(2)} km
+                    </Text>
                   ) : null}
                 </View>
               </Card>
@@ -126,20 +130,21 @@ export default function TrailDetail() {
           )}
         </View>
 
-        <View style={styles.section}>
+        <View style={styles.section} testID="trail-features">
           <Text style={styles.h2}>Features ({features.length})</Text>
           {features.length === 0 ? (
-            <Text style={styles.body}>No features yet.</Text>
+            <Text style={styles.body} testID="trail-features-empty">No features yet.</Text>
           ) : (
             features.map((f) => (
               <Pressable
                 key={f.id}
                 onPress={() => router.push(`/feature/${f.id}` as never)}
+                testID={`trail-feature-${f.id}`}
               >
                 <Card>
                   <View style={styles.row}>
                     <Text style={styles.cardTitle}>{f.name}</Text>
-                    <Text style={styles.flag}>{f.type_tag}</Text>
+                    <Text style={styles.flag} testID={`trail-feature-type-${f.id}`}>{f.type_tag}</Text>
                   </View>
                   {f.description ? <Text style={styles.body}>{f.description}</Text> : null}
                 </Card>

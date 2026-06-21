@@ -10,18 +10,18 @@ export default function ProfileScreen() {
   const isOnline = useOfflineStore((s) => s.isOnline);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} testID="profile-screen">
       <Card>
         <Text style={styles.label}>Contributing as</Text>
-        <Text style={styles.value}>{contributor}</Text>
-        <Text style={styles.hint} onPress={() => setContributor("anonymous")}>
+        <Text style={styles.value} testID="profile-contributor">{contributor}</Text>
+        <Text style={styles.hint} onPress={() => setContributor("anonymous")} testID="profile-reset">
           Tap to reset
         </Text>
       </Card>
 
       <Card>
         <Text style={styles.label}>Status</Text>
-        <Text style={styles.value}>{isOnline ? "Online" : "Offline"}</Text>
+        <Text style={styles.value} testID="profile-status">{isOnline ? "Online" : "Offline"}</Text>
         <Text style={styles.sub}>{pending} pending change(s)</Text>
       </Card>
 

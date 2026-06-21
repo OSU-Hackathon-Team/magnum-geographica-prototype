@@ -17,9 +17,14 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report",
+    "build:e2e": "cd packages/app && EXPO_PUBLIC_API_URL=\"${EXPO_PUBLIC_API_URL:-http://localhost:9999}\" bunx expo export --platform web --output-dir ../../tests/e2e/.app",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "eslint": "^9.17.0",

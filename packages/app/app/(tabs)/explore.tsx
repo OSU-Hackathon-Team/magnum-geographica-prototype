@@ -11,9 +11,9 @@ export default function ExploreScreen() {
   }, [isOnline]);
 
   return (
-    <View style={styles.container}>
-      <SearchBar placeholder="Search trails, systems, features..." />
-      <View style={styles.mapPlaceholder}>
+    <View style={styles.container} testID="explore-screen">
+      <SearchBar placeholder="Search trails, systems, features..." testID="explore-search" />
+      <View style={styles.mapPlaceholder} testID="explore-map">
         <Text style={styles.mapText}>Map</Text>
         <Text style={styles.mapHint}>Wired up in Phase 1 (OpenLayers + Martin tiles)</Text>
       </View>

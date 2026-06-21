@@ -3,14 +3,16 @@ import { Ionicons } from "@expo/vector-icons";
 
 export interface SearchBarProps extends Omit<TextInputProps, "style"> {
   onChangeText?: (text: string) => void;
+  testID?: string;
 }
 
-export function SearchBar(props: SearchBarProps) {
+export function SearchBar({ testID, ...props }: SearchBarProps) {
   return (
     <View style={styles.container}>
       <Ionicons name="search" size={18} color="#888" style={styles.icon} />
       <TextInput
         {...props}
+        testID={testID}
         style={styles.input}
         placeholderTextColor="#999"
         autoCorrect={false}

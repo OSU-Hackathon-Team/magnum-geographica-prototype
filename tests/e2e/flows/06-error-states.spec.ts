@@ -1,0 +1,28 @@
+import { test, expect } from "@playwright/test";
+import { installApiMock } from "../helpers/api-mock.js";
+
+test.beforeEach(async ({ page }) => {
+  await installApiMock(page);
+});
+
+test("404 on unknown system shows the error state", async ({ page }) => {
+  await page.goto("/system/does-not-exist");
+  await expect(page.getByTestId("system-detail-error")).toBeVisible();
+});
+
+test("404 on unknown trail shows the error state", async ({ page }) => {
+  await page.goto("/trail/does-not-exist");
+  await expect(page.getByTestId("trail-detail-error")).toBeVisible();
+});
+
+test("API down -> systems list shows empty state, not a crash", async ({ page }) => {
+  await installApiMock(page, { failAll: true });
+  await page.goto("/systems");
+  await expect(page.getByTestId("systems-empty")).toBeVisible();
+});
+
+test("API down -> profile still loads (no required network call)", async ({ page }) => {
+  await installApiMock(page, { failAll: true });
+  await page.goto("/profile");
+  await expect(page.getByTestId("profile-screen")).toBeVisible();
+});
