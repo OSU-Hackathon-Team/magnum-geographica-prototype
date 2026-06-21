@@ -1,0 +1,185 @@
+import { z } from "zod";
+import { DIFFICULTIES, SURFACE_TYPES, FEATURE_TYPES, WIKI_TARGET_TYPES } from "../constants.js";
+
+const uuidSchema = z.string().uuid();
+const isoDateSchema = z.string().datetime({ offset: true });
+const slugSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[a-z0-9-]+$/, "slug must be lowercase letters, digits, and dashes");
+
+export const superSystemSchema = z.object({
+  id: uuidSchema,
+  name: z.string().min(1).max(200),
+  slug: slugSchema,
+  official: z.boolean(),
+  description: z.string().max(10_000).nullable().optional(),
+  external_url: z.string().url().nullable().optional(),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const systemSchema = z.object({
+  id: uuidSchema,
+  name: z.string().min(1).max(200),
+  slug: slugSchema,
+  boundary: z.unknown().nullable().optional(),
+  ownership_source: z.string().max(500).nullable().optional(),
+  source_date: z.string().date().nullable().optional(),
+  description: z.string().max(10_000).nullable().optional(),
+  external_url: z.string().url().nullable().optional(),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const subSystemSchema = z.object({
+  id: uuidSchema,
+  name: z.string().min(1).max(200),
+  slug: slugSchema,
+  system_id: uuidSchema,
+  geometry: z.unknown().nullable().optional(),
+  description: z.string().max(10_000).nullable().optional(),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const trailSchema = z.object({
+  id: uuidSchema,
+  name: z.string().min(1).max(200),
+  slug: slugSchema,
+  geometry: z.unknown().nullable().optional(),
+  description: z.string().max(10_000).nullable().optional(),
+  difficulty: z.enum(DIFFICULTIES).nullable().optional(),
+  length_meters: z.number().nonnegative().nullable().optional(),
+  elevation_gain_meters: z.number().nonnegative().nullable().optional(),
+  verified: z.boolean().optional(),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const trailSegmentSchema = z.object({
+  id: uuidSchema,
+  trail_id: uuidSchema,
+  name: z.string().max(200).nullable().optional(),
+  geometry: z.unknown(),
+  sort_order: z.number().int().nonnegative(),
+  surface_type: z.enum(SURFACE_TYPES).nullable().optional(),
+  hazards: z.array(z.string()).default([]),
+  is_road_connector: z.boolean(),
+  steep_grade: z.boolean(),
+  one_way: z.boolean(),
+  description: z.string().max(10_000).nullable().optional(),
+  length_meters: z.number().nonnegative().nullable().optional(),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const featureSchema = z.object({
+  id: uuidSchema,
+  name: z.string().min(1).max(200),
+  type_tag: z.enum(FEATURE_TYPES),
+  point: z.unknown(),
+  trail_id: uuidSchema.nullable().optional(),
+  system_id: uuidSchema.nullable().optional(),
+  description: z.string().max(10_000).nullable().optional(),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const wikiPageSchema = z.object({
+  id: uuidSchema,
+  target_type: z.enum(WIKI_TARGET_TYPES),
+  target_id: uuidSchema,
+  title: z.string().min(1).max(300),
+  content_md: z.string().max(200_000),
+  rendered_html: z.string().max(500_000),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const citationSchema = z.object({
+  id: uuidSchema,
+  wiki_page_id: uuidSchema,
+  url: z.string().url().nullable().optional(),
+  title: z.string().min(1).max(300),
+  image_data: z.string().nullable().optional(),
+  image_mime_type: z.string().nullable().optional(),
+  created_at: isoDateSchema,
+});
+
+export const revisionSchema = z.object({
+  id: uuidSchema,
+  wiki_page_id: uuidSchema,
+  content_md: z.string().max(200_000),
+  contributor_name: z.string().min(1).max(120),
+  author_id: uuidSchema.nullable().optional(),
+  edit_summary: z.string().max(500).nullable().optional(),
+  created_at: isoDateSchema,
+});
+
+export const mediaSchema = z.object({
+  id: uuidSchema,
+  feature_id: uuidSchema.nullable().optional(),
+  trail_id: uuidSchema.nullable().optional(),
+  system_id: uuidSchema.nullable().optional(),
+  data: z.string(),
+  mime_type: z.string().min(1).max(120),
+  caption: z.string().max(500).nullable().optional(),
+  width: z.number().int().positive().nullable().optional(),
+  height: z.number().int().positive().nullable().optional(),
+  created_at: isoDateSchema,
+});
+
+export const offlinePackInfoSchema = z.object({
+  system_id: uuidSchema,
+  tile_size_bytes: z.number().int().nonnegative(),
+  geojson_size_bytes: z.number().int().nonnegative(),
+  wiki_size_bytes: z.number().int().nonnegative(),
+  total_size_bytes: z.number().int().nonnegative(),
+  generated_at: isoDateSchema.nullable(),
+});
+
+export const pendingContributionSchema = z.object({
+  id: z.number().int().positive(),
+  entity_type: z.string().min(1).max(60),
+  entity_id: z.string().nullable(),
+  action: z.enum(["create", "update", "delete"]),
+  payload: z.record(z.string(), z.unknown()),
+  contributor_name: z.string().min(1).max(120),
+  created_at: z.string(),
+  sync_status: z.enum(["pending", "syncing", "conflict", "synced"]),
+  server_id: z.string().nullable().optional(),
+  conflict_revision_id: z.string().nullable().optional(),
+});
+
+export const createSystemInputSchema = systemSchema
+  .pick({ name: true, slug: true, description: true, external_url: true, ownership_source: true, source_date: true })
+  .partial({ description: true, external_url: true, ownership_source: true, source_date: true });
+
+export const createTrailInputSchema = trailSchema
+  .pick({ name: true, slug: true, description: true, difficulty: true, length_meters: true, elevation_gain_meters: true })
+  .partial({ description: true, difficulty: true, length_meters: true, elevation_gain_meters: true });
+
+export const createFeatureInputSchema = featureSchema.pick({
+  name: true,
+  type_tag: true,
+  point: true,
+  trail_id: true,
+  system_id: true,
+  description: true,
+});
+
+export const updateWikiPageInputSchema = z.object({
+  title: z.string().min(1).max(300),
+  content_md: z.string().max(200_000),
+  contributor_name: z.string().min(1).max(120).default("anonymous"),
+  edit_summary: z.string().max(500).optional(),
+  base_revision_id: uuidSchema.optional(),
+});
+
+export const searchQuerySchema = z.object({
+  q: z.string().min(1).max(200),
+  type: z.enum(["system", "trail", "feature", "all"]).default("all"),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});

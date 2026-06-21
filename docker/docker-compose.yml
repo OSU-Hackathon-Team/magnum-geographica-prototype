@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: magnum-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-magnum}
+      POSTGRES_USER: ${DB_USER:-magnum}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-magnum} -d ${DB_NAME:-magnum}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    container_name: magnum-martin
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-magnum}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-magnum}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3001:3000"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    container_name: magnum-api
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-magnum}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-magnum}
+      MARTIN_URL: http://martin:3000
+      ADMIN_SECRET: ${ADMIN_SECRET:-dev-secret-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081,http://localhost:19006,http://localhost:3000}
+      API_PORT: "3000"
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      martin:
+        condition: service_started
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ../packages/api/src:/app/src:ro
+      - ../packages/shared:/app/shared:ro
+    command: ["bun", "run", "--watch", "src/index.ts"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:

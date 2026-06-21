@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+.yarn/install-state.gz
+
+# Build outputs
+dist/
+build/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# Bun
+bun.lockb
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# OSM / data
+*.osm.pbf
+*.mbtiles
+*.geojson
+data/
+
+# Generated
+.next/
+out/
+.web/
+
+# Coverage
+coverage/
+*.lcov
+
+# Generated API clients
+packages/api/openapi.json
