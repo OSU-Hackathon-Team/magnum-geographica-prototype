@@ -11,6 +11,7 @@ export const SYSTEMS = [
     source_date: "2024-01-01",
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 39.4301, lon: -82.5404 },
   },
   {
     id: "sys-2",
@@ -22,6 +23,7 @@ export const SYSTEMS = [
     source_date: "2024-01-01",
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 41.2795, lon: -81.5512 },
   },
   {
     id: "sys-3",
@@ -33,6 +35,7 @@ export const SYSTEMS = [
     source_date: "2024-01-01",
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 39.45, lon: -82.15 },
   },
 ] as const;
 
@@ -48,6 +51,7 @@ export const TRAILS = [
     verified: true,
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 39.4301, lon: -82.5404 },
   },
   {
     id: "trail-2",
@@ -60,6 +64,7 @@ export const TRAILS = [
     verified: true,
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 41.2795, lon: -81.5512 },
   },
   {
     id: "trail-3",
@@ -72,6 +77,7 @@ export const TRAILS = [
     verified: false,
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 39.4301, lon: -82.5404 },
   },
 ] as const;
 
@@ -139,6 +145,7 @@ export const FEATURES_BY_TRAIL: Record<string, unknown[]> = {
       system_id: null,
       created_at: "2026-06-21T00:00:00.000Z",
       updated_at: "2026-06-21T00:00:00.000Z",
+      center: { lat: 39.4342, lon: -82.5412 },
     },
   ],
   "trail-2": [
@@ -151,6 +158,7 @@ export const FEATURES_BY_TRAIL: Record<string, unknown[]> = {
       system_id: "sys-2",
       created_at: "2026-06-21T00:00:00.000Z",
       updated_at: "2026-06-21T00:00:00.000Z",
+      center: { lat: 41.2627, lon: -81.5618 },
     },
     {
       id: "f-3",
@@ -161,9 +169,46 @@ export const FEATURES_BY_TRAIL: Record<string, unknown[]> = {
       system_id: "sys-2",
       created_at: "2026-06-21T00:00:00.000Z",
       updated_at: "2026-06-21T00:00:00.000Z",
+      center: { lat: 41.2854, lon: -81.5761 },
     },
   ],
   "trail-3": [],
+};
+
+export const FEATURES: Record<string, unknown> = {
+  "f-1": {
+    id: "f-1",
+    name: "Old Man's Cave",
+    type_tag: "scenic_point",
+    description: "Recessed gorge with waterfall.",
+    trail_id: "trail-1",
+    system_id: null,
+    created_at: "2026-06-21T00:00:00.000Z",
+    updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 39.4342, lon: -82.5412 },
+  },
+  "f-2": {
+    id: "f-2",
+    name: "Boston Mill Visitor Center",
+    type_tag: "trailhead",
+    description: "Main trailhead for the Towpath.",
+    trail_id: "trail-2",
+    system_id: "sys-2",
+    created_at: "2026-06-21T00:00:00.000Z",
+    updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 41.2627, lon: -81.5618 },
+  },
+  "f-3": {
+    id: "f-3",
+    name: "Blue Hen Falls",
+    type_tag: "water_source",
+    description: null,
+    trail_id: "trail-2",
+    system_id: "sys-2",
+    created_at: "2026-06-21T00:00:00.000Z",
+    updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 41.2854, lon: -81.5761 },
+  },
 };
 
 export const TRAILS_BY_SYSTEM: Record<string, typeof TRAILS[number][]> = {

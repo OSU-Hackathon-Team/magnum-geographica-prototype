@@ -84,6 +84,11 @@ export type GeoJSONGeometry =
   | GeoJSONPolygon
   | GeoJSONMultiPolygon;
 
+export interface MapCenter {
+  lat: number;
+  lon: number;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;

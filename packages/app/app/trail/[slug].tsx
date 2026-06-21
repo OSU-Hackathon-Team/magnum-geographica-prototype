@@ -7,6 +7,7 @@ import { createMagnumClient, type Trail, type TrailSegment, type Feature } from 
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
+import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -95,6 +96,7 @@ export default function TrailDetail() {
             ) : null}
           </View>
           {trail.description ? <Text style={styles.body}>{trail.description}</Text> : null}
+          <ViewOnMapButton center={trail.center ?? null} zoom={11} testID="trail-view-on-map" />
         </View>
 
         <View style={styles.section} testID="trail-segments">

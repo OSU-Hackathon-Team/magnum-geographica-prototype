@@ -12,7 +12,13 @@ export type BridgeEvent =
   | { type: "mapClick"; lon: number; lat: number }
   | { type: "mapLongPress"; lon: number; lat: number }
   | { type: "moveEnd"; center: [number, number]; zoom: number }
-  | { type: "featureSelect"; id: string; layer: string }
+  | {
+      type: "featureSelect";
+      id: string;
+      layer: string;
+      slug?: string | null;
+      name?: string | null;
+    }
   | { type: "error"; message: string };
 
 export type BridgeMethod = BridgeCommand["method"];

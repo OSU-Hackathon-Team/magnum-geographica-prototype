@@ -6,6 +6,7 @@ import { MapContainer } from "@magnum/map";
 import { createMagnumClient, type System, type Trail } from "@magnum/shared";
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
+import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -82,6 +83,7 @@ export default function SystemDetail() {
               <Text style={styles.linkText}>Official page</Text>
             </Pressable>
           ) : null}
+          <ViewOnMapButton center={system.center ?? null} zoom={9} testID="system-view-on-map" />
         </View>
 
         <View style={styles.section} testID="system-trails">

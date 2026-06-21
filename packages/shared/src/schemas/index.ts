@@ -20,6 +20,11 @@ export const superSystemSchema = z.object({
   updated_at: isoDateSchema,
 });
 
+export const centerSchema = z
+  .object({ lat: z.number(), lon: z.number() })
+  .nullable()
+  .optional();
+
 export const systemSchema = z.object({
   id: uuidSchema,
   name: z.string().min(1).max(200),
@@ -31,6 +36,7 @@ export const systemSchema = z.object({
   external_url: z.string().url().nullable().optional(),
   created_at: isoDateSchema,
   updated_at: isoDateSchema,
+  center: centerSchema,
 });
 
 export const subSystemSchema = z.object({
@@ -56,6 +62,7 @@ export const trailSchema = z.object({
   verified: z.boolean().optional(),
   created_at: isoDateSchema,
   updated_at: isoDateSchema,
+  center: centerSchema,
 });
 
 export const trailSegmentSchema = z.object({
@@ -85,6 +92,7 @@ export const featureSchema = z.object({
   description: z.string().max(10_000).nullable().optional(),
   created_at: isoDateSchema,
   updated_at: isoDateSchema,
+  center: centerSchema,
 });
 
 export const wikiPageSchema = z.object({

@@ -18,6 +18,12 @@ const baseSystemSelect = {
   updated_at: systems.updatedAt,
 } as const;
 
+const baseSystemSelectWithCenter = {
+  ...baseSystemSelect,
+  lon: sql<number | null>`ST_X(ST_Centroid(${systems.boundary}))`,
+  lat: sql<number | null>`ST_Y(ST_Centroid(${systems.boundary}))`,
+} as const;
+
 const baseTrailSelect = {
   id: trails.id,
   name: trails.name,
@@ -50,7 +56,7 @@ systemsRoute.get("/", async (c) => {
 systemsRoute.get("/by-slug/:slug", async (c) => {
   const slug = c.req.param("slug");
   const rows = await db
-    .select(baseSystemSelect)
+    .select(baseSystemSelectWithCenter)
     .from(systems)
     .where(eq(systems.slug, slug))
     .limit(1);
@@ -59,18 +65,26 @@ systemsRoute.get("/by-slug/:slug", async (c) => {
   if (!system) {
     return c.json({ error: "not_found", message: `system '${slug}' not found` }, 404);
   }
-  return c.json(system);
+  const { lon, lat, ...rest } = system;
+  const center = lon != null && lat != null ? { lat, lon } : null;
+  return c.json({ ...rest, center });
 });
 
 systemsRoute.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const rows = await db.select(baseSystemSelect).from(systems).where(eq(systems.id, id)).limit(1);
+  const rows = await db
+    .select(baseSystemSelectWithCenter)
+    .from(systems)
+    .where(eq(systems.id, id))
+    .limit(1);
 
   const system = rows[0];
   if (!system) {
     return c.json({ error: "not_found", message: `system ${id} not found` }, 404);
   }
-  return c.json(system);
+  const { lon, lat, ...rest } = system;
+  const center = lon != null && lat != null ? { lat, lon } : null;
+  return c.json({ ...rest, center });
 });
 
 systemsRoute.get("/:id/trails", async (c) => {

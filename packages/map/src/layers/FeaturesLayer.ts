@@ -10,7 +10,7 @@ import type { MapConfig } from "../shared/config.js";
 export function createFeaturesLayer(config: MapConfig): VectorTileLayer | null {
   const url = featuresTileUrl(config);
   if (!url) return null;
-  return new VectorTileLayer({
+  const layer = new VectorTileLayer({
     source: new VectorTileSource({
       format: new MVT(),
       url,
@@ -32,4 +32,6 @@ export function createFeaturesLayer(config: MapConfig): VectorTileLayer | null {
       });
     },
   });
+  layer.set("name", "features");
+  return layer;
 }

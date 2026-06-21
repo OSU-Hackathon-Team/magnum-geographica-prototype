@@ -10,7 +10,7 @@ import type { MapConfig } from "../shared/config.js";
 export function createTrailsLayer(config: MapConfig): VectorTileLayer | null {
   const url = trailsTileUrl(config);
   if (!url) return null;
-  return new VectorTileLayer({
+  const layer = new VectorTileLayer({
     source: new VectorTileSource({
       format: new MVT(),
       url,
@@ -26,6 +26,8 @@ export function createTrailsLayer(config: MapConfig): VectorTileLayer | null {
       });
     },
   });
+  layer.set("name", "trails");
+  return layer;
 }
 
 void Fill;

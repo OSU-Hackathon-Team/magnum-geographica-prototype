@@ -65,10 +65,22 @@ trailsRoute.get("/", async (c) => {
   return c.json({ items, total: totalRow[0]?.count ?? 0, page, pageSize });
 });
 
+const baseTrailSelectWithCenter = {
+  ...baseTrailSelect,
+  lon: sql<number | null>`ST_X(ST_StartPoint(ST_LineMerge(${trails.geometry})))`,
+  lat: sql<number | null>`ST_Y(ST_StartPoint(ST_LineMerge(${trails.geometry})))`,
+} as const;
+
+function withCenter<T extends { lon: number | null; lat: number | null }>(row: T) {
+  const { lon, lat, ...rest } = row;
+  const center = lon != null && lat != null ? { lat, lon } : null;
+  return { ...rest, center };
+}
+
 trailsRoute.get("/by-slug/:slug", async (c) => {
   const slug = c.req.param("slug");
   const rows = await db
-    .select(baseTrailSelect)
+    .select(baseTrailSelectWithCenter)
     .from(trails)
     .where(eq(trails.slug, slug))
     .limit(1);
@@ -77,18 +89,22 @@ trailsRoute.get("/by-slug/:slug", async (c) => {
   if (!trail) {
     return c.json({ error: "not_found", message: `trail '${slug}' not found` }, 404);
   }
-  return c.json(trail);
+  return c.json(withCenter(trail));
 });
 
 trailsRoute.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const rows = await db.select(baseTrailSelect).from(trails).where(eq(trails.id, id)).limit(1);
+  const rows = await db
+    .select(baseTrailSelectWithCenter)
+    .from(trails)
+    .where(eq(trails.id, id))
+    .limit(1);
 
   const trail = rows[0];
   if (!trail) {
     return c.json({ error: "not_found", message: `trail ${id} not found` }, 404);
   }
-  return c.json(trail);
+  return c.json(withCenter(trail));
 });
 
 trailsRoute.get("/:id/segments", async (c) => {

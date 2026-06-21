@@ -10,7 +10,7 @@ import type { MapConfig } from "../shared/config.js";
 export function createSystemsLayer(config: MapConfig): VectorTileLayer | null {
   const url = systemsTileUrl(config);
   if (!url) return null;
-  return new VectorTileLayer({
+  const layer = new VectorTileLayer({
     source: new VectorTileSource({
       format: new MVT(),
       url,
@@ -35,4 +35,6 @@ export function createSystemsLayer(config: MapConfig): VectorTileLayer | null {
       });
     },
   });
+  layer.set("name", "systems");
+  return layer;
 }

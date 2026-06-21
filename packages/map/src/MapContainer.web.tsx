@@ -13,13 +13,30 @@ import type { MapContainerProps } from "./types.js";
 
 export type { MapContainerProps };
 
-export default function MapContainer({ config, onReady, onClick }: MapContainerProps) {
+const LAYER_NAME_BY_LAYER = {
+  trails: "trails",
+  segments: "segments",
+  systems: "systems",
+  features: "features",
+} as const;
+
+type FeatureSelectLayer = (typeof LAYER_NAME_BY_LAYER)[keyof typeof LAYER_NAME_BY_LAYER];
+
+function readStringId(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+export default function MapContainer({ config, onReady, onClick, onFeatureSelect, flyTo }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const onReadyRef = useRef(onReady);
   const onClickRef = useRef(onClick);
+  const onFeatureSelectRef = useRef(onFeatureSelect);
   onReadyRef.current = onReady;
   onClickRef.current = onClick;
+  onFeatureSelectRef.current = onFeatureSelect;
 
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
 
@@ -42,10 +59,11 @@ export default function MapContainer({ config, onReady, onClick }: MapContainerP
     if (featuresLayer) layers.push(featuresLayer);
 
     if (mapRef.current) {
-      mapRef.current.getView().setCenter(fromLonLat(center));
-      mapRef.current.getView().setZoom(zoom);
-      mapRef.current.getView().setMinZoom(minZoom);
-      mapRef.current.getView().setMaxZoom(maxZoom);
+      const view = mapRef.current.getView();
+      view.setCenter(fromLonLat(center));
+      view.setZoom(zoom);
+      view.setMinZoom(minZoom);
+      view.setMaxZoom(maxZoom);
       return;
     }
 
@@ -57,6 +75,25 @@ export default function MapContainer({ config, onReady, onClick }: MapContainerP
     mapRef.current = map;
 
     map.on("click", (evt) => {
+      const pixel = map.getEventPixel(evt.originalEvent);
+      const hit = map.forEachFeatureAtPixel(pixel, (feature, layer) => {
+        if (!feature) return null;
+        const layerName = (layer as { get?: (k: string) => unknown } | undefined)?.get?.("name");
+        if (typeof layerName !== "string") return null;
+        const id = readStringId(feature.get("id"));
+        if (!id) return null;
+        const slug = readStringId(feature.get("slug"));
+        const name = readStringId(feature.get("name"));
+        const matched = (Object.values(LAYER_NAME_BY_LAYER) as string[]).find((n) => n === layerName);
+        if (!matched) return null;
+        return { id, layer: matched as FeatureSelectLayer, slug, name };
+      });
+
+      if (hit) {
+        onFeatureSelectRef.current?.(hit);
+        return;
+      }
+
       if (!onClickRef.current) return;
       const [lon, lat] = toLonLat(evt.coordinate);
       if (typeof lon === "number" && typeof lat === "number") {
@@ -71,6 +108,16 @@ export default function MapContainer({ config, onReady, onClick }: MapContainerP
       mapRef.current = null;
     };
   }, [merged]);
+
+  useEffect(() => {
+    if (!mapRef.current || !flyTo) return;
+    const view = mapRef.current.getView();
+    view.animate({
+      center: fromLonLat([flyTo.lon, flyTo.lat]),
+      zoom: typeof flyTo.zoom === "number" ? flyTo.zoom : view.getZoom(),
+      duration: 500,
+    });
+  }, [flyTo]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 }

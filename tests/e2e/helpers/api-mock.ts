@@ -1,5 +1,13 @@
 import type { Page, Route } from "@playwright/test";
-import { MOCK_API_HOST, SYSTEMS, TRAILS, TRAILS_BY_SYSTEM, SEGMENTS_BY_TRAIL, FEATURES_BY_TRAIL } from "../fixtures/data.js";
+import {
+  MOCK_API_HOST,
+  SYSTEMS,
+  TRAILS,
+  TRAILS_BY_SYSTEM,
+  SEGMENTS_BY_TRAIL,
+  FEATURES_BY_TRAIL,
+  FEATURES,
+} from "../fixtures/data.js";
 
 type Json = unknown;
 type Handler = (params: {
@@ -95,13 +103,27 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     },
   },
   {
+    pattern: /\/api\/features\/([^/]+)$/,
+    handler: ({ url }) => {
+      const id = url.pathname.split("/").pop();
+      const feature = id ? FEATURES[id] : undefined;
+      return feature ? ok(feature) : notFound(`feature ${id} not found`);
+    },
+  },
+  {
     pattern: /\/api\/search$/,
     handler: ({ query }) => {
       const q = query.q?.toLowerCase() ?? "";
+      const allFeatures = Object.values(FEATURES);
       return ok({
         systems: SYSTEMS.filter((s) => s.name.toLowerCase().includes(q)),
         trails: TRAILS.filter((t) => t.name.toLowerCase().includes(q)),
-        features: [],
+        features: q
+          ? allFeatures.filter((f) => {
+              const name = String((f as { name?: string }).name ?? "").toLowerCase();
+              return name.includes(q);
+            })
+          : [],
       });
     },
   },

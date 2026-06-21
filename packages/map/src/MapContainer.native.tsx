@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Platform, View, StyleSheet } from "react-native";
 import WebView, { type WebViewMessageEvent } from "react-native-webview";
 import { defaultMapConfig } from "./shared/config.js";
@@ -35,31 +35,41 @@ function buildHtml(martinUrl: string | undefined): string {
         var src=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/trails/{z}/{x}/{y}'});
         vectorSources.trails=src;
         var trailLayer=new ol.layer.VectorTile({source:src,style:baseStyle});
+        trailLayer.set('name','trails');
         layers.push(trailLayer);
         trailLayer.on('click',function(e){
           var feat=e.feature;
-          if(feat){postToRN({type:'featureSelect',id:feat.get('id'),layer:'trails'});}
+          if(feat){postToRN({type:'featureSelect',id:feat.get('id'),layer:'trails',slug:feat.get('slug'),name:feat.get('name')});}
         });
 
         var segSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/segments/{z}/{x}/{y}'});
         vectorSources.segments=segSrc;
-        layers.push(new ol.layer.VectorTile({source:segSrc,style:baseStyle}));
+        var segLayer=new ol.layer.VectorTile({source:segSrc,style:baseStyle});
+        segLayer.set('name','segments');
+        layers.push(segLayer);
 
         var sysSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/systems/{z}/{x}/{y}'});
         vectorSources.systems=sysSrc;
-        layers.push(new ol.layer.VectorTile({source:sysSrc,
+        var sysLayer=new ol.layer.VectorTile({source:sysSrc,
           style:function(f){return new ol.style.Style({fill:new ol.style.Fill({color:'rgba(34,197,94,0.08)'}),stroke:new ol.style.Stroke({color:'#22c55e',width:1.5})});}
-        }));
+        });
+        sysLayer.set('name','systems');
+        layers.push(sysLayer);
+        sysLayer.on('click',function(e){
+          var feat=e.feature;
+          if(feat){postToRN({type:'featureSelect',id:feat.get('id'),layer:'systems',slug:feat.get('slug'),name:feat.get('name')});}
+        });
 
         var featSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/features/{z}/{x}/{y}'});
         vectorSources.features=featSrc;
         var featLayer=new ol.layer.VectorTile({source:featSrc,
           style:function(f){return new ol.style.Style({image:new ol.style.Circle({radius:7,fill:new ol.style.Fill({color:'white'}),stroke:new ol.style.Stroke({color:'#22c55e',width:2})}),text:new ol.style.Text({text:f.get('name'),offsetY:-12,font:'12px sans-serif',fill:new ol.style.Fill({color:'#333'}),stroke:new ol.style.Stroke({color:'white',width:3})})});}
         });
+        featLayer.set('name','features');
         layers.push(featLayer);
         featLayer.on('click',function(e){
           var feat=e.feature;
-          if(feat){postToRN({type:'featureSelect',id:feat.get('id'),layer:'features'});}
+          if(feat){postToRN({type:'featureSelect',id:feat.get('id'),layer:'features',slug:feat.get('slug'),name:feat.get('name')});}
         });
       }
       map=new ol.Map({target:'map',layers:layers,view:new ol.View({center:ol.proj.fromLonLat([-82.9988,39.9612]),zoom:6})});
@@ -85,6 +95,8 @@ export default function MapContainer({
   config,
   onReady,
   onClick,
+  onFeatureSelect,
+  flyTo,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
@@ -99,9 +111,9 @@ export default function MapContainer({
         return;
       }
       if (!isBridgeEvent(parsed)) return;
-      handleBridgeEvent(parsed, { onReady, onClick });
+      handleBridgeEvent(parsed, { onReady, onClick, onFeatureSelect });
     },
-    [onReady, onClick],
+    [onReady, onClick, onFeatureSelect],
   );
 
   const send = useCallback((command: BridgeCommand) => {
@@ -112,6 +124,11 @@ export default function MapContainer({
   const onLoadEnd = useCallback(() => {
     send({ method: "init", args: {} as never });
   }, [send]);
+
+  useEffect(() => {
+    if (!flyTo) return;
+    send({ method: "flyTo", args: { lon: flyTo.lon, lat: flyTo.lat, zoom: flyTo.zoom } });
+  }, [flyTo, send]);
 
   if (Platform.OS === "web") {
     return null;
@@ -139,7 +156,16 @@ export default function MapContainer({
 
 function handleBridgeEvent(
   event: BridgeEvent,
-  handlers: { onReady?: () => void; onClick?: (lon: number, lat: number) => void },
+  handlers: {
+    onReady?: () => void;
+    onClick?: (lon: number, lat: number) => void;
+    onFeatureSelect?: (selection: {
+      id: string;
+      layer: "trails" | "segments" | "systems" | "features";
+      slug?: string | null;
+      name?: string | null;
+    }) => void;
+  },
 ) {
   switch (event.type) {
     case "ready":
@@ -148,9 +174,21 @@ function handleBridgeEvent(
     case "mapClick":
       handlers.onClick?.(event.lon, event.lat);
       return;
+    case "featureSelect": {
+      const layer = (["trails", "segments", "systems", "features"] as const).find(
+        (l) => l === event.layer,
+      );
+      if (!layer) return;
+      handlers.onFeatureSelect?.({
+        id: event.id,
+        layer,
+        slug: null,
+        name: null,
+      });
+      return;
+    }
     case "mapLongPress":
     case "moveEnd":
-    case "featureSelect":
     case "error":
       return;
     default: {

@@ -1,5 +1,6 @@
 import { StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { ClientOnly } from "./ClientOnly";
 
 export interface SearchBarProps extends Omit<TextInputProps, "style"> {
   onChangeText?: (text: string) => void;
@@ -9,7 +10,9 @@ export interface SearchBarProps extends Omit<TextInputProps, "style"> {
 export function SearchBar({ testID, ...props }: SearchBarProps) {
   return (
     <View style={styles.container}>
-      <Ionicons name="search" size={18} color="#888" style={styles.icon} />
+      <ClientOnly fallback={<View style={styles.icon} />}>
+        <Ionicons name="search" size={18} color="#888" style={styles.icon} />
+      </ClientOnly>
       <TextInput
         {...props}
         testID={testID}

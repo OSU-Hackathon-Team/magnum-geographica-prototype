@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { createMagnumClient, type Feature } from "@magnum/shared";
+import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -42,6 +43,7 @@ export default function FeatureDetail() {
           <Text style={styles.title} testID="feature-name">{feature.name}</Text>
           <Text style={styles.badge}>{feature.type_tag}</Text>
           {feature.description ? <Text style={styles.body}>{feature.description}</Text> : null}
+          <ViewOnMapButton center={feature.center ?? null} zoom={14} testID="feature-view-on-map" />
         </View>
       </ScrollView>
     </>
