@@ -12,10 +12,12 @@ healthRoute.get("/", async (c) => {
     dbOk = false;
   }
 
+  const dbStatus = dbOk ? "ok" : "unreachable";
+  const statusCode = dbOk ? 200 : 503;
   return c.json({
-    status: "ok",
+    status: dbOk ? "ok" : "degraded",
     version: "0.0.1",
     time: new Date().toISOString(),
-    database: dbOk ? "ok" : "unreachable",
-  });
+    database: dbStatus,
+  }, statusCode as 200);
 });

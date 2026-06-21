@@ -6,6 +6,7 @@ import { trailsRoute } from "./routes/trails.js";
 import { searchRoute } from "./routes/search.js";
 import { seedRoute } from "./routes/seed.js";
 import { tilesRoute } from "./routes/tiles.js";
+import { featuresRoute } from "./routes/features.js";
 
 const app = new Hono();
 
@@ -17,6 +18,7 @@ app.route("/api/trails", trailsRoute);
 app.route("/api/search", searchRoute);
 app.route("/api/seed", seedRoute);
 app.route("/api/tiles", tilesRoute);
+app.route("/api/features", featuresRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));
 
@@ -26,7 +28,7 @@ app.notFound((c) =>
 
 app.onError((err, c) => {
   console.error("api error:", err);
-  return c.json({ error: "internal", message: err.message }, 500);
+  return c.json({ error: "internal", message: err instanceof Error ? err.message : String(err) }, 500);
 });
 
 const port = Number(process.env.API_PORT ?? 3000);

@@ -68,6 +68,7 @@ export function createMagnumClient(baseUrl: string, opts?: {
       client.put<WikiPage>(`/api/wiki-pages/${id}`, body),
 
     createFeature: (body: CreateFeatureInput) => client.post<Feature>("/api/features", body),
+    getFeature: (id: string) => client.get<Feature>(`/api/features/${id}`),
   };
 }
 

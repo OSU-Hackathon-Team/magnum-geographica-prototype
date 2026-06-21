@@ -17,12 +17,14 @@ See [PLAN.md](./PLAN.md) for the full architecture and phased build plan, and [o
 ## Quick start
 
 ```bash
-bun install                              # workspace install
-docker compose -f docker/docker-compose.yml up -d
-cd packages/api && bun run db:migrate    # apply schema
-curl -X POST http://localhost:3000/api/seed
-cd packages/app && bun run web           # Expo dev server
+bun install                                         # workspace install
+docker compose -f docker/docker-compose.yml up -d   # start postgres + martin + api
+bun run --cwd packages/api db:migrate               # apply schema
+curl -X POST http://localhost:3000/api/seed         # seed demo data
+bun run --cwd packages/app web                      # Expo dev server (web)
 ```
+
+All commands run from the repo root. The API will be available at `http://localhost:3000` and the web app at `http://localhost:8081`.
 
 ## Layout
 
@@ -59,7 +61,7 @@ Verified:
 - Monorepo installs (`bun install`)
 - All four packages typecheck (`bun run typecheck`)
 - ESLint + Prettier configured and clean (`bun run lint`)
-- Bun tests pass (6 tests across `api` + `shared`)
+- Bun tests pass (54 tests across `api` + `shared`)
 - Drizzle migration generated (`packages/api/drizzle/0000_init.sql`)
 - API boots and serves all routes (returns 500s on DB-backed routes without Postgres — expected)
 - Expo web build exports all 4 tab routes (~1.6 MB JS)

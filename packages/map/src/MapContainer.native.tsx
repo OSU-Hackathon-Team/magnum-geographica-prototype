@@ -34,7 +34,33 @@ function buildHtml(martinUrl: string | undefined): string {
       if(martinUrl){
         var src=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/trails/{z}/{x}/{y}'});
         vectorSources.trails=src;
-        layers.push(new ol.layer.VectorTile({source:src,style:baseStyle}));
+        var trailLayer=new ol.layer.VectorTile({source:src,style:baseStyle});
+        layers.push(trailLayer);
+        trailLayer.on('click',function(e){
+          var feat=e.feature;
+          if(feat){postToRN({type:'featureSelect',id:feat.get('id'),layer:'trails'});}
+        });
+
+        var segSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/segments/{z}/{x}/{y}'});
+        vectorSources.segments=segSrc;
+        layers.push(new ol.layer.VectorTile({source:segSrc,style:baseStyle}));
+
+        var sysSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/systems/{z}/{x}/{y}'});
+        vectorSources.systems=sysSrc;
+        layers.push(new ol.layer.VectorTile({source:sysSrc,
+          style:function(f){return new ol.style.Style({fill:new ol.style.Fill({color:'rgba(34,197,94,0.08)'}),stroke:new ol.style.Stroke({color:'#22c55e',width:1.5})});}
+        }));
+
+        var featSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/features/{z}/{x}/{y}'});
+        vectorSources.features=featSrc;
+        var featLayer=new ol.layer.VectorTile({source:featSrc,
+          style:function(f){return new ol.style.Style({image:new ol.style.Circle({radius:7,fill:new ol.style.Fill({color:'white'}),stroke:new ol.style.Stroke({color:'#22c55e',width:2})}),text:new ol.style.Text({text:f.get('name'),offsetY:-12,font:'12px sans-serif',fill:new ol.style.Fill({color:'#333'}),stroke:new ol.style.Stroke({color:'white',width:3})})});}
+        });
+        layers.push(featLayer);
+        featLayer.on('click',function(e){
+          var feat=e.feature;
+          if(feat){postToRN({type:'featureSelect',id:feat.get('id'),layer:'features'});}
+        });
       }
       map=new ol.Map({target:'map',layers:layers,view:new ol.View({center:ol.proj.fromLonLat([-82.9988,39.9612]),zoom:6})});
       map.on('click',function(e){var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]});});

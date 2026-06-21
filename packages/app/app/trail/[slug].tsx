@@ -166,7 +166,6 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   errorText: { color: "#ef4444", padding: 16 },
   mapPreview: { height: 240, backgroundColor: "#e8e8e8" },
-  mapPlaceholder: { flex: 1, textAlign: "center", textAlignVertical: "center", color: "#888" },
   section: { padding: 16, gap: 8 },
   title: { fontSize: 22, fontWeight: "700", flexShrink: 1 },
   h2: { fontSize: 18, fontWeight: "600", marginBottom: 8 },

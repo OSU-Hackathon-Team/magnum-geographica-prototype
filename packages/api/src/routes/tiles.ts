@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, asc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { systems, features } from "../db/schema.js";
 import { trails, trailSystems } from "../db/schema.js";
@@ -18,7 +18,7 @@ tilesRoute.get("/system/:systemId/trails.geojson", async (c) => {
       difficulty: trails.difficulty,
       surface_type: sql<string | null>`(SELECT ts.surface_type FROM trail_segments ts WHERE ts.trail_id = ${trails.id} ORDER BY ts.sort_order LIMIT 1)`,
       length_meters: trails.lengthMeters,
-      geometry: sql<string>`ST_AsGeoJSON(${trails.geometry})`,
+      geometry: sql<string>`ST_AsGeoJSON(COALESCE(${trails.geometry}, ST_GeomFromText('POINT EMPTY', 4326)))`,
     })
     .from(trails)
     .innerJoin(trailSystems, eq(trailSystems.trailId, trails.id))
@@ -35,7 +35,7 @@ tilesRoute.get("/system/:systemId/features.geojson", async (c) => {
       name: features.name,
       type_tag: features.typeTag,
       description: features.description,
-      geometry: sql<string>`ST_AsGeoJSON(${features.point})`,
+      geometry: sql<string>`ST_AsGeoJSON(COALESCE(${features.point}, ST_GeomFromText('POINT EMPTY', 4326)))`,
     })
     .from(features)
     .where(eq(features.systemId, systemId));
@@ -50,7 +50,7 @@ tilesRoute.get("/system/:systemId/bbox.geojson", async (c) => {
       id: systems.id,
       name: systems.name,
       slug: systems.slug,
-      geometry: sql<string>`ST_AsGeoJSON(${systems.boundary})`,
+      geometry: sql<string>`ST_AsGeoJSON(COALESCE(${systems.boundary}, ST_GeomFromText('POLYGON EMPTY', 4326)))`,
     })
     .from(systems)
     .where(eq(systems.id, systemId))
@@ -76,4 +76,3 @@ function toFeatureCollection(rows: Array<{ id: string; geometry: string; [k: str
   };
 }
 
-void asc;

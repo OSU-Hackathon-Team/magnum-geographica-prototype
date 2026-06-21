@@ -8,6 +8,9 @@
 
 set -euo pipefail
 
+echo "Step 0/3: Running Drizzle migrations"
+(cd packages/api && bun run drizzle-kit push)
+
 REGION="${REGION:-ohio}"
 EXTRACT_URL="${EXTRACT_URL:-https://download.geofabrik.de/north-america/us/${REGION}-latest.osm.pbf}"
 WORKDIR="${WORKDIR:-./data}"
@@ -21,7 +24,7 @@ if [ ! -f "$EXTRACT_FILE" ]; then
   curl -fL "$EXTRACT_URL" -o "$EXTRACT_FILE"
 fi
 
-echo "Step 1/2: Importing $EXTRACT_FILE with osm2pgsql flex output"
+echo "Step 1/3: Importing $EXTRACT_FILE with osm2pgsql flex output"
 osm2pgsql \
   --database "$DB_URL" \
   --create \
@@ -30,7 +33,7 @@ osm2pgsql \
   --output flex \
   "$EXTRACT_FILE"
 
-echo "Step 2/2: Post-processing into production tables"
+echo "Step 2/3: Post-processing into production tables"
 psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/ingest-post.sql
 
 echo "Done."

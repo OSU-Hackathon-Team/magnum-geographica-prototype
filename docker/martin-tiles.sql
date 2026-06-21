@@ -34,7 +34,6 @@ AS $$
         ) AS geometry
       FROM trails t, bounds
       WHERE t.geometry && ST_Transform(bounds.geom, 4326)
-        AND t.verified = true
     )
   SELECT ST_AsMVT(tile, 'trails', 4096, 'geometry')
   FROM tile;

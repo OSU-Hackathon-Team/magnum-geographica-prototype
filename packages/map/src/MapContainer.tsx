@@ -1,16 +1,8 @@
 import { Platform } from "react-native";
-import type { ComponentType } from "react";
-import type { MapContainerProps } from "./types.js";
+import MapContainerWeb from "./MapContainer.web.js";
+import MapContainerNative from "./MapContainer.native.js";
 
-declare const require: (id: string) => { default: ComponentType<MapContainerProps> };
+const MapContainer = Platform.OS === "web" ? MapContainerWeb : MapContainerNative;
 
-let Component: ComponentType<MapContainerProps>;
-
-if (Platform.OS === "web") {
-  Component = require("./MapContainer.web.js").default;
-} else {
-  Component = require("./MapContainer.native.js").default;
-}
-
-export default Component;
+export default MapContainer;
 export type { MapContainerProps } from "./types.js";

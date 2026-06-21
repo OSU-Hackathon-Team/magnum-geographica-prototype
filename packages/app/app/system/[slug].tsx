@@ -35,15 +35,11 @@ export default function SystemDetail() {
   useEffect(() => {
     if (!slug || typeof slug !== "string") return;
     const client = createMagnumClient(API_URL);
-    Promise.all([
-      client.getSystemBySlug(slug),
-      client
-        .getSystemBySlug(slug)
-        .then((s) => client.listSystemTrails(s.id))
-        .catch(() => ({ items: [] as Trail[], total: 0 })),
-    ])
-      .then(([s, t]) => {
+    client
+      .getSystemBySlug(slug)
+      .then(async (s) => {
         setSystem(s);
+        const t = await client.listSystemTrails(s.id).catch(() => ({ items: [] as Trail[], total: 0 }));
         setTrails(t.items);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
@@ -127,7 +123,6 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   errorText: { color: "#ef4444", padding: 16 },
   mapPreview: { height: 240, backgroundColor: "#e8e8e8" },
-  mapPlaceholder: { flex: 1, textAlign: "center", textAlignVertical: "center", color: "#888" },
   section: { padding: 16, gap: 8 },
   title: { fontSize: 22, fontWeight: "700" },
   h2: { fontSize: 18, fontWeight: "600", marginBottom: 8 },

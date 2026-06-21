@@ -53,4 +53,8 @@ export interface ApiRoutes {
     request: { body: CreateFeatureInput };
     response: import("../types/index.js").Feature;
   };
+  getFeature: {
+    request: { id: string };
+    response: import("../types/index.js").Feature;
+  };
 }

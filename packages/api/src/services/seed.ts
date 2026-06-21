@@ -192,8 +192,9 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
   for (const trail of allTrails) {
     await database.execute(
       sql`INSERT INTO trail_segments (trail_id, name, sort_order, surface_type, geometry)
-          VALUES (${trail.id}, 'Main segment', 0, 'natural',
-                  ST_Multi(ST_GeomFromText('MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))', 4326)))`,
+          SELECT ${trail.id}, 'Main segment', 0, 'natural',
+                  ST_Multi(ST_GeomFromText('MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))', 4326))
+          WHERE NOT EXISTS (SELECT 1 FROM trail_segments WHERE trail_id = ${trail.id} AND sort_order = 0)`,
     );
     result.segments += 1;
   }
@@ -204,9 +205,9 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
       const coords = OHIO_SYSTEMS[Math.min(f.systemIdx, OHIO_SYSTEMS.length - 1)]!;
       await database.execute(
         sql`INSERT INTO features (name, type_tag, system_id, description, point)
-            VALUES (${f.name}, ${f.typeTag}, ${sys.id}, ${f.description ?? null},
-                    ST_SetSRID(ST_MakePoint(${coords.lon}, ${coords.lat}), 4326))
-            ON CONFLICT DO NOTHING`,
+            SELECT ${f.name}, ${f.typeTag}, ${sys.id}, ${f.description ?? null},
+                   ST_SetSRID(ST_MakePoint(${coords.lon}, ${coords.lat}), 4326)
+            WHERE NOT EXISTS (SELECT 1 FROM features WHERE name = ${f.name} AND system_id = ${sys.id})`,
       );
       result.features += 1;
     }
