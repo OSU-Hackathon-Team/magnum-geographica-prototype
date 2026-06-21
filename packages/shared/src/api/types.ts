@@ -3,14 +3,22 @@ import {
   createSystemInputSchema,
   createTrailInputSchema,
   createFeatureInputSchema,
+  createWikiPageInputSchema,
   updateWikiPageInputSchema,
+  revertWikiPageInputSchema,
+  createCitationInputSchema,
+  wikiPageQuerySchema,
   searchQuerySchema,
 } from "../schemas/index.js";
 
 export type CreateSystemInput = z.infer<typeof createSystemInputSchema>;
 export type CreateTrailInput = z.infer<typeof createTrailInputSchema>;
 export type CreateFeatureInput = z.infer<typeof createFeatureInputSchema>;
+export type CreateWikiPageInput = z.infer<typeof createWikiPageInputSchema>;
 export type UpdateWikiPageInput = z.infer<typeof updateWikiPageInputSchema>;
+export type RevertWikiPageInput = z.infer<typeof revertWikiPageInputSchema>;
+export type CreateCitationInput = z.infer<typeof createCitationInputSchema>;
+export type WikiPageQuery = z.infer<typeof wikiPageQuerySchema>;
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
 
 export type ApiRequest<TRoute extends keyof ApiRoutes> = ApiRoutes[TRoute]["request"];
@@ -45,9 +53,45 @@ export interface ApiRoutes {
       features: import("../types/index.js").Feature[];
     };
   };
+  getWikiPage: {
+    request: WikiPageQuery;
+    response: import("../types/index.js").WikiPage;
+  };
+  createWikiPage: {
+    request: { body: CreateWikiPageInput };
+    response: import("../types/index.js").WikiPage;
+  };
   updateWikiPage: {
     request: { id: string; body: UpdateWikiPageInput };
     response: import("../types/index.js").WikiPage;
+  };
+  listRevisions: {
+    request: { id: string; page?: number; pageSize?: number };
+    response: { items: import("../types/index.js").Revision[]; total: number; page: number; pageSize: number };
+  };
+  getRevision: {
+    request: { wikiId: string; revId: string };
+    response: import("../types/index.js").Revision;
+  };
+  revertWikiPage: {
+    request: { id: string; body: RevertWikiPageInput };
+    response: import("../types/index.js").WikiPage;
+  };
+  recentRevisions: {
+    request: { page?: number; pageSize?: number };
+    response: { items: import("../types/index.js").Revision[]; total: number; page: number; pageSize: number };
+  };
+  listCitations: {
+    request: { wikiPageId: string };
+    response: { items: import("../types/index.js").Citation[]; total: number };
+  };
+  createCitation: {
+    request: { body: CreateCitationInput };
+    response: import("../types/index.js").Citation;
+  };
+  deleteCitation: {
+    request: { id: string };
+    response: { ok: boolean };
   };
   createFeature: {
     request: { body: CreateFeatureInput };

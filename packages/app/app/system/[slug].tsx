@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
-import { createMagnumClient, type System, type Trail } from "@magnum/shared";
+import { createMagnumClient, type System, type Trail, type WikiPage } from "@magnum/shared";
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
+import { Button } from "../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -31,6 +32,7 @@ export default function SystemDetail() {
   const router = useRouter();
   const [system, setSystem] = useState<System | null>(null);
   const [trails, setTrails] = useState<Trail[]>([]);
+  const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,8 +42,12 @@ export default function SystemDetail() {
       .getSystemBySlug(slug)
       .then(async (s) => {
         setSystem(s);
-        const t = await client.listSystemTrails(s.id).catch(() => ({ items: [] as Trail[], total: 0 }));
+        const [t, w] = await Promise.all([
+          client.listSystemTrails(s.id).catch(() => ({ items: [] as Trail[], total: 0 })),
+          client.getWikiPage("system", s.id).catch(() => null),
+        ]);
         setTrails(t.items);
+        if (w) setWikiPage(w as WikiPage);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
   }, [slug]);
@@ -84,6 +90,34 @@ export default function SystemDetail() {
             </Pressable>
           ) : null}
           <ViewOnMapButton center={system.center ?? null} zoom={9} testID="system-view-on-map" />
+        </View>
+
+        <View style={styles.section} testID="system-wiki">
+          <View style={styles.row}>
+            <Text style={styles.h2}>Wiki</Text>
+            <Button
+              variant={wikiPage ? "ghost" : "primary"}
+              size="small"
+              onPress={() =>
+                router.push(`/wiki/edit/system/${system.id}` as never)
+              }
+              testID="system-wiki-edit"
+            >
+              {wikiPage ? "Edit" : "Create"}
+            </Button>
+          </View>
+          {wikiPage ? (
+            <Pressable
+              onPress={() => router.push(`/wiki/system/${system.id}` as never)}
+              testID="system-wiki-view"
+            >
+              <Text style={styles.wikiPreview} numberOfLines={3}>
+                {wikiPage.content_md || "No content yet."}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.body}>No wiki page yet for this system.</Text>
+          )}
         </View>
 
         <View style={styles.section} testID="system-trails">
@@ -134,4 +168,14 @@ const styles = StyleSheet.create({
   linkText: { fontSize: 13, color: "#22c55e" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { fontSize: 15, fontWeight: "600" },
+  wikiPreview: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 18,
+    backgroundColor: "#f9fafb",
+    padding: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e8e8e8",
+  },
 });

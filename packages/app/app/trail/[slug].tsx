@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
-import { createMagnumClient, type Trail, type TrailSegment, type Feature } from "@magnum/shared";
+import { createMagnumClient, type Trail, type TrailSegment, type Feature, type WikiPage } from "@magnum/shared";
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
+import { Button } from "../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -33,6 +34,7 @@ export default function TrailDetail() {
   const [trail, setTrail] = useState<Trail | null>(null);
   const [segments, setSegments] = useState<TrailSegment[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
+  const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,12 +44,14 @@ export default function TrailDetail() {
       .getTrailBySlug(slug)
       .then(async (t) => {
         setTrail(t);
-        const [segs, feats] = await Promise.all([
+        const [segs, feats, wiki] = await Promise.all([
           client.listTrailSegments(t.id).catch(() => ({ items: [] as TrailSegment[], total: 0 })),
           client.listTrailFeatures(t.id).catch(() => ({ items: [] as Feature[], total: 0 })),
+          client.getWikiPage("trail", t.id).catch(() => null),
         ]);
         setSegments(segs.items);
         setFeatures(feats.items);
+        if (wiki) setWikiPage(wiki as WikiPage);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
   }, [slug]);
@@ -97,6 +101,34 @@ export default function TrailDetail() {
           </View>
           {trail.description ? <Text style={styles.body}>{trail.description}</Text> : null}
           <ViewOnMapButton center={trail.center ?? null} zoom={11} testID="trail-view-on-map" />
+        </View>
+
+        <View style={styles.section} testID="trail-wiki">
+          <View style={styles.row}>
+            <Text style={styles.h2}>Wiki</Text>
+            <Button
+              variant={wikiPage ? "ghost" : "primary"}
+              size="small"
+              onPress={() =>
+                router.push(`/wiki/edit/trail/${trail.id}` as never)
+              }
+              testID="trail-wiki-edit"
+            >
+              {wikiPage ? "Edit" : "Create"}
+            </Button>
+          </View>
+          {wikiPage ? (
+            <Pressable
+              onPress={() => router.push(`/wiki/trail/${trail.id}` as never)}
+              testID="trail-wiki-view"
+            >
+              <Text style={styles.wikiPreview} numberOfLines={3}>
+                {wikiPage.content_md || "No content yet."}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.body}>No wiki page yet for this trail.</Text>
+          )}
         </View>
 
         <View style={styles.section} testID="trail-segments">
@@ -186,5 +218,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 3,
+  },
+  wikiPreview: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 18,
+    backgroundColor: "#f9fafb",
+    padding: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e8e8e8",
   },
 });

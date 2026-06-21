@@ -186,6 +186,34 @@ export const updateWikiPageInputSchema = z.object({
   base_revision_id: uuidSchema.optional(),
 });
 
+export const createWikiPageInputSchema = z.object({
+  target_type: z.enum(WIKI_TARGET_TYPES),
+  target_id: uuidSchema,
+  title: z.string().min(1).max(300),
+  content_md: z.string().max(200_000).default(""),
+  contributor_name: z.string().min(1).max(120).default("anonymous"),
+  edit_summary: z.string().max(500).optional(),
+});
+
+export const revertWikiPageInputSchema = z.object({
+  revision_id: uuidSchema,
+  contributor_name: z.string().min(1).max(120).default("anonymous"),
+  edit_summary: z.string().max(500).optional(),
+});
+
+export const createCitationInputSchema = z.object({
+  wiki_page_id: uuidSchema,
+  url: z.string().url().nullable().optional(),
+  title: z.string().min(1).max(300),
+  image_data: z.string().nullable().optional(),
+  image_mime_type: z.string().nullable().optional(),
+});
+
+export const wikiPageQuerySchema = z.object({
+  target_type: z.enum(WIKI_TARGET_TYPES),
+  target_id: uuidSchema,
+});
+
 export const searchQuerySchema = z.object({
   q: z.string().min(1).max(200),
   type: z.enum(["system", "trail", "feature", "all"]).default("all"),

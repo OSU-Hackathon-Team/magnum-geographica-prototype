@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, ilike, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { systems, trailSystems, trails } from "../db/schema.js";
+import { systems, trailSystems, trails, features } from "../db/schema.js";
 import { createSystemInputSchema } from "@magnum/shared";
 
 export const systemsRoute = new Hono();
@@ -103,6 +103,34 @@ systemsRoute.get("/:id/trails", async (c) => {
     .from(trails)
     .innerJoin(trailSystems, eq(trailSystems.trailId, trails.id))
     .where(eq(trailSystems.systemId, id));
+
+  return c.json({ items, total: items.length });
+});
+
+systemsRoute.get("/:id/features", async (c) => {
+  const id = c.req.param("id");
+  const systemExists = await db
+    .select({ id: systems.id })
+    .from(systems)
+    .where(eq(systems.id, id))
+    .limit(1);
+  if (systemExists.length === 0) {
+    return c.json({ error: "not_found", message: `system ${id} not found` }, 404);
+  }
+
+  const items = await db
+    .select({
+      id: features.id,
+      name: features.name,
+      type_tag: features.typeTag,
+      description: features.description,
+      trail_id: features.trailId,
+      system_id: features.systemId,
+      created_at: features.createdAt,
+      updated_at: features.updatedAt,
+    })
+    .from(features)
+    .where(eq(features.systemId, id));
 
   return c.json({ items, total: items.length });
 });

@@ -7,6 +7,11 @@ import { searchRoute } from "./routes/search.js";
 import { seedRoute } from "./routes/seed.js";
 import { tilesRoute } from "./routes/tiles.js";
 import { featuresRoute } from "./routes/features.js";
+import { wikiRoute } from "./routes/wiki.js";
+import { citationsRoute } from "./routes/citations.js";
+import { revisionsRoute } from "./routes/revisions.js";
+import { offlineRoute } from "./routes/offline.js";
+import { syncRoute } from "./routes/sync.js";
 
 const app = new Hono();
 
@@ -19,6 +24,11 @@ app.route("/api/search", searchRoute);
 app.route("/api/seed", seedRoute);
 app.route("/api/tiles", tilesRoute);
 app.route("/api/features", featuresRoute);
+app.route("/api/wiki-pages", wikiRoute);
+app.route("/api/citations", citationsRoute);
+app.route("/api/revisions", revisionsRoute);
+app.route("/api/offline-packs", offlineRoute);
+app.route("/api/sync", syncRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));
 

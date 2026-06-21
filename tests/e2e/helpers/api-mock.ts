@@ -55,6 +55,10 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     },
   },
   {
+    pattern: /\/api\/systems\/([^/]+)\/features$/,
+    handler: () => ok({ items: [], total: 0 }),
+  },
+  {
     pattern: /\/api\/systems$/,
     handler: ({ query }) => {
       const q = query.q?.toLowerCase() ?? "";
@@ -109,6 +113,10 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
       const feature = id ? FEATURES[id] : undefined;
       return feature ? ok(feature) : notFound(`feature ${id} not found`);
     },
+  },
+  {
+    pattern: /\/api\/wiki-pages/,
+    handler: () => notFound("wiki page not found"),
   },
   {
     pattern: /\/api\/search$/,

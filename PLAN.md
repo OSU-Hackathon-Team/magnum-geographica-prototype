@@ -1258,6 +1258,38 @@ CMD ["bun", "run", "start"]
 - ~2GB RAM minimum (Postgres + PostGIS + Martin + API)
 - MBTiles can grow large; consider separate volume for generated packs
 
+### Android Build
+
+```bash
+# Prerequisites
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk  # Gradle 8.10.2 needs Java 21
+
+# First-time setup
+cd packages/app
+npx expo prebuild --platform android --clean
+
+# Build and install on emulator
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+npx expo run:android
+
+# Or just build the APK
+cd packages/app/android
+./gradlew app:assembleDebug -x lint -x test -PreactNativeArchitectures=x86_64
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# Metro dev server (for debug builds without embedded bundle)
+npx expo start --no-dev  # Bundler serves on port 8081
+adb reverse tcp:8081 tcp:8081  # Forward emulator -> host
+
+# Production release (embeds JS bundle)
+npx expo export --platform android  # Builds JS bundle into dist/
+npx expo run:android --variant release
+```
+
+Known issues:
+- Expo autolinker may generate `expo.core.ExpoModulesPackage` import instead of `expo.modules.ExpoModulesPackage` — create a delegating `expo/core/ExpoModulesPackage.java` wrapper class in the expo module's android source directory as a workaround.
+- Gradle needs Java 21 (OpenJDK 26+ not supported).
+
 ---
 
 ## 13. Data Sources & Ingestion
