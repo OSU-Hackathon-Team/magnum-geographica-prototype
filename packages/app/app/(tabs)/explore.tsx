@@ -1,21 +1,22 @@
-import { StyleSheet, Text, View } from "react-native";
-import { useEffect } from "react";
-import { useOfflineStore } from "../../src/stores/offlineStore";
+import { StyleSheet, View } from "react-native";
+import { MapContainer } from "@magnum/map";
 import { SearchBar } from "../../src/components/ui/SearchBar";
 
+const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
+
 export default function ExploreScreen() {
-  const isOnline = useOfflineStore((s) => s.isOnline);
-
-  useEffect(() => {
-    void isOnline;
-  }, [isOnline]);
-
   return (
     <View style={styles.container} testID="explore-screen">
       <SearchBar placeholder="Search trails, systems, features..." testID="explore-search" />
-      <View style={styles.mapPlaceholder} testID="explore-map">
-        <Text style={styles.mapText}>Map</Text>
-        <Text style={styles.mapHint}>Wired up in Phase 1 (OpenLayers + Martin tiles)</Text>
+      <View style={styles.mapContainer} testID="explore-map">
+        <MapContainer
+          config={{
+            baseTileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            martinTilesUrl: MARTIN_URL,
+            initialCenter: [-82.9988, 39.9612],
+            initialZoom: 6,
+          }}
+        />
       </View>
     </View>
   );
@@ -23,14 +24,5 @@ export default function ExploreScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-  mapPlaceholder: {
-    flex: 1,
-    margin: 16,
-    borderRadius: 12,
-    backgroundColor: "#e8e8e8",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mapText: { fontSize: 24, fontWeight: "600", color: "#555" },
-  mapHint: { fontSize: 12, color: "#888", marginTop: 8 },
+  mapContainer: { flex: 1 },
 });
