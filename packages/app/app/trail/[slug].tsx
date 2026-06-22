@@ -9,6 +9,7 @@ import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import {
   getTrailBySlug,
@@ -260,8 +261,8 @@ export default function TrailDetail() {
               >
                 <Card>
                   <View style={styles.row}>
+                    <FeatureTypeIcon type={f.type_tag} size={14} />
                     <Text style={styles.cardTitle}>{f.name}</Text>
-                    <Text style={styles.flag} testID={`trail-feature-type-${f.id}`}>{f.type_tag}</Text>
                   </View>
                   {f.description ? <Text style={styles.body}>{f.description}</Text> : null}
                 </Card>

@@ -15,6 +15,7 @@ import {
   getDownloadedSystemIds,
 } from "../../src/services/offlineDataService";
 import type { OfflineMapData } from "../../src/services/offlineDataService";
+import { Button } from "../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -53,6 +54,7 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [offlineData, setOfflineData] = useState<OfflineMapData | null>(null);
+  const [pendingPin, setPendingPin] = useState<{ lon: number; lat: number } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestRef = useRef(0);
 
@@ -177,6 +179,27 @@ export default function ExploreScreen() {
     setShowResults(false);
   }, []);
 
+  const handleMapClick = useCallback((lon: number, lat: number) => {
+    setPendingPin({ lon, lat });
+  }, []);
+
+  const handleAddFeature = useCallback(() => {
+    if (!pendingPin) return;
+    const { lon, lat } = pendingPin;
+    setPendingPin(null);
+    router.push(`/feature/create?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}` as never);
+  }, [pendingPin, router]);
+
+  const handleDismissPin = useCallback(() => {
+    setPendingPin(null);
+  }, []);
+
+  const handleAddFeatureAtCenter = useCallback(() => {
+    const center = mapCenter ?? [-82.9988, 39.9612];
+    const [lon, lat] = center;
+    router.push(`/feature/create?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}` as never);
+  }, [mapCenter, router]);
+
   const initialCenter = deepLink
     ? ([deepLink.lon, deepLink.lat] as [number, number])
     : mapCenter;
@@ -225,6 +248,7 @@ export default function ExploreScreen() {
             initialZoom,
           }}
           onFeatureSelect={handleFeatureSelect}
+          onClick={handleMapClick}
           flyTo={flyTo}
           offlineMode={!isOnline}
           offlineData={offlineData}
@@ -236,6 +260,30 @@ export default function ExploreScreen() {
           <Text style={styles.coordsText}>
             {deepLink.lat.toFixed(4)}, {deepLink.lon.toFixed(4)} · z{deepLink.zoom}
           </Text>
+        </View>
+      ) : null}
+
+      <Pressable
+        style={styles.addFeatureFab}
+        onPress={handleAddFeatureAtCenter}
+        testID="explore-add-feature"
+      >
+        <Text style={styles.addFeatureFabText}>+</Text>
+      </Pressable>
+
+      {pendingPin ? (
+        <View style={styles.pinBar} testID="explore-pin-bar">
+          <Text style={styles.pinText}>
+            {pendingPin.lat.toFixed(5)}, {pendingPin.lon.toFixed(5)}
+          </Text>
+          <View style={styles.pinActions}>
+            <Button variant="ghost" size="small" onPress={handleDismissPin} testID="explore-pin-cancel">
+              Cancel
+            </Button>
+            <Button variant="primary" size="small" onPress={handleAddFeature} testID="explore-pin-add">
+              Add Feature
+            </Button>
+          </View>
         </View>
       ) : null}
     </View>
@@ -267,4 +315,40 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   coordsText: { color: "#fff", fontSize: 12 },
+  pinBar: {
+    position: "absolute",
+    bottom: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  pinText: { fontSize: 13, color: "#333", fontFamily: "monospace" },
+  pinActions: { flexDirection: "row", gap: 8 },
+  addFeatureFab: {
+    position: "absolute",
+    bottom: 80,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#22c55e",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  addFeatureFabText: { fontSize: 24, color: "#fff", lineHeight: 28 },
 });

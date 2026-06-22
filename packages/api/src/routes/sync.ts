@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, desc, sql, gt } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { wikiPages, revisions } from "../db/schema.js";
+import { wikiPages, revisions, features } from "../db/schema.js";
 
 export const syncRoute = new Hono();
 
@@ -85,6 +85,45 @@ syncRoute.post("/contributions", async (c) => {
           } else {
             results.push({ local_id: localId, status: "synced", server_id: entityId });
           }
+        } else {
+          results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
+        }
+      } else if (contrib.entity_type === "feature") {
+        if (contrib.action === "create") {
+          const data = contrib.payload as { name: string; type_tag: string; description?: string; point: { coordinates: [number, number] }; system_id?: string; trail_id?: string };
+          const [lon, lat] = data.point?.coordinates ?? [null, null];
+          if (!lon || !lat) {
+            results.push({ local_id: localId, status: "error" });
+            continue;
+          }
+          const rows = await db
+            .insert(features)
+            .values({
+              name: data.name,
+              typeTag: data.type_tag,
+              point: sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)`,
+              description: data.description ?? null,
+              systemId: data.system_id ?? null,
+              trailId: data.trail_id ?? null,
+            })
+            .returning();
+          if (rows[0]) {
+            results.push({ local_id: localId, status: "synced", server_id: rows[0].id });
+          } else {
+            results.push({ local_id: localId, status: "error" });
+          }
+        } else if (contrib.action === "update" && contrib.entity_id) {
+          const entityId = contrib.entity_id as string;
+          const data = contrib.payload as { name?: string; type_tag?: string; description?: string };
+          const updates: Record<string, unknown> = { updatedAt: sql`now()` };
+          if (data.name) (updates as Record<string, string | null>).name = data.name;
+          if (data.type_tag) (updates as Record<string, string | null>).typeTag = data.type_tag;
+          if (data.description !== undefined) (updates as Record<string, string | null>).description = data.description || null;
+          await db
+            .update(features)
+            .set(updates as Parameters<typeof db.update>[1])
+            .where(eq(features.id, entityId));
+          results.push({ local_id: localId, status: "synced", server_id: entityId });
         } else {
           results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
         }

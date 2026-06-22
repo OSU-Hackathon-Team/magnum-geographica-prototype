@@ -12,6 +12,7 @@ import { citationsRoute } from "./routes/citations.js";
 import { revisionsRoute } from "./routes/revisions.js";
 import { offlineRoute } from "./routes/offline.js";
 import { syncRoute } from "./routes/sync.js";
+import { mediaRoute } from "./routes/media.js";
 
 const app = new Hono();
 
@@ -29,6 +30,7 @@ app.route("/api/citations", citationsRoute);
 app.route("/api/revisions", revisionsRoute);
 app.route("/api/offline-packs", offlineRoute);
 app.route("/api/sync", syncRoute);
+app.route("/api/media", mediaRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));
 
