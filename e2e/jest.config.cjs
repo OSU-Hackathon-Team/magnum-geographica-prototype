@@ -7,7 +7,7 @@ module.exports = {
   globalSetup: "detox/runners/jest/globalSetup",
   globalTeardown: "detox/runners/jest/globalTeardown",
   testEnvironment: "detox/runners/jest/testEnvironment",
-  setupFilesAfterFramework: ["./e2e/setup.cjs"],
+  setupFilesAfterEnv: ["./e2e/setup.cjs"],
   reporters: ["detox/runners/jest/reporter"],
   verbose: true,
 };

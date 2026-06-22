@@ -1,4 +1,4 @@
-const { expectVisible, tapByTestID, waitForScreen } = require("../helpers/test-utils.cjs");
+const { expectVisible, expectExists, scrollToTestID, tapByTestID, waitForScreen } = require("../helpers/test-utils.cjs");
 
 describe("Browse Systems and Trails", () => {
   beforeEach(async () => {
@@ -24,6 +24,7 @@ describe("Browse Systems and Trails", () => {
     await waitForScreen("systems-screen");
     await element(by.id("system-card-hocking-hills-state-park")).tap();
     await waitForScreen("system-detail-screen");
+    await scrollToTestID("system-trails", "system-detail-screen");
     await expectVisible("system-trails");
   });
 
@@ -36,3 +37,4 @@ describe("Browse Systems and Trails", () => {
     await waitForScreen("systems-screen");
   });
 });
+

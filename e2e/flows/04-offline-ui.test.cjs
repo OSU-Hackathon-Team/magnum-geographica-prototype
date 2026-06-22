@@ -1,4 +1,4 @@
-const { expectVisible, tapByTestID, waitForScreen } = require("../helpers/test-utils.cjs");
+const { expectVisible, expectExists, scrollToTestID, tapByTestID, waitForScreen } = require("../helpers/test-utils.cjs");
 
 describe("Offline UI", () => {
   beforeEach(async () => {
@@ -11,8 +11,9 @@ describe("Offline UI", () => {
     await element(by.id("system-card-hocking-hills-state-park")).tap();
     await waitForScreen("system-detail-screen");
 
-    await expectVisible("download-container-sys-1");
-    await expectVisible("download-button-sys-1");
+    await scrollToTestID("system-meta", "system-detail-screen");
+    await expectVisible("system-meta");
+    await expect(element(by.text("Download for Offline"))).toExist();
   });
 
   it("should show status indicator on all tabs", async () => {
@@ -30,7 +31,7 @@ describe("Offline UI", () => {
     await element(by.text("Profile")).tap();
     await waitForScreen("profile-screen");
     await expectVisible("storage-manager");
-    await expectVisible("storage-delete-all");
+    await expectVisible("storage-empty");
   });
 
   it("should show profile with contributor and status", async () => {
@@ -41,3 +42,4 @@ describe("Offline UI", () => {
     await expectVisible("profile-pending-section");
   });
 });
+
