@@ -5,6 +5,8 @@ import { createMagnumClient } from "@magnum/shared";
 import { SearchBar } from "../../src/components/ui/SearchBar";
 import { Card } from "../../src/components/ui/Card";
 import type { System } from "@magnum/shared";
+import { useOfflineStore } from "../../src/stores/offlineStore";
+import { getAllDownloadedSystems } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -13,8 +15,29 @@ export default function SystemsScreen() {
   const [items, setItems] = useState<System[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
+  const isOnline = useOfflineStore((s) => s.isOnline);
 
   useEffect(() => {
+    if (!isOnline) {
+      void getAllDownloadedSystems().then((rows) =>
+        setItems(
+          rows.map((r) => ({
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: r.description ? String(r.description) : null,
+            boundary: null,
+            ownership_source: null,
+            source_date: null,
+            external_url: null,
+            created_at: "",
+            updated_at: "",
+          })),
+        ),
+      );
+      setLoading(false);
+      return;
+    }
     const client = createMagnumClient(API_URL);
     setLoading(true);
     client
@@ -22,7 +45,7 @@ export default function SystemsScreen() {
       .then((res) => setItems(res.items))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }, [q]);
+  }, [q, isOnline]);
 
   return (
     <View style={styles.container} testID="systems-screen">

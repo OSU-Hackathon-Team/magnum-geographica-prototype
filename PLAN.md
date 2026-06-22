@@ -1289,6 +1289,7 @@ npx expo run:android --variant release
 Known issues:
 - Expo autolinker may generate `expo.core.ExpoModulesPackage` import instead of `expo.modules.ExpoModulesPackage` — create a delegating `expo/core/ExpoModulesPackage.java` wrapper class in the expo module's android source directory as a workaround.
 - Gradle needs Java 21 (OpenJDK 26+ not supported).
+- If you start an emulator via the back_background tool, leave OUT the timeout param. This way the default timeout of 'infinity' is chosen
 
 ---
 
@@ -1799,3 +1800,171 @@ magnum/
 
 *Last updated: 2026-06-21*
 *Phase 0 starts with: monorepo scaffold, Docker Compose, DB schema, API skeleton, RN app shell.*
+
+---
+
+## 20. DevOps & Agent Workflow
+
+This section describes the development workflow for agents (and humans) to quickly iterate on the app.
+
+### 20.1 Quick Start
+
+```bash
+# 1. Start backend (Postgres + Martin + API)
+docker compose -f docker/docker-compose.yml up -d
+cd packages/api && bun run dev  # API on :3000 with hot-reload
+
+# 2. Start Metro bundler (in separate terminal)
+cd packages/app
+EXPO_PUBLIC_API_URL=http://localhost:3000 \
+EXPO_PUBLIC_MARTIN_URL=http://localhost:3001 \
+  npx expo start --dev-client --port 8081
+
+# 3. Start emulator (in separate terminal)
+$ANDROID_HOME/emulator/emulator -avd test_device -no-audio -no-window -gpu swiftshader_indirect -no-snapshot -memory 1536
+
+# 4. Port forwarding (run once per emulator boot)
+adb reverse tcp:8081 tcp:8081   # Metro
+adb reverse tcp:3000 tcp:3000   # API
+```
+
+### 20.2 Dev Scripts
+
+```bash
+# Start full dev environment
+./scripts/dev-start.sh --all
+
+# Build APK and install on connected emulator
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+./scripts/dev-build-android.sh
+
+# Build release APK
+./scripts/dev-build-android.sh --release
+```
+
+### 20.3 Fast Edit Cycle (JS/TS changes only)
+
+When only editing JS/TS code (no native changes):
+
+1. **Start Metro** — `cd packages/app && npx expo start --dev-client --port 8081`
+2. **Ensure app has debug APK installed** — `./scripts/dev-build-android.sh`
+3. **Launch app on emulator** — `adb shell am start -n org.magnum.app/.MainActivity`
+4. **Edit code** — Save file → Metro detects change → App reloads automatically
+5. **See errors** — `adb logcat -s ReactNativeJS:V AndroidRuntime:E`
+
+**No rebuild needed for JS/TS edits!** Metro's fast refresh handles it.
+
+### 20.4 When Rebuild IS Required
+
+Rebuild the APK only when:
+- Adding/removing native dependencies (`bun add`/`bun remove` anything with native code)
+- Changing `app.json` or Expo config
+- Adding new native asset files (images, fonts in `assets/`)
+- After `bun install` that changes native module versions
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+cd packages/app/android
+./gradlew app:assembleDebug -x lint -x test -PreactNativeArchitectures=x86_64
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+### 20.5 Viewing Device Logs
+
+```bash
+# JS console logs + errors
+adb logcat -s ReactNativeJS:V
+
+# Full Android logs (crash info)
+adb logcat AndroidRuntime:E *:S
+
+# Clear and watch
+adb logcat -c && adb logcat -s ReactNativeJS:V
+```
+
+### 20.6 Common Issues
+
+**Build fails with "Plugin [id: 'expo-module-gradle-plugin'] was not found"**
+- This happens when Bun's nested node_modules layout confuses Gradle
+- The `expo-module-gradle-plugin` npm package is an empty placeholder — remove it if installed
+- For expo modules using the new plugin format, convert them to use `apply plugin: 'com.android.library'` + manual `ExpoModulesCorePlugin.gradle` application
+- Or use `npx expo install expo-sqlite@~15.0.0` to get SDK 52 compatible versions
+
+**Build fails with Kotlin compilation errors (Unresolved reference: NativeArrayBuffer etc.)**
+- Version mismatch: package is for a newer Expo SDK than 52
+- Install compatible version: `bun add expo-sqlite@~15.0.0`
+
+**Bun install breaks the Android build**
+- Bun uses a nested `node_modules/.bun/` structure that Gradle can't resolve
+- If the build breaks after `bun install`, try running `npx expo prebuild --platform android --clean` first
+- If `expo-modules-core` isn't resolvable, manually symlink it:
+  ```bash
+  cd packages/app/node_modules
+  ln -sf ../../../node_modules/.bun/expo-modules-core@2.2.3/node_modules/expo-modules-core expo-modules-core
+  ```
+
+**Emulator not found by adb**
+```bash
+adb kill-server && adb start-server
+adb devices  # should show emulator-5554
+```
+
+**Metro port already in use**
+```bash
+lsof -i :8081 | grep LISTEN | awk '{print $2}' | xargs kill
+```
+
+### 20.7 API Development
+
+```bash
+# API hot-reloads on file changes
+cd packages/api && bun run dev
+
+# Run API tests
+cd packages/api && bun test
+
+# Seed test data (requires admin secret)
+curl -X POST http://localhost:3000/api/seed \
+  -H "x-admin-secret: dev-secret-change-me"
+
+# Run DB migration
+cd packages/api && bun run db:migrate
+```
+
+### 20.8 Environment Variables
+
+Copy `.env.example` to `.env` and customize:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_HOST` | localhost | PostgreSQL host |
+| `DB_NAME` | magnum | Database name |
+| `DB_USER` | magnum | Database user |
+| `DB_PASSWORD` | changeme | Database password |
+| `MARTIN_URL` | http://localhost:3001 | Martin tile server |
+| `EXPO_PUBLIC_API_URL` | http://localhost:3000 | API URL (exposed to app) |
+| `EXPO_PUBLIC_MARTIN_URL` | http://localhost:3001 | Martin URL (exposed to app) |
+| `ADMIN_SECRET` | dev-secret-change-me | Admin header secret |
+
+**IMPORTANT**: `EXPO_PUBLIC_*` variables are inlined at BUILD TIME. If you change them, you must rebuild the APK.
+
+For Metro dev server, set them when starting:
+```bash
+EXPO_PUBLIC_API_URL=http://localhost:3000 npx expo start --dev-client --port 8081
+```
+
+### 20.9 Testing Mobile App
+
+```bash
+# For JS changes: no rebuild needed, Metro live reloads
+# For native changes: rebuild APK
+
+# Take screenshot
+adb exec-out screencap -p > screenshot.png
+
+# Check app process
+adb shell ps | grep magnum
+
+# Force stop app
+adb shell am force-stop org.magnum.app
+```

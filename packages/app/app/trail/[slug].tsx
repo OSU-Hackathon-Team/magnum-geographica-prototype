@@ -9,6 +9,13 @@ import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { useOfflineStore } from "../../src/stores/offlineStore";
+import {
+  getTrailBySlug,
+  getTrailSegments,
+  getTrailFeatures,
+  getWikiPage as getLocalWikiPage,
+} from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -36,9 +43,85 @@ export default function TrailDetail() {
   const [features, setFeatures] = useState<Feature[]>([]);
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isOnline = useOfflineStore((s) => s.isOnline);
 
   useEffect(() => {
     if (!slug || typeof slug !== "string") return;
+
+    if (!isOnline) {
+      const loadOffline = async () => {
+        const localTrail = await getTrailBySlug(slug);
+        if (!localTrail) {
+          setError("Trail not downloaded for offline use");
+          return;
+        }
+        const trailId = String(localTrail.id);
+        setTrail({
+          id: trailId,
+          name: String(localTrail.name),
+          slug: String(localTrail.slug),
+          description: localTrail.description ? String(localTrail.description) : null,
+          difficulty: localTrail.difficulty as Trail["difficulty"],
+          length_meters: localTrail.length_meters ? Number(localTrail.length_meters) : null,
+          elevation_gain_meters: localTrail.elevation_gain_meters ? Number(localTrail.elevation_gain_meters) : null,
+          geometry: null,
+          created_at: "",
+          updated_at: "",
+          verified: Boolean(localTrail.verified),
+        });
+        const [localSegs, localFeats, localWiki] = await Promise.all([
+          getTrailSegments(trailId),
+          getTrailFeatures(trailId),
+          getLocalWikiPage("trail", trailId),
+        ]);
+        setSegments(
+          localSegs.map((s) => ({
+            id: String(s.id),
+            trail_id: trailId,
+            name: s.name ? String(s.name) : null,
+            geometry: null,
+            sort_order: Number(s.sort_order ?? 0),
+            surface_type: s.surface_type ? String(s.surface_type) as TrailSegment["surface_type"] : null,
+            hazards: (() => { try { return JSON.parse(String(s.hazards ?? "[]")); } catch { return []; } })(),
+            is_road_connector: Boolean(s.is_road_connector),
+            steep_grade: Boolean(s.steep_grade),
+            one_way: Boolean(s.one_way),
+            description: s.description ? String(s.description) : null,
+            length_meters: s.length_meters ? Number(s.length_meters) : null,
+            created_at: "",
+            updated_at: "",
+          })),
+        );
+        setFeatures(
+          localFeats.map((f) => ({
+            id: String(f.id),
+            name: String(f.name),
+            type_tag: String(f.type_tag) as Feature["type_tag"],
+            point: f.lon != null && f.lat != null ? { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] } : null,
+            description: f.description ? String(f.description) : null,
+            trail_id: f.trail_id ? String(f.trail_id) : null,
+            system_id: f.system_id ? String(f.system_id) : null,
+            created_at: "",
+            updated_at: "",
+          })),
+        );
+        if (localWiki) {
+          setWikiPage({
+            id: String(localWiki.id),
+            target_type: "trail",
+            target_id: trailId,
+            title: String(localWiki.title),
+            content_md: String(localWiki.content_md),
+            rendered_html: "",
+            created_at: String(localWiki.updated_at),
+            updated_at: String(localWiki.updated_at),
+          });
+        }
+      };
+      void loadOffline();
+      return;
+    }
+
     const client = createMagnumClient(API_URL);
     client
       .getTrailBySlug(slug)
@@ -54,7 +137,7 @@ export default function TrailDetail() {
         if (wiki) setWikiPage(wiki as WikiPage);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
-  }, [slug]);
+  }, [slug, isOnline]);
 
   if (error) {
     return (

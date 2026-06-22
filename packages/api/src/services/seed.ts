@@ -148,7 +148,7 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
         VALUES ${sql.join(
           OHIO_SYSTEMS.map(
             (s) =>
-              sql`(${s.name}, ${s.slug}, ${s.description}, ${s.externalUrl}, 'ODNR / NPS / USFS', DATE '2024-01-01', ST_Multi(ST_GeomFromText(${OHIO_BBOX}, 4326)))`,
+              sql`(${s.name}, ${s.slug}, ${s.description}, ${s.externalUrl}, 'ODNR / NPS / USFS', DATE '2024-01-01', ST_Multi(ST_GeomFromText('${sql.raw(OHIO_BBOX)}', 4326))::geometry(MultiPolygon,4326))`,
           ),
           sql.raw(", "),
         )}
@@ -170,7 +170,7 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
         VALUES ${sql.join(
           OHIO_TRAILS.map(
             (t) =>
-              sql`(${t.name}, ${t.slug}, ${t.description}, ${t.difficulty}, ${t.lengthMeters}, ${t.elevationGainMeters}, TRUE, ST_Multi(ST_GeomFromText('MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))', 4326)))`,
+              sql`(${t.name}, ${t.slug}, ${t.description}, ${t.difficulty}, ${t.lengthMeters}, ${t.elevationGainMeters}, TRUE, ST_Multi(ST_GeomFromText('${sql.raw(`MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))`)}', 4326))::geometry(MultiLineString,4326))`,
           ),
           sql.raw(", "),
         )}
@@ -193,7 +193,7 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
     await database.execute(
       sql`INSERT INTO trail_segments (trail_id, name, sort_order, surface_type, geometry)
           SELECT ${trail.id}, 'Main segment', 0, 'natural',
-                  ST_Multi(ST_GeomFromText('MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))', 4326))
+                  ST_Multi(ST_GeomFromText('${sql.raw(`MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))`)}', 4326))::geometry(MultiLineString,4326)
           WHERE NOT EXISTS (SELECT 1 FROM trail_segments WHERE trail_id = ${trail.id} AND sort_order = 0)`,
     );
     result.segments += 1;
@@ -206,7 +206,7 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
       await database.execute(
         sql`INSERT INTO features (name, type_tag, system_id, description, point)
             SELECT ${f.name}, ${f.typeTag}, ${sys.id}, ${f.description ?? null},
-                   ST_SetSRID(ST_MakePoint(${coords.lon}, ${coords.lat}), 4326)
+                   ST_SetSRID(ST_MakePoint(${coords.lon}, ${coords.lat}), 4326)::geometry(Point,4326)
             WHERE NOT EXISTS (SELECT 1 FROM features WHERE name = ${f.name} AND system_id = ${sys.id})`,
       );
       result.features += 1;

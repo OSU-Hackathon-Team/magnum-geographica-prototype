@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Button } from "../ui/Button";
 
 export interface PendingItem {
@@ -29,6 +30,8 @@ function formatDate(iso: string): string {
 }
 
 export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQueueProps) {
+  const router = useRouter();
+
   if (items.length === 0) {
     return (
       <View style={styles.container} testID="pending-queue-empty">
@@ -60,7 +63,19 @@ export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQue
               {item.contributor_name} · {formatDate(item.created_at)}
             </Text>
             {item.sync_status === "conflict" ? (
-              <Text style={styles.conflict}>Conflict — needs resolution</Text>
+              <View style={styles.conflictRow}>
+                <Text style={styles.conflict}>Conflict — needs resolution</Text>
+                <Button
+                  variant="primary"
+                  size="small"
+                  onPress={() =>
+                    router.push(`/conflict/${item.id}` as never)
+                  }
+                  testID={`pending-resolve-${item.id}`}
+                >
+                  Resolve
+                </Button>
+              </View>
             ) : null}
           </View>
           <Button variant="ghost" size="small" onPress={() => onDelete(item.id)} testID={`pending-delete-${item.id}`}>
@@ -99,4 +114,5 @@ const styles = StyleSheet.create({
   entityType: { fontSize: 12, color: "#666" },
   meta: { fontSize: 11, color: "#999" },
   conflict: { fontSize: 11, color: "#ef4444" },
+  conflictRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
 });

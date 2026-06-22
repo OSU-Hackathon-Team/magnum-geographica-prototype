@@ -5,6 +5,7 @@ import {
   markContributionSynced,
   markContributionConflict,
   getPendingCount,
+  type PendingContributionRow,
 } from "./offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -18,7 +19,8 @@ export async function syncContributions(contributorName: string): Promise<{ sync
   let synced = 0;
   let conflicts = 0;
 
-  const payload = pending.map((p) => ({
+  const payload = pending.map((p: PendingContributionRow) => ({
+    local_id: p.id,
     entity_type: p.entity_type,
     entity_id: p.entity_id,
     action: p.action,
@@ -32,7 +34,7 @@ export async function syncContributions(contributorName: string): Promise<{ sync
     }>("POST", "/api/sync/contributions", { body: { contributions: payload } });
 
     for (const result of response.results) {
-      const local = pending.find((p) => p.id === result.local_id);
+      const local = pending.find((p: PendingContributionRow) => p.id === result.local_id);
       if (!local) continue;
 
       if (result.status === "synced" && result.server_id) {

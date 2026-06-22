@@ -17,6 +17,10 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.setFeatures(${json});`;
     case "highlightTrail":
       return `window.olBridge.highlightTrail(${json});`;
+    case "setOfflineMode":
+      return `window.olBridge.setOfflineMode(${json});`;
+    case "setOfflineData":
+      return `window.olBridge.setOfflineData(${json});`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -34,6 +38,8 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "setSystems",
     "setFeatures",
     "highlightTrail",
+    "setOfflineMode",
+    "setOfflineData",
   ].includes(method);
 }
 

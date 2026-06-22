@@ -6,6 +6,8 @@ import { SearchBar } from "../../src/components/ui/SearchBar";
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import type { Trail } from "@magnum/shared";
+import { useOfflineStore } from "../../src/stores/offlineStore";
+import { getAllDownloadedTrails } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -13,14 +15,38 @@ export default function TrailsScreen() {
   const router = useRouter();
   const [items, setItems] = useState<Trail[]>([]);
   const [q, setQ] = useState("");
+  const isOnline = useOfflineStore((s) => s.isOnline);
 
   useEffect(() => {
+    if (!isOnline) {
+      void getAllDownloadedTrails().then((rows) => {
+        const filtered = q
+          ? rows.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
+          : rows;
+        setItems(
+          filtered.map((r) => ({
+            id: r.id,
+            name: r.name,
+            slug: r.slug,
+            description: r.description,
+            difficulty: r.difficulty as Trail["difficulty"],
+            length_meters: r.length_meters,
+            elevation_gain_meters: r.elevation_gain_meters,
+            geometry: null,
+            created_at: "",
+            updated_at: "",
+            verified: Boolean(r.verified),
+          })),
+        );
+      });
+      return;
+    }
     const client = createMagnumClient(API_URL);
     client
       .listTrails({ q: q || undefined })
       .then((res) => setItems(res.items))
       .catch(() => setItems([]));
-  }, [q]);
+  }, [q, isOnline]);
 
   return (
     <View style={styles.container} testID="trails-screen">

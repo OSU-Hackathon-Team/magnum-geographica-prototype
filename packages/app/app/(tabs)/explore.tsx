@@ -9,6 +9,12 @@ import {
   type SearchResults,
 } from "../../src/components/ui/SearchResultsDropdown";
 import { useMapStore } from "../../src/stores/mapStore";
+import { useOfflineStore } from "../../src/stores/offlineStore";
+import {
+  loadOfflineMapData,
+  getDownloadedSystemIds,
+} from "../../src/services/offlineDataService";
+import type { OfflineMapData } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -39,11 +45,14 @@ export default function ExploreScreen() {
   const params = useLocalSearchParams<{ lat?: string; lon?: string; zoom?: string }>();
   const mapCenter = useMapStore((s) => s.center);
   const mapZoom = useMapStore((s) => s.zoom);
+  const isOnline = useOfflineStore((s) => s.isOnline);
+  const downloadedPacks = useOfflineStore((s) => s.downloadedPacks);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [offlineData, setOfflineData] = useState<OfflineMapData | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestRef = useRef(0);
 
@@ -52,6 +61,36 @@ export default function ExploreScreen() {
     () => (deepLink ? { lon: deepLink.lon, lat: deepLink.lat, zoom: deepLink.zoom } : null),
     [deepLink],
   );
+
+  // Load offline map data when offline with downloaded packs
+  useEffect(() => {
+    if (isOnline || downloadedPacks.length === 0) {
+      setOfflineData(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const ids = await getDownloadedSystemIds();
+      if (ids.length === 0 || cancelled) return;
+      const data = await loadOfflineMapData(ids[0]);
+      if (!cancelled) setOfflineData(data);
+    })();
+    return () => { cancelled = true };
+  }, [isOnline, downloadedPacks]);
+
+  // Search offline when disconnected
+  useEffect(() => {
+    if (isOnline || !query || query.length < MIN_QUERY_LENGTH) {
+      if (!isOnline && !query) {
+        setResults(null);
+        setLoading(false);
+      }
+      return;
+    }
+    // For offline, search is limited; clear online results
+    setResults(null);
+    setLoading(false);
+  }, [isOnline, query]);
 
   useEffect(() => {
     if (!query || query.length < MIN_QUERY_LENGTH) {
@@ -187,6 +226,8 @@ export default function ExploreScreen() {
           }}
           onFeatureSelect={handleFeatureSelect}
           flyTo={flyTo}
+          offlineMode={!isOnline}
+          offlineData={offlineData}
         />
       </View>
 

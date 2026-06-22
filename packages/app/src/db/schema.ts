@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const OFFLINE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -123,14 +123,6 @@ CREATE TABLE IF NOT EXISTS pending_contributions (
   sync_status TEXT NOT NULL DEFAULT 'pending',
   server_id TEXT,
   conflict_revision_id TEXT
-);
-
-CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(
-  name,
-  type,
-  description,
-  content='',
-  tokenize='porter unicode61'
 );
 
 CREATE INDEX IF NOT EXISTS idx_offline_systems_slug ON systems(slug);

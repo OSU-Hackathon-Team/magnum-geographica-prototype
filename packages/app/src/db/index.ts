@@ -9,7 +9,32 @@ export interface OfflineDatabase {
   close(): void;
 }
 
+type OpSqliteScalar = string | number | boolean | null | Uint8Array;
+
+function toOpSqliteParams(params: unknown[]): OpSqliteScalar[] {
+  return params.map((p): OpSqliteScalar => {
+    if (p === null || p === undefined) return null;
+    if (typeof p === "string" || typeof p === "number" || typeof p === "boolean") {
+      return p;
+    }
+    if (p instanceof Uint8Array) return p;
+    return String(p);
+  });
+}
+
+function normalizeRows(rows: Array<Record<string, unknown>> | undefined): SQLResult {
+  if (!rows) return [];
+  return rows.map((r) => {
+    const obj: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(r)) {
+      obj[k] = v;
+    }
+    return obj;
+  });
+}
+
 let dbInstance: OfflineDatabase | null = null;
+let initPromise: Promise<OfflineDatabase> | null = null;
 
 async function initOpSqlite(): Promise<OfflineDatabase> {
   const { open } = await import("@op-engineering/op-sqlite");
@@ -20,38 +45,12 @@ async function initOpSqlite(): Promise<OfflineDatabase> {
 
   return {
     async exec(sql: string, params: unknown[] = []) {
-      const result = db.execute(sql, params);
-      if (!result.rows) return [];
-      const columns = result.rows._array?.length
-        ? Object.keys(result.rows.item(0))
-        : [];
-      const rows: SQLResult = [];
-      for (let i = 0; i < (result.rows.length ?? 0); i++) {
-        const row = result.rows.item(i);
-        const obj: Record<string, unknown> = {};
-        for (const col of columns) {
-          obj[col] = row[col];
-        }
-        rows.push(obj);
-      }
-      return rows;
+      const result = await db.execute(sql, toOpSqliteParams(params));
+      return normalizeRows(result.rows as Array<Record<string, unknown>> | undefined);
     },
     async execRaw(sql: string, params: unknown[] = []) {
-      const result = db.execute(sql, params);
-      if (!result.rows) return [];
-      const columns = result.rows._array?.length
-        ? Object.keys(result.rows.item(0))
-        : [];
-      const rows: SQLResult = [];
-      for (let i = 0; i < (result.rows.length ?? 0); i++) {
-        const row = result.rows.item(i);
-        const obj: Record<string, unknown> = {};
-        for (const col of columns) {
-          obj[col] = row[col];
-        }
-        rows.push(obj);
-      }
-      return rows;
+      const result = await db.execute(sql, toOpSqliteParams(params));
+      return normalizeRows(result.rows as Array<Record<string, unknown>> | undefined);
     },
     close() {
       db.close();
@@ -69,60 +68,76 @@ async function initExpoSqlite(): Promise<OfflineDatabase> {
   return {
     async exec(sql: string, params: unknown[] = []) {
       if (sql.trim().toUpperCase().startsWith("SELECT")) {
-        const rows = await db.getAllAsync(sql, ...(params as []));
+        const rows = await db.getAllAsync(sql, ...(params as never[]));
         return rows as SQLResult;
       }
-      await db.runAsync(sql, ...(params as []));
+      await db.runAsync(sql, ...(params as never[]));
       return [];
     },
-    async execRaw(sql: string, params: unknown[] = []) {
-      if (sql.trim().toUpperCase().startsWith("SELECT")) {
-        const rows = await db.getAllAsync(sql, ...(params as []));
-        return rows as SQLResult;
-      }
-      await db.runAsync(sql, ...(params as []));
+    async execRaw(_sql: string, _params: unknown[] = []) {
       return [];
     },
     close() {
-      db.closeAsync();
+      void db.closeAsync();
     },
   };
 }
 
-export async function getOfflineDb(): Promise<OfflineDatabase> {
-  if (dbInstance) return dbInstance;
-
+async function initDatabase(): Promise<OfflineDatabase> {
+  let db: OfflineDatabase;
   if (Platform.OS === "android") {
-    dbInstance = await initOpSqlite();
+    db = await initOpSqlite();
   } else {
-    dbInstance = await initExpoSqlite();
+    db = await initExpoSqlite();
   }
 
-  await dbInstance.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");
-  const versionRows = await dbInstance.exec("SELECT version FROM schema_version LIMIT 1");
+  await db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");
+  const versionRows = await db.exec("SELECT version FROM schema_version LIMIT 1");
   const currentVersion = versionRows[0] ? Number(versionRows[0].version) : 0;
 
   if (currentVersion < SCHEMA_VERSION) {
-    const statements = OFFLINE_SCHEMA_SQL
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    for (const stmt of statements) {
-      await dbInstance.exec(stmt);
-    }
-    if (currentVersion === 0) {
-      await dbInstance.exec("INSERT INTO schema_version (version) VALUES (?)", [SCHEMA_VERSION]);
-    } else {
-      await dbInstance.exec("UPDATE schema_version SET version = ?", [SCHEMA_VERSION]);
+    await db.exec("BEGIN TRANSACTION");
+    try {
+      const statements = OFFLINE_SCHEMA_SQL
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (const stmt of statements) {
+        await db.exec(stmt);
+      }
+      if (currentVersion === 0) {
+        await db.exec("INSERT INTO schema_version (version) VALUES (?)", [SCHEMA_VERSION]);
+      } else {
+        await db.exec("UPDATE schema_version SET version = ?", [SCHEMA_VERSION]);
+      }
+      await db.exec("COMMIT");
+    } catch (e) {
+      await db.exec("ROLLBACK");
+      throw e;
     }
   }
 
-  return dbInstance;
+  return db;
+}
+
+export async function getOfflineDb(): Promise<OfflineDatabase> {
+  if (initPromise) return initPromise;
+
+  initPromise = initDatabase().then((db) => {
+    dbInstance = db;
+    return db;
+  }).catch((e) => {
+    initPromise = null;
+    throw e;
+  });
+
+  return initPromise;
 }
 
 export function closeOfflineDb() {
   if (dbInstance) {
     dbInstance.close();
     dbInstance = null;
+    initPromise = null;
   }
 }

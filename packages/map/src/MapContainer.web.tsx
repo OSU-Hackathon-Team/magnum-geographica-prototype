@@ -28,7 +28,7 @@ function readStringId(value: unknown): string | null {
   return null;
 }
 
-export default function MapContainer({ config, onReady, onClick, onFeatureSelect, flyTo }: MapContainerProps) {
+export default function MapContainer({ config, onReady, onClick, onFeatureSelect, flyTo, offlineMode: _offlineMode, offlineData: _offlineData, onMapRef: _onMapRef }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const onReadyRef = useRef(onReady);

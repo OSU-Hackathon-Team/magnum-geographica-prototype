@@ -16,4 +16,11 @@ export interface MapContainerProps {
     name?: string | null;
   }) => void;
   flyTo?: { lon: number; lat: number; zoom?: number } | null;
+  offlineMode?: boolean;
+  offlineData?: {
+    trails?: unknown;
+    systems?: unknown;
+    features?: unknown;
+  } | null;
+  onMapRef?: (send: (cmd: { method: string; args: unknown }) => void) => void;
 }

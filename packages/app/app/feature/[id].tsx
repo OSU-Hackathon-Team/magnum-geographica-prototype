@@ -4,6 +4,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { createMagnumClient, type Feature, type WikiPage } from "@magnum/shared";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { useOfflineStore } from "../../src/stores/offlineStore";
+import {
+  getFeatureById,
+  getWikiPage as getLocalWikiPage,
+} from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -13,9 +18,47 @@ export default function FeatureDetail() {
   const [feature, setFeature] = useState<Feature | null>(null);
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isOnline = useOfflineStore((s) => s.isOnline);
 
   useEffect(() => {
     if (!id || typeof id !== "string") return;
+
+    if (!isOnline) {
+      const loadOffline = async () => {
+        const local = await getFeatureById(id);
+        if (!local) {
+          setError("Feature not downloaded for offline use");
+          return;
+        }
+        setFeature({
+          id: String(local.id),
+          name: String(local.name),
+          type_tag: String(local.type_tag) as Feature["type_tag"],
+          point: local.lon != null && local.lat != null ? { type: "Point", coordinates: [Number(local.lon), Number(local.lat)] } : null,
+          description: local.description ? String(local.description) : null,
+          trail_id: local.trail_id ? String(local.trail_id) : null,
+          system_id: local.system_id ? String(local.system_id) : null,
+          created_at: "",
+          updated_at: "",
+        });
+        const localWiki = await getLocalWikiPage("feature", id);
+        if (localWiki) {
+          setWikiPage({
+            id: String(localWiki.id),
+            target_type: "feature",
+            target_id: id,
+            title: String(localWiki.title),
+            content_md: String(localWiki.content_md),
+            rendered_html: "",
+            created_at: String(localWiki.updated_at),
+            updated_at: String(localWiki.updated_at),
+          });
+        }
+      };
+      void loadOffline();
+      return;
+    }
+
     const client = createMagnumClient(API_URL);
     client
       .getFeature(id)
@@ -25,7 +68,7 @@ export default function FeatureDetail() {
         if (w) setWikiPage(w as WikiPage);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
-  }, [id]);
+  }, [id, isOnline]);
 
   if (error) {
     return (

@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
@@ -8,6 +8,10 @@ import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { DownloadButton } from "../../src/components/offline/DownloadButton";
+import { downloadSystemPack, fetchPackInfo } from "../../src/services/offlinePackService";
+import { isSystemDownloaded, getSystemTrails, getWikiPage as getLocalWikiPage } from "../../src/services/offlineDataService";
+import { useOfflineStore } from "../../src/stores/offlineStore";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -34,10 +38,70 @@ export default function SystemDetail() {
   const [trails, setTrails] = useState<Trail[]>([]);
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  const [packSize, setPackSize] = useState<number | undefined>(undefined);
+  const isOnline = useOfflineStore((s) => s.isOnline);
+  const downloadedPacks = useOfflineStore((s) => s.downloadedPacks);
 
   useEffect(() => {
     if (!slug || typeof slug !== "string") return;
     const client = createMagnumClient(API_URL);
+
+    if (!isOnline) {
+      const pack = downloadedPacks.find(
+        (p) => p.systemName.toLowerCase().replace(/[^a-z0-9]+/g, "-") === slug,
+      );
+      if (pack) {
+        setSystem({
+          id: pack.systemId,
+          name: pack.systemName,
+          slug: slug,
+          description: null,
+          boundary: null,
+          ownership_source: null,
+          source_date: null,
+          external_url: null,
+          created_at: "",
+          updated_at: "",
+        } as System);
+        setIsDownloaded(true);
+        getSystemTrails(pack.systemId).then((localTrails) =>
+          setTrails(
+            localTrails.map((t) => ({
+              id: t.id,
+              name: t.name,
+              slug: t.slug,
+              description: t.description,
+              difficulty: t.difficulty as Trail["difficulty"],
+              length_meters: t.length_meters,
+              elevation_gain_meters: t.elevation_gain_meters,
+              geometry: null,
+              created_at: "",
+              updated_at: "",
+              verified: Boolean(t.verified),
+            })),
+          ),
+        );
+        getLocalWikiPage("system", pack.systemId).then((localWiki) => {
+          if (localWiki) {
+            setWikiPage({
+              id: String(localWiki.id),
+              target_type: "system",
+              target_id: pack.systemId,
+              title: String(localWiki.title),
+              content_md: String(localWiki.content_md),
+              rendered_html: "",
+              created_at: String(localWiki.updated_at),
+              updated_at: String(localWiki.updated_at),
+            });
+          }
+        });
+      } else {
+        setError("Offline and not downloaded");
+      }
+      return;
+    }
+
     client
       .getSystemBySlug(slug)
       .then(async (s) => {
@@ -48,9 +112,31 @@ export default function SystemDetail() {
         ]);
         setTrails(t.items);
         if (w) setWikiPage(w as WikiPage);
+
+        const downloaded = await isSystemDownloaded(s.id).catch(() => false);
+        setIsDownloaded(downloaded);
+        if (!downloaded) {
+          try {
+            const info = await fetchPackInfo(s.id);
+            setPackSize(info.total_size_bytes);
+          } catch {
+            setPackSize(undefined);
+          }
+        }
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
-  }, [slug]);
+  }, [slug, isOnline, downloadedPacks]);
+
+  useEffect(() => {
+    if (!system) return;
+    const found = downloadedPacks.find((p) => p.systemId === system.id);
+    setIsDownloaded(Boolean(found));
+  }, [downloadedPacks, system]);
+
+  const handleDownload = useCallback(async () => {
+    if (!system) throw new Error("system not loaded");
+    await downloadSystemPack(system.id, system.name);
+  }, [system]);
 
   if (error) {
     return (
@@ -90,6 +176,17 @@ export default function SystemDetail() {
             </Pressable>
           ) : null}
           <ViewOnMapButton center={system.center ?? null} zoom={9} testID="system-view-on-map" />
+          {isOnline ? (
+            <DownloadButton
+              systemId={system.id}
+              systemName={system.name}
+              isDownloaded={isDownloaded}
+              downloadSizeBytes={packSize}
+              onDownload={handleDownload}
+            />
+          ) : isDownloaded ? (
+            <Text style={styles.meta} testID="system-offline-ready">Available offline</Text>
+          ) : null}
         </View>
 
         <View style={styles.section} testID="system-wiki">

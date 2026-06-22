@@ -60,7 +60,7 @@ export function DownloadButton({
         testID={`download-button-${systemId}`}
       >
         <Ionicons name="download-outline" size={14} color="#fff" />
-        {" "}{downloading ? "Downloading..." : "Download for Offline"}
+        <Text style={styles.btnText}>{downloading ? "Downloading..." : "Download for Offline"}</Text>
       </Button>
       {downloadSizeBytes !== undefined ? (
         <Text style={styles.size}>~{formatSize(downloadSizeBytes)}</Text>
@@ -78,4 +78,5 @@ const styles = StyleSheet.create({
   downloadedText: { fontSize: 12, color: "#22c55e" },
   size: { fontSize: 11, color: "#999" },
   error: { color: "#ef4444", fontSize: 12 },
+  btnText: { fontSize: 12, fontWeight: "600", color: "#fff" },
 });

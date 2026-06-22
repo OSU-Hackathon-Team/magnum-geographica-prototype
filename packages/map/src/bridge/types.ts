@@ -5,7 +5,9 @@ export type BridgeCommand =
   | { method: "setTrails"; args: { geojson: unknown } }
   | { method: "setSystems"; args: { geojson: unknown } }
   | { method: "setFeatures"; args: { geojson: unknown } }
-  | { method: "highlightTrail"; args: { id: string | null } };
+  | { method: "highlightTrail"; args: { id: string | null } }
+  | { method: "setOfflineMode"; args: { offline: boolean } }
+  | { method: "setOfflineData"; args: { trails?: unknown; systems?: unknown; features?: unknown } };
 
 export type BridgeEvent =
   | { type: "ready" }

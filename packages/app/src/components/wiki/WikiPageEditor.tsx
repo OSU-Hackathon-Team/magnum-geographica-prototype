@@ -93,7 +93,7 @@ export function WikiPageEditor({
               <Text style={styles.label}>Content (Markdown)</Text>
               <Button variant="ghost" size="small" onPress={() => setShowPreview(!showPreview)} testID="wiki-toggle-preview">
                 <Ionicons name={showPreview ? "create-outline" : "eye-outline"} size={14} color="#666" />
-                {" "}{showPreview ? "Edit" : "Preview"}
+                <Text style={styles.btnLabel}>{showPreview ? "Edit" : "Preview"}</Text>
               </Button>
             </View>
             {showPreview ? (
@@ -130,9 +130,8 @@ export function WikiPageEditor({
               onPress={() => onSave({ title, content_md: content, edit_summary: editSummary })}
               disabled={!canSave || !title.trim()}
               testID="wiki-editor-save"
-            >
-              {wikiPage ? "Save Changes" : "Create Page"}
-            </Button>
+              title={wikiPage ? "Save Changes" : "Create Page"}
+            />
           </View>
         </>
       ) : null}
@@ -152,7 +151,7 @@ export function WikiPageEditor({
               testID={`wiki-tab-${t.key}`}
             >
               <Ionicons name={t.icon} size={14} color={tab === t.key ? "#fff" : "#666"} />
-              {" "}{t.label}
+              <Text style={[styles.btnLabel, tab === t.key ? styles.btnLabelActive : null]}>{t.label}</Text>
             </Button>
           ))}
         </View>
@@ -201,4 +200,6 @@ const styles = StyleSheet.create({
     minHeight: 180,
   },
   tabBar: { flexDirection: "row", gap: 8 },
+  btnLabel: { fontSize: 12, fontWeight: "600", color: "#666" },
+  btnLabelActive: { color: "#fff" },
 });
