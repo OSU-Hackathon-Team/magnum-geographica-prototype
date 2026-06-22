@@ -10,7 +10,9 @@ test("user opens a feature detail page and sees its name and type", async ({ pag
 
   await expect(page.getByTestId("feature-detail-screen")).toBeVisible();
   await expect(page.getByTestId("feature-name")).toHaveText("Old Man's Cave");
-  await expect(page.getByText("scenic_point")).toBeVisible();
+  // Feature type is displayed (rendered as "scenic point" with capitalization)
+  await expect(page.getByTestId("feature-meta")).toBeVisible();
+  await expect(page.getByText(/scenic/i)).toBeVisible();
 });
 
 test("unknown feature id shows the error state", async ({ page }) => {

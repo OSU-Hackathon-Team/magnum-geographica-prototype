@@ -10,9 +10,9 @@ export interface ImageViewerProps {
 
 export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <Pressable style={styles.closeBtn} onPress={onClose}>
+    <Modal visible={visible} transparent animationType="fade" testID="image-viewer-modal">
+      <View style={styles.overlay} testID="image-viewer-overlay">
+        <Pressable style={styles.closeBtn} onPress={onClose} testID="image-viewer-close">
           <Ionicons name="close" size={24} color="#fff" />
         </Pressable>
 
@@ -21,14 +21,15 @@ export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps
             source={{ uri }}
             style={styles.image}
             resizeMode="contain"
+            testID="image-viewer-image"
           />
         ) : (
-          <Text style={styles.noImage}>No image</Text>
+          <Text style={styles.noImage} testID="image-viewer-no-image">No image</Text>
         )}
 
         {caption ? (
-          <View style={styles.captionBar}>
-            <Text style={styles.caption}>{caption}</Text>
+          <View style={styles.captionBar} testID="image-viewer-caption-bar">
+            <Text style={styles.caption} testID="image-viewer-caption">{caption}</Text>
           </View>
         ) : null}
       </View>

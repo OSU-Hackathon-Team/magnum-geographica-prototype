@@ -261,7 +261,9 @@ export default function TrailDetail() {
               >
                 <Card>
                   <View style={styles.row}>
-                    <FeatureTypeIcon type={f.type_tag} size={14} />
+                    <View testID={`trail-feature-type-${f.id}`}>
+                      <FeatureTypeIcon type={f.type_tag} size={14} />
+                    </View>
                     <Text style={styles.cardTitle}>{f.name}</Text>
                   </View>
                   {f.description ? <Text style={styles.body}>{f.description}</Text> : null}

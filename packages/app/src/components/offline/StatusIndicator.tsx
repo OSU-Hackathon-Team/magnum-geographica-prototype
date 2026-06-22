@@ -14,9 +14,9 @@ export function StatusIndicator() {
   })();
 
   return (
-    <View style={styles.row}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
-      <Text style={styles.text}>{label}</Text>
+    <View style={styles.row} testID="status-indicator">
+      <View style={[styles.dot, { backgroundColor: color }]} testID="status-dot" />
+      <Text style={styles.text} testID="status-label">{label}</Text>
     </View>
   );
 }

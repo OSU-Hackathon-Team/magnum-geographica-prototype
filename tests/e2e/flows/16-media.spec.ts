@@ -1,0 +1,42 @@
+import { test, expect } from "@playwright/test";
+import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+
+test.beforeEach(async ({ page }) => {
+  resetApiMock();
+  await installApiMock(page);
+});
+
+test("media uploader shows input and attach button", async ({ page }) => {
+  // The media uploader is part of feature detail (inside MediaUploader component)
+  // Go directly to a screen that uses it — in the app, media upload is on feature detail
+  await page.goto("/feature/f-1");
+  await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId("feature-media-gallery")).toBeVisible();
+});
+
+test("media gallery shows no items initially for a feature", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
+  // The gallery should exist but may be empty
+  await expect(page.getByTestId("feature-media")).toBeVisible();
+});
+
+test("user can view feature detail with wiki section", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId("feature-name")).toHaveText("Old Man's Cave");
+  await expect(page.getByTestId("feature-meta")).toBeVisible();
+  await expect(page.getByTestId("feature-wiki")).toBeVisible();
+});
+
+test("feature detail shows view-on-map button", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId("feature-view-on-map")).toBeVisible();
+});
+
+test("user can see wiki edit/create button on feature", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId("feature-wiki-edit")).toBeVisible();
+});

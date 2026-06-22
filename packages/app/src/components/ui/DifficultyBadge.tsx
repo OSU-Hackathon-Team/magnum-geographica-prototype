@@ -5,8 +5,8 @@ export function DifficultyBadge({ difficulty }: { difficulty: Difficulty | strin
   const color =
     (DIFFICULTY_COLORS as Record<string, string>)[difficulty] ?? DIFFICULTY_COLORS.easy;
   return (
-    <View style={[styles.badge, { backgroundColor: color }]}>
-      <Text style={styles.text}>{String(difficulty).toUpperCase()}</Text>
+    <View style={[styles.badge, { backgroundColor: color }]} testID={`difficulty-badge-${difficulty}`}>
+      <Text style={styles.text} testID="difficulty-label">{String(difficulty).toUpperCase()}</Text>
     </View>
   );
 }

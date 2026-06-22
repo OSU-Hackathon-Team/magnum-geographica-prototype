@@ -15,6 +15,7 @@ export default function TabsLayout() {
         name="explore"
         options={{
           title: "Explore",
+          tabBarTestID: "tab-explore",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map-outline" color={color} size={size} />
           ),
@@ -24,6 +25,7 @@ export default function TabsLayout() {
         name="systems"
         options={{
           title: "Systems",
+          tabBarTestID: "tab-systems",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="business-outline" color={color} size={size} />
           ),
@@ -33,6 +35,7 @@ export default function TabsLayout() {
         name="trails"
         options={{
           title: "Trails",
+          tabBarTestID: "tab-trails",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="trail-sign-outline" color={color} size={size} />
           ),
@@ -42,6 +45,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
+          tabBarTestID: "tab-profile",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-circle-outline" color={color} size={size} />
           ),

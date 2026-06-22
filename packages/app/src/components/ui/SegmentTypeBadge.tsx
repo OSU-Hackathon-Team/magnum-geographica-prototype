@@ -5,8 +5,8 @@ export function SegmentTypeBadge({ surface }: { surface: SurfaceType | string })
   const color =
     (SURFACE_COLORS as Record<string, string>)[surface] ?? SURFACE_COLORS.natural;
   return (
-    <View style={[styles.badge, { borderColor: color }]}>
-      <Text style={[styles.text, { color }]}>{String(surface).replace("_", " ").toUpperCase()}</Text>
+    <View style={[styles.badge, { borderColor: color }]} testID={`segment-type-badge-${surface}`}>
+      <Text style={[styles.text, { color }]} testID="segment-type-label">{String(surface).replace("_", " ").toUpperCase()}</Text>
     </View>
   );
 }

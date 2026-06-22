@@ -26,7 +26,8 @@
     "plugins": [
       "expo-router",
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "@config-plugins/detox"
     ],
     "experiments": {
       "typedRoutes": true

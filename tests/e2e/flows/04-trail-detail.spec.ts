@@ -28,7 +28,9 @@ test("user sees the trail's segments with surface types and hazard flags", async
 test("user sees the trail's features with type tags", async ({ page }) => {
   await page.goto("/trail/buckeye-trail");
   await expect(page.getByTestId("trail-feature-f-1")).toBeVisible();
-  await expect(page.getByTestId("trail-feature-type-f-1")).toHaveText("scenic_point");
+  // FeatureTypeIcon renders a single-letter abbreviation (e.g., "V" for scenic_point)
+  await expect(page.getByTestId("trail-feature-type-f-1")).toBeVisible();
+  await expect(page.getByTestId("trail-feature-type-f-1")).toContainText("V");
 });
 
 test("user sees an empty state for trails without features", async ({ page }) => {

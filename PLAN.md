@@ -1326,17 +1326,584 @@ osm2pgsql \
 
 ## 14. Testing Strategy
 
-| Layer | Tool | What |
-|---|---|---|
-| API unit tests | Bun test | Hono route handlers, Drizzle queries |
-| API integration | Bun test + Testcontainers | Seed DB, test endpoints |
-| Shared validation | Vitest | Zod schemas parse/fail correctly |
-| Map (web) | Playwright | Map renders, clicks produce events |
-| App (web) | Playwright | Full user flows via RNW |
-| App (mobile) | Detox or Maestro | E2E on Android emulator |
-| Offline sync | Manual + scripted | Disconnect network, edit, reconnect |
+### 14.1 Test Pyramid
 
-Test pyramid: heavy on API tests, moderate on component tests, light on E2E.
+| Layer | Tool | What | Priority |
+|---|---|---|---|
+| API unit tests | Bun test | Hono route handlers, Drizzle queries | High |
+| API integration | Bun test + Testcontainers | Seed DB → test endpoints | High |
+| Shared validation | Bun test | Zod schemas, API client, constants | High |
+| App components | React Native Testing Library | UI components in isolation | Medium |
+| Map (web) | Playwright | OpenLayers renders, layer toggles, clicks → events | Medium |
+| App E2E (web-parity) | Playwright | Full user flows via RNW (existing) | Medium |
+| App E2E (mobile-only) | **Detox** (Android) | Offline, sync, camera, GPS, WebView map | High |
+| Offline sync logic | Bun test | SyncService, conflict resolution, queue logic | High |
+
+### 14.2 Feature-Parity Rule
+
+When a feature has **identical behavior on web and mobile**, test it with Playwright (web). When a feature is **mobile-only or platform-divergent**, test it with Detox on Android emulator. Web E2E smoke tests cover the union.
+
+#### Web-Parity Features (Playwright only)
+
+These have the same UI, routes, and state management on web + RN:
+
+| Feature | Playwright Coverage |
+|---|---|
+| Tab navigation (Explore, Systems, Trails, Profile) | `tests/e2e/flows/01-tabs.spec.ts` |
+| System listing, search, filter | `02-browse-systems.spec.ts` |
+| System detail (mini-map, trail list, wiki) | `03-system-detail.spec.ts` |
+| Trail detail (stats, segments, features, wiki) | `04-trail-detail.spec.ts` |
+| Feature/landmark detail | `10-feature-detail.spec.ts` |
+| Wiki page view + edit + revision history | (Phase 2 specs) |
+| Search (typeahead, cross-entity) | `08-search.spec.ts` |
+| Deep linking | `09-deeplink.spec.ts` |
+| Error states (404, API-down) | `06-error-states.spec.ts` |
+| User journeys / happy paths | `07-journey.spec.ts` |
+| Auth flows (login, register, profile) | (Phase 6 specs) |
+| Admin dashboard, revision feed, ban | (Phase 6 specs) |
+| Segment editor, split/merge/reorder | (Phase 5 specs) |
+| Feature CRUD forms | (Phase 4 specs) |
+| Media gallery (photo grid, full-screen) | (Phase 4 specs) |
+| Citations (add URL/image, delete) | (Phase 2 specs) |
+| Storage manager UI shell | (Phase 3 specs) |
+| Responsive layout (desktop sidebar ↔ mobile stack) | (Phase 7 specs) |
+
+#### Mobile-Only Features (Detox)
+
+These depend on native APIs, device sensors, app lifecycle, or offline-first architecture:
+
+| Feature | Requires Detox | Why Mobile-Only |
+|---|---|---|
+| Offline browsing (map, trails, wiki from SQLite) | Yes | `navigator.onLine`, SQLite, MBTiles |
+| Download for Offline (MBTiles + GeoJSON + Wiki JSON) | Yes | File system, background fetch, progress |
+| Offline edit queue (wiki, features, media) | Yes | Queued in SQLite, sync on reconnect |
+| Sync upload (pending contributions → server) | Yes | App foreground detection, chunked upload |
+| Sync conflict resolution (diff view, keep mine/theirs) | Yes | Conflict UI is mobile-specific |
+| Connectivity status indicator (🟢🟡🔴⚪) | Yes | `@react-native-community/netinfo` |
+| Storage manager interactions (download, delete, size bars) | Yes | SQLite reads, file deletion |
+| WebView map bridge (pinch-zoom, tap, long-press, drag) | Yes | `postMessage` bridge is platform-specific |
+| Camera capture + gallery pick for media | Yes | `expo-camera`, `expo-image-picker` |
+| GPS tracking / Record Hike | Yes | `expo-location`, background tasks |
+| Background location for attestation | Yes | `expo-task-manager` |
+| JWT storage in SecureStore | Yes | `expo-secure-store` |
+| App lifecycle (background → foreground sync trigger) | Yes | React Native `AppState` |
+| Network toggle (airplane mode simulation) | Yes | Device-specific |
+| Offline tile rendering fallback (MBTiles → grey overlay) | Yes | WebView SQLite bridge |
+| Android-specific: back button, deep link from notification | Yes | Android navigation |
+
+### 14.3 Detox Setup (Android)
+
+#### Dependencies
+
+```json
+// packages/app/package.json (devDependencies)
+{
+  "detox": "^20.35",
+  "@config-plugins/detox": "^9"
+}
+```
+
+```bash
+# Global CLI
+bun add -g detox-cli
+```
+
+#### Configuration Files
+
+**`.detoxrc.js`** (project root):
+
+```js
+module.exports = {
+  logger: { level: process.env.CI ? 'error' : 'info' },
+  testRunner: {
+    $0: 'jest',
+    args: {
+      config: 'e2e/jest.config.js',
+      _: ['e2e']
+    }
+  },
+  apps: {
+    'android.debug': {
+      type: 'android.apk',
+      binaryPath: 'packages/app/android/app/build/outputs/apk/debug/app-debug.apk',
+      build: `
+        export JAVA_HOME=/usr/lib/jvm/java-21-openjdk && \
+        cd packages/app/android && \
+        ./gradlew app:assembleDebug app:assembleAndroidTest -DtestBuildType=debug -x lint -x test -PreactNativeArchitectures=x86_64
+      `,
+      reversePorts: [8081, 3000]
+    },
+    'android.release': {
+      type: 'android.apk',
+      binaryPath: 'packages/app/android/app/build/outputs/apk/release/app-release.apk',
+      build: `
+        export JAVA_HOME=/usr/lib/jvm/java-21-openjdk && \
+        cd packages/app/android && \
+        ./gradlew app:assembleRelease app:assembleAndroidTest -DtestBuildType=release -x lint -x test -PreactNativeArchitectures=x86_64
+      `
+    }
+  },
+  devices: {
+    emulator: {
+      type: 'android.emulator',
+      device: { avdName: 'detox_test' }
+    }
+  },
+  configurations: {
+    'android.emu.debug': {
+      device: 'emulator',
+      app: 'android.debug'
+    },
+    'android.emu.release': {
+      device: 'emulator',
+      app: 'android.release'
+    }
+  }
+};
+```
+
+**`e2e/jest.config.js`**:
+
+```js
+module.exports = {
+  rootDir: '..',
+  testMatch: ['<rootDir>/e2e/**/*.test.js'],
+  testTimeout: 120000,
+  maxWorkers: 1,
+  globalSetup: 'detox/runners/jest/globalSetup',
+  globalTeardown: 'detox/runners/jest/globalTeardown',
+  testEnvironment: 'detox/runners/jest/testEnvironment',
+  setupFilesAfterSetup: ['./e2e/setup.ts'],
+  reporters: [
+    'detox/runners/jest/reporter',
+    ['jest-junit', { outputDirectory: 'e2e/.results', outputName: 'report.xml' }]
+  ],
+  verbose: true
+};
+```
+
+#### Directory Structure
+
+```
+e2e/
+├── jest.config.js           # Jest runner config for Detox
+├── setup.ts                 # Global setup: launch app, mock API, reset state
+├── helpers/
+│   ├── api-mock.ts          # Mock backend API responses via proxy
+│   ├── network.ts           # Toggle airplane mode, simulate offline
+│   ├── test-data.ts         # Seed test systems, trails, wiki pages
+│   └── wait-for.ts          # Custom wait helpers (map render, sync complete)
+├── flows/
+│   ├── 01-offline-download.test.ts    # Phase 3
+│   ├── 02-offline-browse.test.ts      # Phase 3
+│   ├── 03-offline-edit.test.ts        # Phase 3
+│   ├── 04-sync-upload.test.ts         # Phase 3
+│   ├── 05-sync-conflict.test.ts       # Phase 3
+│   ├── 06-storage-manager.test.ts     # Phase 3
+│   ├── 07-webview-map.test.ts         # Phase 1 (map touch interactions)
+│   ├── 08-camera-gallery.test.ts      # Phase 4
+│   ├── 09-gps-recording.test.ts       # Phase 9
+│   ├── 10-auth-secure-store.test.ts   # Phase 6
+│   ├── 11-app-lifecycle.test.ts       # Background/foreground
+│   ├── 12-back-navigation.test.ts     # Android back button
+│   └── 13-full-journey.test.ts        # Smoke: online → download → offline → sync
+├── pages/
+│   ├── ExplorePage.ts       # Map interaction selectors
+│   ├── SystemDetailPage.ts  # Download button, wiki toggle
+│   ├── TrailDetailPage.ts   # Segment list, record hike
+│   ├── WikiEditorPage.ts    # TextArea, save, citations
+│   ├── SettingsPage.ts      # Storage manager, downloads
+│   └── ProfilePage.ts       # Pending queue, sync status
+└── .results/                # Test reports + screenshots (gitignored)
+```
+
+#### Emulator Setup
+
+```bash
+# Create AVD for Detox (pixel_6, API 34, x86_64, 2GB RAM)
+avdmanager create avd \
+  -n detox_test \
+  -k "system-images;android-34;google_apis;x86_64" \
+  -d pixel_6 \
+  --force
+
+# Start emulator headless for CI
+$ANDROID_HOME/emulator/emulator \
+  -avd detox_test \
+  -no-audio -no-window \
+  -gpu swiftshader_indirect \
+  -no-snapshot \
+  -memory 2048 &
+
+# Wait for emulator to boot
+adb wait-for-device
+adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+```
+
+#### Run Commands
+
+```bash
+# Build debug APK + run Detox tests
+bun run detox:build-android:debug
+bun run detox:test-android:debug
+
+# Or combined
+detox test --configuration android.emu.debug
+
+# Single test file
+detox test e2e/flows/01-offline-download.test.js --configuration android.emu.debug
+
+# With artifacts on failure (screenshots, logs)
+detox test --configuration android.emu.debug --artifacts-location e2e/.results/ --take-screenshots failing
+
+# CI mode
+CI=true detox test --configuration android.emu.release --cleanup
+```
+
+### 14.4 Detox Test Scenarios by Phase
+
+#### Phase 3: Offline Mode (Critical Path — 6 test files)
+
+**`01-offline-download.test.ts`** — Download a System for offline use:
+1. Navigate to System detail page
+2. Tap "Download for Offline" button
+3. Verify progress indicator appears (0% → 50% → 100%)
+4. Verify success toast: "Downloaded 42MB"
+5. Verify "Download for Offline" changes to "Update Download"
+6. Kill app, go offline, relaunch → verify system is accessible
+
+**`02-offline-browse.test.ts`** — Browse downloaded content while offline:
+1. Pre-condition: system pack downloaded
+2. Enable airplane mode
+3. Verify status indicator shows 🔴 "Offline (no data)" on undownloaded tab
+4. Navigate to Systems tab → verify only downloaded systems shown
+5. Tap downloaded system → verify trail list renders from SQLite
+6. Tap trail → verify segments, features, wiki page render
+7. Search (FTS5) → verify results appear for downloaded content
+8. Map → verify MBTiles render, grey "not downloaded" overlay for outside area
+
+**`03-offline-edit.test.ts`** — Edit wiki pages while offline:
+1. Pre-condition: system pack downloaded, go offline
+2. Open wiki page for a trail, tap "Edit"
+3. Modify content: "Updated this offline"
+4. Add edit summary: "Offline test edit"
+5. Save → verify pending queue count increases (🟡)
+6. Navigate to Profile → verify PendingQueue shows the edit with preview
+7. Delete edit from queue → verify it's removed
+8. Re-edit and save again → verify queue has 1 pending again
+
+**`04-sync-upload.test.ts`** — Sync pending edits on reconnect:
+1. Pre-condition: 3 offline edits queued (wiki, feature, media)
+2. Re-enable network (disable airplane mode)
+3. Wait for auto-sync to trigger (debounced, ~5s)
+4. Verify status indicator shows ⚪ "Syncing 1 of 3..." → "Syncing 2 of 3..." → "Syncing 3 of 3..."
+5. Verify indicator changes to 🟢 "Online"
+6. Verify pending queue is empty
+7. Navigate to API to verify edits were persisted server-side
+8. Pull-to-refresh to verify server content matches
+
+**`05-sync-conflict.test.ts`** — Handle edit conflicts:
+1. Pre-condition: edit wiki page offline (base_revision_id = v42)
+2. While offline, simulate another user editing the same page via API (revision v43)
+3. Reconnect → sync attempt returns 409 Conflict
+4. Verify conflict screen appears: "Someone else edited this page while you were offline"
+5. Side-by-side diff: your version (v42) vs server version (v43)
+6. Tap "Keep Mine" → verify your edit is applied (creates v44)
+7. Kill and retry scenario with "Keep Theirs" → verify server version kept
+8. Retry with no resolution → verify conflict remains pending
+
+**`06-storage-manager.test.ts`** — Manage downloaded packs:
+1. Download 3 systems (42MB, 89MB, 128MB)
+2. Navigate to Settings → Storage
+3. Verify total usage bar: `████████░ 259MB / 500MB`
+4. Verify each system: name, size, last synced date, [Update] [Delete] buttons
+5. Tap [Delete] on one system → confirmation dialog → confirm
+6. Verify system removed from list, storage bar updates
+7. Tap [Update] on a system → verify re-download with updated data
+8. "Delete All" → verify all packs removed, storage shows 0MB
+
+#### Phase 1: Map Interactions on Mobile (1 test file)
+
+**`07-webview-map.test.ts`** — Verify WebView map bridge:
+1. Open Explore tab → map loads (verify WebView renders)
+2. Pinch zoom → verify map zooms (check zoom level via bridge)
+3. Double-tap → verify zoom in
+4. Single tap on trail → verify feature select event fires → bottom sheet appears
+5. Long-press on empty area → verify "Add Feature" modal opens
+6. Tap feature marker (trailhead icon) → verify feature detail bottom sheet
+7. "View on map" from trail detail → verify map flies to trail geometry
+8. Layer toggles: hide trails → verify trails disappear; re-enable → verify they reappear
+9. Locate-me button → verify map centers on current location (if location granted)
+
+#### Phase 4: Camera & Gallery (1 test file)
+
+**`08-camera-gallery.test.ts`** — Media capture on mobile:
+1. Navigate to feature detail, tap "Add Photo"
+2. Tap "Take Photo" → verify camera launches
+3. Capture photo → verify thumbnail appears in gallery
+4. Tap "Choose from Gallery" → verify picker opens
+5. Select image → verify thumbnail appears
+6. While offline: capture photo → verify queued in pending (base64 stored)
+7. Reconnect → verify photo syncs to server
+
+#### Phase 9: GPS Recording (1 test file)
+
+**`09-gps-recording.test.ts`** — Record and upload GPS tracks:
+1. Navigate to trail detail, tap "Record Hike"
+2. Verify tracking starts → timer running, distance accumulating
+3. Simulate location changes (mock `expo-location` via Detox launch args)
+4. Wait 10s → verify track recorded
+5. Tap "Stop & Save" → verify GPX data stored
+6. Upload track → verify strong attestation POST succeeds
+7. Verify "Verified" badge appears on trail (if quorum met)
+
+#### Phase 6: Auth (1 test file)
+
+**`10-auth-secure-store.test.ts`** — JWT persistence across app restarts:
+1. Login → verify JWT stored in SecureStore
+2. Kill app completely (adb force-stop)
+3. Relaunch app → verify user is still authenticated (token read from SecureStore)
+4. Logout → verify token removed from SecureStore
+5. Relaunch → verify user is unauthenticated
+
+#### Platform-Specific (2 test files)
+
+**`11-app-lifecycle.test.ts`** — Background/foreground sync:
+1. Queue 2 offline edits
+2. Put app in background (Home button)
+3. Re-enable network while app is in background
+4. Bring app to foreground → verify sync auto-triggers (AppState change)
+5. Verify edits synced
+
+**`12-back-navigation.test.ts`** — Android hardware back button:
+1. Navigate Trail → Segment → verify back button returns to Trail
+2. Navigate System → Trail → verify back button returns to System
+3. From editor with unsaved changes → verify "Discard changes?" dialog
+4. From root tab → verify back exits app (or shows confirmation)
+
+#### Full Journey Smoke Test (1 test file)
+
+**`13-full-journey.test.ts`** — End-to-end user journey:
+1. Launch app online → browse systems, find "Hocking Hills"
+2. Download system (42MB)
+3. Go offline → browse map, trails, read wiki
+4. Edit wiki page offline ("Added hazard note")
+5. Add feature offline (long-press map → "Trailhead" tag)
+6. Take photo of sign (offline)
+7. Reconnect → sync completes
+8. Verify all contributions appear on server
+9. View system again → verify edits visible
+
+### 14.5 Playwright E2E Integration
+
+Existing Playwright tests in `tests/e2e/` cover web-parity features (10 spec files). They use:
+- `playwright.config.ts` — Chromium, parallel, Expo web build served locally
+- `tests/e2e/helpers/api-mock.ts` — Route interception mocking the API
+- `tests/e2e/fixtures/data.ts` — Test seed data
+- `data-testid` selectors for element targeting
+
+#### Adding New Playwright Specs (Web-Parity Features)
+
+As new phases add web-parity features, add corresponding Playwright specs:
+
+| Phase | New Playwright Specs |
+|---|---|
+| Phase 2 (Wiki) | `tests/e2e/flows/11-wiki-view.spec.ts`, `12-wiki-edit.spec.ts`, `13-wiki-revisions.spec.ts`, `14-citations.spec.ts` |
+| Phase 4 (Features) | `tests/e2e/flows/15-feature-create.spec.ts`, `16-feature-edit.spec.ts`, `17-media-upload.spec.ts` |
+| Phase 5 (Segments) | `tests/e2e/flows/18-segment-create.spec.ts`, `19-segment-split-merge.spec.ts`, `20-segment-reorder.spec.ts` |
+| Phase 6 (Auth) | `tests/e2e/flows/21-auth-register.spec.ts`, `22-auth-login.spec.ts`, `23-admin-dashboard.spec.ts`, `24-admin-moderation.spec.ts` |
+| Phase 7 (Polish) | `tests/e2e/flows/25-desktop-layout.spec.ts`, `26-responsive.spec.ts` |
+
+### 14.6 Component Unit Tests (React Native Testing Library)
+
+For shared components that run on both web and native, add unit tests in `packages/app/src/**/__tests__/`:
+
+```
+packages/app/src/
+├── components/
+│   ├── ui/
+│   │   └── __tests__/
+│   │       ├── Button.test.tsx
+│   │       ├── Badge.test.tsx
+│   │       ├── SearchBar.test.tsx
+│   │       └── DifficultyBadge.test.tsx
+│   ├── trail/
+│   │   └── __tests__/
+│   │       ├── TrailCard.test.tsx
+│   │       └── TrailDetailHeader.test.tsx
+│   ├── system/
+│   │   └── __tests__/
+│   │       └── SystemCard.test.tsx
+│   ├── feature/
+│   │   └── __tests__/
+│   │       └── FeatureTypeIcon.test.tsx
+│   └── offline/
+│       └── __tests__/
+│           └── StatusIndicator.test.tsx
+├── stores/
+│   └── __tests__/
+│       ├── offlineStore.test.ts
+│       ├── mapStore.test.ts
+│       └── uiStore.test.ts
+├── services/
+│   └── __tests__/
+│       ├── syncService.test.ts
+│       └── offlinePackService.test.ts
+└── hooks/
+    └── __tests__/
+        ├── useOffline.test.ts
+        └── useSync.test.ts
+```
+
+Test framework: `@testing-library/react-native` + `jest` (already ships with Expo).
+
+### 14.7 Test Data Strategy
+
+#### For Detox Tests (Mobile)
+
+- Mock the API at the **network layer** using a local proxy or Detox's mock server
+- Alternative: run the real API (Docker Compose) with a `?seed=test` query param that creates deterministic test data
+- Pre-condition data via `detox.device.launchApp({ newInstance: true, launchArgs: { seed: 'test' } })`
+- For offline scenarios: pre-populate SQLite via launch args
+- GPS mocks: `detox.device.setLocation(lat, lon)`
+
+#### For Playwright Tests (Web)
+
+- Existing `tests/e2e/helpers/api-mock.ts` pattern: intercept all API calls via `page.route()` and return fixture data
+- Fixture data in `tests/e2e/fixtures/data.ts` — 3 systems, 3 trails, segments, features
+
+### 14.8 CI/CD Pipeline
+
+```yaml
+# .github/workflows/test.yml (to be created)
+name: Test
+on: [push, pull_request]
+jobs:
+  unit-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: cd packages/api && bun test
+      - run: cd packages/shared && bun test
+
+  e2e-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run build:e2e
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/e2e/.results/
+
+  e2e-android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        api-level: [34]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Start API + Postgres
+        run: docker compose -f docker/docker-compose.yml up -d postgres api
+      - name: Seed test data
+        run: curl -X POST http://localhost:3000/api/seed -H "x-admin-secret: dev-secret"
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/avd/*
+          key: avd-${{ matrix.api-level }}-v1
+
+      - name: Create and run emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          avd-name: detox_test
+          script: |
+            bun run detox:build-android:debug
+            bun run detox:test-android:debug -- --ci --artifacts-location e2e/.results/
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detox-artifacts
+          path: e2e/.results/
+```
+
+### 14.9 Root Package.json Scripts
+
+```jsonc
+{
+  "scripts": {
+    // Existing
+    "test": "turbo run test",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report",
+    "build:e2e": "cd packages/app && npx expo export --platform web && cp -r dist ../../tests/e2e/.app",
+
+    // Detox
+    "detox:build-android:debug": "detox build --configuration android.emu.debug",
+    "detox:build-android:release": "detox build --configuration android.emu.release",
+    "detox:test-android:debug": "detox test --configuration android.emu.debug",
+    "detox:test-android:release": "detox test --configuration android.emu.release",
+    "detox:test-android:debug:ci": "CI=true detox test --configuration android.emu.debug --cleanup --artifacts-location e2e/.results/",
+
+    // Dev
+    "dev:android": "cd packages/app && npx expo run:android",
+    "log:android": "adb logcat -s ReactNativeJS:V",
+    "screenshot:android": "adb exec-out screencap -p > screenshot.png"
+  }
+}
+```
+
+---
+
+### 14.10 Testing Phase-Gate Checklist
+
+Each phase must pass the following before being considered "done":
+
+| Phase | Must Pass |
+|---|---|
+| Phase 1 | Playwright: tabs, browse, system/trail detail, search, deep links. Detox: WebView map interactions. |
+| Phase 2 | Playwright: wiki view, edit, revisions, citations. |
+| Phase 3 | **Detox: all 6 offline test files (download, browse, edit, sync, conflict, storage).** Playwright: storage manager UI shell. Bun test: syncService, conflict resolution. |
+| Phase 4 | Playwright: feature CRUD, media gallery. Detox: camera/gallery. |
+| Phase 5 | Playwright: segment CRUD, split/merge/reorder. |
+| Phase 6 | Playwright: auth flows, admin dashboard. Detox: SecureStore persistence, app lifecycle. |
+| Phase 7 | Playwright: responsive layout, accessibility. Performance benchmarks (Lighthouse). |
+| Phase 8 | Detox: all iOS tests (reuse Android test JS, different `.detoxrc.js` config). |
+| Phase 9 | Detox: GPS recording, track playback. Bun test: attestation logic, trust score math. |
+
+---
+
+### 14.11 Risks & Mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Detox + Expo compatibility | Use `@config-plugins/detox` Expo plugin; test on SDK 52 early |
+| Detox + WebView interactions | WebView inside RN is opaque to Detox matchers; use `testID` on RN wrapper views, use `webview.element(by.webView())` for OL events |
+| Detox + op-sqlite | Native SQLite binding may not work in Android emulator with Detox; fall back to `expo-sqlite` for Detox test builds if needed |
+| Long test runtime (emulator boot) | Cache AVD snapshot; run only `android.emu.release` in CI; parallelize by test file (future) |
+| Flaky WebView map tests | Retry with visual diff; use `waitFor` with generous timeouts (15s for tile render) |
+| MBTiles generation in CI | Pre-generate test packs, commit to repo or upload as CI artifact |
+| Network toggle flakiness | Use Detox's `device.setURLBlacklist()` to simulate offline rather than airplane mode |
 
 ---
 
