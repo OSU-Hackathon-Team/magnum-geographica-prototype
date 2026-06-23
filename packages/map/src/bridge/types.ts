@@ -39,7 +39,10 @@ export type BridgeCommand =
   | { method: "highlightTrail"; args: { id: string | null } }
   | { method: "setOfflineMode"; args: { offline: boolean } }
   | { method: "setOfflineData"; args: { trails?: unknown; systems?: unknown; features?: unknown } }
-  | { method: "setBaseLayer"; args: { id: string } };
+  | { method: "setBaseLayer"; args: { id: string } }
+  | { method: "setOfflineBaseLayer"; args: { kind: "mvt" | "raster"; tilesPath: string; minZoom: number; maxZoom: number; active: boolean } }
+  | { method: "enterDrawMode"; args: {} }
+  | { method: "exitDrawMode"; args: {} };
 
 export type BridgeEvent =
   | { type: "ready" }
@@ -53,6 +56,7 @@ export type BridgeEvent =
       slug?: string | null;
       name?: string | null;
     }
+  | { type: "drawEnd"; minLon: number; minLat: number; maxLon: number; maxLat: number }
   | { type: "error"; message: string };
 
 export type BridgeMethod = BridgeCommand["method"];

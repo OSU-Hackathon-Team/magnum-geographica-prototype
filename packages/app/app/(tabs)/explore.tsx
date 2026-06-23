@@ -9,12 +9,13 @@ import {
   type SearchResults,
 } from "../../src/components/ui/SearchResultsDropdown";
 import { BaseLayerSwitcher } from "../../src/components/map/BaseLayerSwitcher";
+import { DownloadAreaSheet } from "../../src/components/offline/DownloadAreaSheet";
 import { useMapStore } from "../../src/stores/mapStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useBaseLayerStore } from "../../src/stores/baseLayerStore";
 import {
   loadOfflineMapData,
-  getDownloadedSystemIds,
+  getDownloadedRegionIds,
 } from "../../src/services/offlineDataService";
 import type { OfflineMapData } from "../../src/services/offlineDataService";
 
@@ -49,7 +50,7 @@ export default function ExploreScreen() {
   const mapZoom = useMapStore((s) => s.zoom);
   const setViewport = useMapStore((s) => s.setViewport);
   const isOnline = useOfflineStore((s) => s.isOnline);
-  const downloadedPacks = useOfflineStore((s) => s.downloadedPacks);
+  const offlineRegions = useOfflineStore((s) => s.offlineRegions);
   const baseLayerId = useBaseLayerStore((s) => s.baseLayerId);
   const baseLayerDefs = useMemo(
     () => resolveBaseLayers({ martinTilesUrl: MARTIN_URL }),
@@ -65,6 +66,9 @@ export default function ExploreScreen() {
   const [selectedSystemSlug, setSelectedSystemSlug] = useState<string | null>(null);
   const [selectedSystem, setSelectedSystem] = useState<System | null>(null);
   const [systemLoading, setSystemLoading] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawBbox, setDrawBbox] = useState<{ minLon: number; minLat: number; maxLon: number; maxLat: number } | null>(null);
+  const [showDownloadSheet, setShowDownloadSheet] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestRef = useRef(0);
 
@@ -114,21 +118,21 @@ export default function ExploreScreen() {
     return () => { cancelled = true };
   }, [selectedSystemSlug]);
 
-  // Load offline map data when offline with downloaded packs
+  // Load offline map data when offline with downloaded regions
   useEffect(() => {
-    if (isOnline || downloadedPacks.length === 0) {
+    if (isOnline || offlineRegions.length === 0) {
       setOfflineData(null);
       return;
     }
     let cancelled = false;
     (async () => {
-      const ids = await getDownloadedSystemIds();
+      const ids = await getDownloadedRegionIds();
       if (ids.length === 0 || cancelled) return;
-      const data = await loadOfflineMapData(ids[0]);
+      const data = await loadOfflineMapData();
       if (!cancelled) setOfflineData(data);
     })();
     return () => { cancelled = true };
-  }, [isOnline, downloadedPacks]);
+  }, [isOnline, offlineRegions]);
 
   // Search offline when disconnected
   useEffect(() => {
@@ -258,6 +262,41 @@ export default function ExploreScreen() {
     setSelectedSystem(null);
   }, []);
 
+  const offlineBaseLayer = useMemo(() => {
+    if (isOnline || offlineRegions.length === 0) return null;
+    const region = offlineRegions[0];
+    if (!region?.tilesPath) return null;
+    return {
+      kind: region.baseLayerId === "satellite" ? "raster" as const : "mvt" as const,
+      tilesPath: region.tilesPath,
+      minZoom: region.minZoom,
+      maxZoom: region.maxZoom,
+    };
+  }, [isOnline, offlineRegions]);
+
+  const handleDrawEnd = useCallback(
+    (bbox: { minLon: number; minLat: number; maxLon: number; maxLat: number }) => {
+      setIsDrawing(false);
+      setDrawBbox(bbox);
+      setShowDownloadSheet(true);
+    },
+    [],
+  );
+
+  const handleStartDraw = useCallback(() => {
+    setIsDrawing(true);
+    setShowDownloadSheet(false);
+  }, []);
+
+  const handleCancelDraw = useCallback(() => {
+    setIsDrawing(false);
+  }, []);
+
+  const handleDismissDownloadSheet = useCallback(() => {
+    setShowDownloadSheet(false);
+    setDrawBbox(null);
+  }, []);
+
   return (
     <View style={styles.container} testID="explore-screen">
       <View style={styles.searchRow}>
@@ -302,6 +341,9 @@ export default function ExploreScreen() {
           flyTo={flyTo}
           offlineMode={!isOnline}
           offlineData={offlineData}
+          offlineBaseLayer={offlineBaseLayer}
+          drawMode={isDrawing}
+          onDrawEnd={handleDrawEnd}
         />
         <BaseLayerSwitcher
           layers={baseLayerDefs}
@@ -376,15 +418,49 @@ export default function ExploreScreen() {
             <Text style={styles.placingCancelText}>Cancel</Text>
           </Pressable>
         </View>
+      ) : isDrawing ? (
+        <View style={styles.placingBanner} testID="explore-draw-banner">
+          <Text style={styles.placingText}>
+            Drag to select download area
+          </Text>
+          <Pressable
+            onPress={handleCancelDraw}
+            style={styles.placingCancel}
+            testID="explore-draw-cancel"
+          >
+            <Text style={styles.placingCancelText}>Cancel</Text>
+          </Pressable>
+        </View>
       ) : (
-        <Pressable
-          style={styles.addFeatureFab}
-          onPress={handleStartPlacing}
-          testID="explore-add-feature"
-        >
-          <Text style={styles.addFeatureFabText}>+</Text>
-        </Pressable>
+        <View style={styles.fabColumn}>
+          <Pressable
+            style={styles.addFeatureFab}
+            onPress={handleStartPlacing}
+            testID="explore-add-feature"
+          >
+            <Text style={styles.addFeatureFabText}>+</Text>
+          </Pressable>
+          {isOnline ? (
+            <Pressable
+              style={styles.downloadAreaFab}
+              onPress={handleStartDraw}
+              testID="explore-download-area"
+            >
+              <Text style={styles.downloadAreaFabText}>⬇</Text>
+            </Pressable>
+          ) : null}
+        </View>
       )}
+
+      {showDownloadSheet && drawBbox ? (
+        <DownloadAreaSheet
+          bbox={drawBbox}
+          baseLayerId={baseLayerId}
+          baseLayerLabel={baseLayerDefs.find((l) => l.id === baseLayerId)?.label ?? baseLayerId}
+          onDismiss={handleDismissDownloadSheet}
+          testID="explore-download-sheet"
+        />
+      ) : null}
     </View>
   );
 }
@@ -521,9 +597,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   addFeatureFab: {
-    position: "absolute",
-    bottom: 80,
-    right: 20,
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -537,4 +610,25 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   addFeatureFabText: { fontSize: 24, color: "#fff", lineHeight: 28 },
+  fabColumn: {
+    position: "absolute",
+    bottom: 80,
+    right: 20,
+    gap: 12,
+    alignItems: "center",
+  },
+  downloadAreaFab: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#3b82f6",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  downloadAreaFabText: { fontSize: 20, color: "#fff", lineHeight: 24 },
 });

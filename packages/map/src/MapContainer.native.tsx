@@ -52,7 +52,9 @@ function buildMapHtml(
           highlightedId=null,
           offlineMode=${isOffline},
           baseLayerImpls={},
-          activeBaseLayer=null;
+          activeBaseLayer=null,
+          dragBox=null,
+          dragLayer=null;
 
       function postToRN(e){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(e))}}
 
@@ -310,6 +312,57 @@ function buildMapHtml(
             vectorLayers.features.getSource().clear();
             vectorLayers.features.getSource().addFeatures(ff);
           }
+        },
+        setOfflineBaseLayer:function(a){
+          if(!map)return;
+          var ext=a.kind==='raster'?'.jpg':'.pbf';
+          var prefix='file://'+a.tilesPath+'/';
+          var srcMaxZoom=a.maxZoom||14;
+          if(a.kind==='raster'){
+            var src=new ol.source.XYZ({url:prefix+'{z}/{x}/{y}'+ext,maxZoom:srcMaxZoom});
+            var layer=new ol.layer.Tile({source:src,minZoom:a.minZoom||2,maxZoom:a.maxZoom||18});
+            layer.set('name','basemap-offline');
+            var layers=map.getLayers().getArray();
+            for(var i=layers.length-1;i>=0;i--){
+              if(layers[i].get('name')==='basemap-offline')map.removeLayer(layers[i]);
+              if(layers[i].get('name')==='basemap')layers[i].setVisible(!a.active);
+            }
+            layer.setVisible(a.active);
+            map.getLayers().insertAt(0,layer);
+          }else{
+            var src2=new ol.source.VectorTile({format:new ol.format.MVT(),url:prefix+'{z}/{x}/{y}'+ext,tileGrid:ol.tilegrid.createXYZ({maxZoom:srcMaxZoom})});
+            var layer2=new ol.layer.VectorTile({source:src2,minZoom:a.minZoom||2,maxZoom:a.maxZoom||18,style:styleMvtFeature});
+            layer2.set('name','basemap-offline');
+            var layers2=map.getLayers().getArray();
+            for(var i2=layers2.length-1;i2>=0;i2--){
+              if(layers2[i2].get('name')==='basemap-offline')map.removeLayer(layers2[i2]);
+              if(layers2[i2].get('name')==='basemap')layers2[i2].setVisible(!a.active);
+            }
+            layer2.setVisible(a.active);
+            map.getLayers().insertAt(0,layer2);
+          }
+        },
+        enterDrawMode:function(){
+          if(!map)return;
+          if(dragBox)exitDrawMode();
+          dragLayer=new ol.layer.Vector({source:new ol.source.Vector(),style:new ol.style.Style({fill:new ol.style.Fill({color:'rgba(34,197,94,0.1)'}),stroke:new ol.style.Stroke({color:'#22c55e',width:2,lineDash:[6,4]})})});
+          dragLayer.set('name','draw-layer');
+          map.addLayer(dragLayer);
+          dragBox=new ol.interaction.DragBox({condition:ol.events.condition.always});
+          map.addInteraction(dragBox);
+          dragBox.on('boxend',function(){
+            var geom=dragBox.getGeometry();
+            var ext=geom.getExtent();
+            var bl=ol.proj.toLonLat([ext[0],ext[1]]);
+            var tr=ol.proj.toLonLat([ext[2],ext[3]]);
+            dragLayer.getSource().clear();
+            dragLayer.getSource().addFeature(new ol.Feature(geom));
+            postToRN({type:'drawEnd',minLon:bl[0],minLat:bl[1],maxLon:tr[0],maxLat:tr[1]});
+          });
+        },
+        exitDrawMode:function(){
+          if(dragBox){map.removeInteraction(dragBox);dragBox=null}
+          if(dragLayer){map.removeLayer(dragLayer);dragLayer=null}
         }
       };
       window.addEventListener('error',function(e){postToRN({type:'error',message:e.message})});
@@ -328,6 +381,9 @@ export default function MapContainer({
   flyTo,
   offlineMode,
   offlineData,
+  offlineBaseLayer,
+  drawMode,
+  onDrawEnd,
   onMapRef,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
@@ -421,7 +477,7 @@ export default function MapContainer({
         return;
       }
       if (!isBridgeEvent(parsed)) return;
-      handleBridgeEvent(parsed, { onReady, onClick, onFeatureSelect, onMoveEnd });
+      handleBridgeEvent(parsed, { onReady, onClick, onFeatureSelect, onMoveEnd, onDrawEnd });
     },
     [onReady, onClick, onFeatureSelect, onMoveEnd],
   );
@@ -464,6 +520,27 @@ export default function MapContainer({
     if (!initSentRef.current || !offlineData) return;
     send({ method: "setOfflineData", args: offlineData });
   }, [offlineData, send]);
+
+  // Sync offline base layer to WebView
+  useEffect(() => {
+    if (!initSentRef.current) return;
+    if (offlineBaseLayer) {
+      send({
+        method: "setOfflineBaseLayer",
+        args: { ...offlineBaseLayer, active: !!offlineMode },
+      });
+    }
+  }, [offlineBaseLayer, offlineMode, send]);
+
+  // Sync draw mode to WebView
+  useEffect(() => {
+    if (!initSentRef.current) return;
+    if (drawMode) {
+      send({ method: "enterDrawMode", args: {} });
+    } else {
+      send({ method: "exitDrawMode", args: {} });
+    }
+  }, [drawMode, send]);
 
   // Track the last flyTo values so we only re-send when the target actually
   // changes (not when the parent passes a new object ref with same values).
@@ -522,6 +599,7 @@ function handleBridgeEvent(
       name?: string | null;
     }) => void;
     onMoveEnd?: (center: [number, number], zoom: number) => void;
+    onDrawEnd?: (bbox: { minLon: number; minLat: number; maxLon: number; maxLat: number }) => void;
   },
 ) {
   switch (event.type) {
@@ -546,6 +624,14 @@ function handleBridgeEvent(
     }
     case "moveEnd":
       handlers.onMoveEnd?.(event.center, event.zoom);
+      return;
+    case "drawEnd":
+      handlers.onDrawEnd?.({
+        minLon: event.minLon,
+        minLat: event.minLat,
+        maxLon: event.maxLon,
+        maxLat: event.maxLat,
+      });
       return;
     case "mapLongPress":
     case "error":

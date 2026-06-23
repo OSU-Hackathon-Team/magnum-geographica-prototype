@@ -298,58 +298,39 @@ export interface OfflineMapData {
   features: unknown;
 }
 
-export async function loadOfflineMapData(systemId: string): Promise<OfflineMapData | null> {
+export async function loadOfflineMapData(_systemId?: string): Promise<OfflineMapData | null> {
   const db = await getOfflineDb();
-  const packs = await db.exec(
-    "SELECT geojson_data, wiki_data FROM downloaded_packs WHERE system_id = ?",
-    [systemId],
-  );
-  if (packs.length === 0) return null;
+  const trails = await db.exec("SELECT id, name, slug, description, difficulty, length_meters, elevation_gain_meters, verified FROM trails");
+  const features = await db.exec("SELECT id, name, type_tag, description, trail_id, system_id, lon, lat FROM features");
+  const systems = await db.exec("SELECT id, name, slug, description, min_lon, max_lon, min_lat, max_lat FROM systems");
 
-  const raw = packs[0]?.geojson_data;
-  if (!raw) return null;
+  if (trails.length === 0 && features.length === 0 && systems.length === 0) return null;
 
-  let parsed: { trails?: unknown[]; features?: unknown[] };
-  try {
-    parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-  } catch {
-    return null;
-  }
-
-  const trails = parsed.trails ?? [];
-  const features = parsed.features ?? [];
-
-  const trailFeatures = trails.map((t: Record<string, unknown>) => {
-    let geometry = t.geometry;
-    try {
-      if (typeof geometry === "string") geometry = JSON.parse(geometry as string);
-    } catch { geometry = null; }
-    return {
-      type: "Feature",
+  const trailFeatures = trails.map((t: Record<string, unknown>) => ({
+    type: "Feature",
+    id: t.id,
+    geometry: null,
+    properties: {
       id: t.id,
-      geometry,
-      properties: {
-        id: t.id,
-        name: t.name,
-        slug: t.slug,
-        description: t.description,
-        difficulty: t.difficulty,
-        surface_type: t.surface_type,
-        is_road_connector: t.is_road_connector,
-        is_verified: t.is_verified,
-      },
-    };
-  });
+      name: t.name,
+      slug: t.slug,
+      description: t.description,
+      difficulty: t.difficulty,
+      surface_type: undefined,
+      is_road_connector: false,
+      is_verified: Boolean(t.verified),
+    },
+  }));
 
   const featurePoints = features.map((f: Record<string, unknown>) => {
-    let point = f.point;
-    try {
-      if (typeof point === "string") point = JSON.parse(point as string);
-    } catch { point = null; }
+    let geometry = null;
+    if (f.lon != null && f.lat != null) {
+      geometry = { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] };
+    }
     return {
       type: "Feature",
       id: f.id,
-      geometry: point,
+      geometry,
       properties: {
         id: f.id,
         name: f.name,
@@ -361,15 +342,43 @@ export async function loadOfflineMapData(systemId: string): Promise<OfflineMapDa
     };
   });
 
+  const systemFeatures = systems.map((s: Record<string, unknown>) => ({
+    type: "Feature",
+    id: s.id,
+    geometry: null,
+    properties: {
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      description: s.description,
+    },
+  }));
+
   return {
     trails: { type: "FeatureCollection", features: trailFeatures },
-    systems: { type: "FeatureCollection", features: [] },
+    systems: { type: "FeatureCollection", features: systemFeatures },
     features: { type: "FeatureCollection", features: featurePoints },
   };
 }
 
-export async function getDownloadedSystemIds(): Promise<string[]> {
+export async function getDownloadedRegionIds(): Promise<string[]> {
   const db = await getOfflineDb();
-  const rows = await db.exec("SELECT system_id FROM downloaded_packs");
-  return rows.map((r) => String(r.system_id));
+  const rows = await db.exec("SELECT id FROM offline_regions");
+  return rows.map((r) => String(r.id));
+}
+
+export async function getOfflineRegions() {
+  const db = await getOfflineDb();
+  return db.exec("SELECT * FROM offline_regions");
+}
+
+export async function deleteAllOfflineRegions() {
+  const db = await getOfflineDb();
+  await db.execRaw("DELETE FROM offline_regions");
+  await db.execRaw("DELETE FROM systems");
+  await db.execRaw("DELETE FROM trails");
+  await db.execRaw("DELETE FROM trail_systems");
+  await db.execRaw("DELETE FROM trail_segments");
+  await db.execRaw("DELETE FROM features");
+  await db.execRaw("DELETE FROM wiki_pages WHERE target_type != 'trail' AND target_type != 'system' AND target_type != 'feature'");
 }

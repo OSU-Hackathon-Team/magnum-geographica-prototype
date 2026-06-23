@@ -69,5 +69,27 @@ export const STORAGE_HARD_CAP_BYTES = 500 * 1024 * 1024;
 export const OFFLINE_TILE_ZOOM_DETAIL_MAX = 14;
 export const OFFLINE_TILE_ZOOM_OVERVIEW_MAX = 9;
 
+export type QualityLevelKey = "basic" | "standard" | "high" | "maximum";
+
+export interface QualityLevel {
+  key: QualityLevelKey;
+  label: string;
+  minZoom: number;
+  maxZoom: number;
+}
+
+export const QUALITY_LEVELS: Record<QualityLevelKey, QualityLevel> = {
+  basic: { key: "basic", label: "Basic", minZoom: 2, maxZoom: 8 },
+  standard: { key: "standard", label: "Standard", minZoom: 2, maxZoom: 10 },
+  high: { key: "high", label: "High", minZoom: 2, maxZoom: 12 },
+  maximum: { key: "maximum", label: "Maximum", minZoom: 2, maxZoom: 14 },
+};
+
+export const QUALITY_LEVEL_ORDER: QualityLevelKey[] = ["basic", "standard", "high", "maximum"];
+
+export const DEFAULT_OFFLINE_QUALITY: QualityLevelKey = "high";
+
+export const DEFAULT_OFFLINE_MIN_ZOOM = 2;
+
 export const ATTESTATION_QUORUM_DEFAULT = 3;
 export const ATTESTATION_TRACK_OVERLAP_THRESHOLD = 0.8;

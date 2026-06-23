@@ -12,24 +12,24 @@ function formatSize(bytes: number): string {
 }
 
 export interface StorageManagerProps {
-  onDeletePack: (systemId: string) => Promise<void>;
+  onDeleteRegion: (regionId: string) => Promise<void>;
 }
 
-export function StorageManager({ onDeletePack }: StorageManagerProps) {
-  const { downloadedPacks } = useOfflineStore();
+export function StorageManager({ onDeleteRegion }: StorageManagerProps) {
+  const { offlineRegions } = useOfflineStore();
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const totalBytes = downloadedPacks.reduce(
-    (sum, p) => sum + p.tileSizeBytes + p.geojsonSizeBytes + p.wikiSizeBytes,
+  const totalBytes = offlineRegions.reduce(
+    (sum, r) => sum + r.tileSizeBytes + r.geojsonSizeBytes + r.wikiSizeBytes,
     0,
   );
   const usagePercent = Math.min(100, (totalBytes / STORAGE_HARD_CAP_BYTES) * 100);
   const nearLimit = totalBytes >= STORAGE_SOFT_WARN_BYTES;
 
-  async function handleDelete(systemId: string) {
-    setDeleting(systemId);
+  async function handleDelete(regionId: string) {
+    setDeleting(regionId);
     try {
-      await onDeletePack(systemId);
+      await onDeleteRegion(regionId);
     } finally {
       setDeleting(null);
     }
@@ -55,24 +55,31 @@ export function StorageManager({ onDeletePack }: StorageManagerProps) {
         {nearLimit ? "  Warning: approaching limit" : ""}
       </Text>
 
-      {downloadedPacks.length === 0 ? (
-        <Text style={styles.empty} testID="storage-empty">No systems downloaded for offline use.</Text>
+      {offlineRegions.length === 0 ? (
+        <Text style={styles.empty} testID="storage-empty">
+          No regions downloaded for offline use.
+        </Text>
       ) : (
-        downloadedPacks.map((pack) => (
-          <View key={pack.systemId} style={styles.packRow} testID={`storage-pack-${pack.systemId}`}>
-            <View style={styles.packInfo}>
-              <Text style={styles.packName}>{pack.systemName}</Text>
-              <Text style={styles.packSize}>
-                {formatSize(pack.tileSizeBytes + pack.geojsonSizeBytes + pack.wikiSizeBytes)}
-                {pack.lastSynced ? ` · Synced ${new Date(pack.lastSynced).toLocaleDateString()}` : ""}
+        offlineRegions.map((region) => (
+          <View key={region.id} style={styles.regionRow} testID={`storage-region-${region.id}`}>
+            <View style={styles.regionInfo}>
+              <Text style={styles.regionName}>{region.name}</Text>
+              <Text style={styles.regionDetail}>
+                {region.baseLayerId} · z{region.minZoom}–{region.maxZoom} · {region.totalTiles} tiles
+              </Text>
+              <Text style={styles.regionSize}>
+                {formatSize(region.tileSizeBytes + region.geojsonSizeBytes + region.wikiSizeBytes)}
+                {region.lastSynced
+                  ? ` · Synced ${new Date(region.lastSynced).toLocaleDateString()}`
+                  : ""}
               </Text>
             </View>
             <Button
               variant="ghost"
               size="small"
-              onPress={() => handleDelete(pack.systemId)}
-              disabled={deleting === pack.systemId}
-              testID={`storage-delete-${pack.systemId}`}
+              onPress={() => handleDelete(region.id)}
+              disabled={deleting === region.id}
+              testID={`storage-delete-${region.id}`}
             >
               <Ionicons name="trash-outline" size={14} color="#ef4444" />
             </Button>
@@ -80,11 +87,16 @@ export function StorageManager({ onDeletePack }: StorageManagerProps) {
         ))
       )}
 
-      {downloadedPacks.length > 0 ? (
+      {offlineRegions.length > 0 ? (
         <View style={styles.deleteAll}>
-          <Button variant="ghost" size="small" onPress={() => {
-            downloadedPacks.forEach((p) => handleDelete(p.systemId));
-          }} testID="storage-delete-all">
+          <Button
+            variant="ghost"
+            size="small"
+            onPress={() => {
+              offlineRegions.forEach((r) => handleDelete(r.id));
+            }}
+            testID="storage-delete-all"
+          >
             Delete All
           </Button>
         </View>
@@ -106,7 +118,7 @@ const styles = StyleSheet.create({
   usageText: { fontSize: 11, color: "#888" },
   usageWarn: { color: "#f97316" },
   empty: { fontSize: 13, color: "#aaa", fontStyle: "italic" },
-  packRow: {
+  regionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -114,8 +126,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
-  packInfo: { flex: 1, gap: 2 },
-  packName: { fontSize: 13, fontWeight: "500" },
-  packSize: { fontSize: 11, color: "#888" },
+  regionInfo: { flex: 1, gap: 2 },
+  regionName: { fontSize: 13, fontWeight: "500" },
+  regionDetail: { fontSize: 11, color: "#999" },
+  regionSize: { fontSize: 11, color: "#888" },
   deleteAll: { alignItems: "flex-end", paddingTop: 8 },
 });

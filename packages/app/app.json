@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "magnum",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "platforms": [
       "ios",
       "android",

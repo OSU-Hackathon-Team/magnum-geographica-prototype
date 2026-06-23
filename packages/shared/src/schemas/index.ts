@@ -290,3 +290,62 @@ export const mediaListResponseSchema = z.object({
   items: z.array(mediaSchema.omit({ data: true }).extend({ thumbnail_url: z.string() })),
   total: z.number().int().nonnegative(),
 });
+
+export const bboxDownloadRequestSchema = z.object({
+  minLon: z.number().min(-180).max(180),
+  minLat: z.number().min(-90).max(90),
+  maxLon: z.number().min(-180).max(180),
+  maxLat: z.number().min(-90).max(90),
+  baseLayerId: z.string().min(1).max(60),
+  minZoom: z.number().int().min(0).max(18),
+  maxZoom: z.number().int().min(0).max(18),
+}).refine((d) => d.minLon < d.maxLon && d.minLat < d.maxLat && d.minZoom <= d.maxZoom, {
+  message: "min must be less than max for lon, lat, and zoom",
+});
+
+export const bboxInfoResponseSchema = z.object({
+  tileCount: z.number().int().nonnegative(),
+  estimatedTileBytes: z.number().int().nonnegative(),
+  entityCounts: z.object({
+    systems: z.number().int().nonnegative(),
+    trails: z.number().int().nonnegative(),
+    features: z.number().int().nonnegative(),
+    wikiPages: z.number().int().nonnegative(),
+  }),
+  totalEstimatedBytes: z.number().int().nonnegative(),
+});
+
+export const offlineRegionSchema = z.object({
+  id: uuidSchema,
+  name: z.string().min(1).max(200),
+  baseLayerId: z.string().min(1).max(60),
+  minLon: z.number(),
+  minLat: z.number(),
+  maxLon: z.number(),
+  maxLat: z.number(),
+  minZoom: z.number().int(),
+  maxZoom: z.number().int(),
+  totalTiles: z.number().int().nonnegative(),
+  tileSizeBytes: z.number().int().nonnegative(),
+  geojsonSizeBytes: z.number().int().nonnegative(),
+  wikiSizeBytes: z.number().int().nonnegative(),
+  tilesPath: z.string().nullable(),
+  generatedAt: z.string().nullable(),
+  lastSynced: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export const bboxPackGenerateResponseSchema = z.object({
+  packId: uuidSchema,
+  tileCount: z.number().int().nonnegative(),
+  tileSizeBytes: z.number().int().nonnegative(),
+  geojsonSizeBytes: z.number().int().nonnegative(),
+  wikiSizeBytes: z.number().int().nonnegative(),
+  totalSizeBytes: z.number().int().nonnegative(),
+  entityCounts: z.object({
+    systems: z.number().int().nonnegative(),
+    trails: z.number().int().nonnegative(),
+    features: z.number().int().nonnegative(),
+    wikiPages: z.number().int().nonnegative(),
+  }),
+});

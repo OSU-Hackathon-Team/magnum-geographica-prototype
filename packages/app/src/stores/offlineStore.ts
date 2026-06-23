@@ -2,47 +2,57 @@ import { create } from "zustand";
 
 export type SyncState = "idle" | "syncing" | "error";
 
-export interface DownloadedPack {
-  systemId: string;
-  systemName: string;
+export interface OfflineRegion {
+  id: string;
+  name: string;
+  baseLayerId: string;
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+  minZoom: number;
+  maxZoom: number;
+  totalTiles: number;
   tileSizeBytes: number;
   geojsonSizeBytes: number;
   wikiSizeBytes: number;
+  tilesPath: string | null;
   generatedAt: string | null;
   lastSynced: string | null;
+  createdAt: string;
 }
 
 export interface OfflineState {
   isOnline: boolean;
   pendingCount: number;
   syncState: SyncState;
-  downloadedPacks: DownloadedPack[];
+  offlineRegions: OfflineRegion[];
   setOnline: (online: boolean) => void;
   setPendingCount: (n: number) => void;
   setSyncState: (s: SyncState) => void;
-  setDownloadedPacks: (packs: DownloadedPack[]) => void;
-  addDownloadedPack: (pack: DownloadedPack) => void;
-  removeDownloadedPack: (systemId: string) => void;
+  setOfflineRegions: (regions: OfflineRegion[]) => void;
+  addOfflineRegion: (region: OfflineRegion) => void;
+  removeOfflineRegion: (id: string) => void;
 }
 
 export const useOfflineStore = create<OfflineState>((set) => ({
   isOnline: true,
   pendingCount: 0,
   syncState: "idle",
-  downloadedPacks: [],
+  offlineRegions: [],
   setOnline: (online) => set({ isOnline: online }),
   setPendingCount: (n) => set({ pendingCount: n }),
   setSyncState: (s) => set({ syncState: s }),
-  setDownloadedPacks: (packs) => set({ downloadedPacks: packs }),
-  addDownloadedPack: (pack) =>
+  setOfflineRegions: (regions) => set({ offlineRegions: regions }),
+  addOfflineRegion: (region) =>
     set((s) => ({
-      downloadedPacks: [
-        ...s.downloadedPacks.filter((p) => p.systemId !== pack.systemId),
-        pack,
+      offlineRegions: [
+        ...s.offlineRegions.filter((r) => r.id !== region.id),
+        region,
       ],
     })),
-  removeDownloadedPack: (systemId) =>
+  removeOfflineRegion: (id) =>
     set((s) => ({
-      downloadedPacks: s.downloadedPacks.filter((p) => p.systemId !== systemId),
+      offlineRegions: s.offlineRegions.filter((r) => r.id !== id),
     })),
 }));

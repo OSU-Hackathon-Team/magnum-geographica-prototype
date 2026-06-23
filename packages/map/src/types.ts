@@ -26,5 +26,13 @@ export interface MapContainerProps {
     systems?: unknown;
     features?: unknown;
   } | null;
+  offlineBaseLayer?: {
+    kind: "mvt" | "raster";
+    tilesPath: string;
+    minZoom: number;
+    maxZoom: number;
+  } | null;
+  drawMode?: boolean;
+  onDrawEnd?: (bbox: { minLon: number; minLat: number; maxLon: number; maxLat: number }) => void;
   onMapRef?: (send: (cmd: import("./bridge/types.js").BridgeCommand) => void) => void;
 }

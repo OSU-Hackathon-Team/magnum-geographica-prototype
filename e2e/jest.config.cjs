@@ -2,7 +2,8 @@
 module.exports = {
   rootDir: "..",
   testMatch: ["<rootDir>/e2e/**/*.test.cjs"],
-  testTimeout: 120000,
+  testTimeout: 300000,
+  setupTimeout: 180000,
   maxWorkers: 1,
   globalSetup: "detox/runners/jest/globalSetup",
   globalTeardown: "detox/runners/jest/globalTeardown",

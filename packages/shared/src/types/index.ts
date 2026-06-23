@@ -12,6 +12,9 @@ import {
   mediaSchema,
   offlinePackInfoSchema,
   pendingContributionSchema,
+  bboxDownloadRequestSchema,
+  bboxInfoResponseSchema,
+  offlineRegionSchema,
 } from "../schemas/index.js";
 
 export type Difficulty = "easy" | "moderate" | "hard" | "expert";
@@ -55,6 +58,9 @@ export type Revision = z.infer<typeof revisionSchema>;
 export type Media = z.infer<typeof mediaSchema>;
 export type OfflinePackInfo = z.infer<typeof offlinePackInfoSchema>;
 export type PendingContribution = z.infer<typeof pendingContributionSchema>;
+export type BboxDownloadRequest = z.infer<typeof bboxDownloadRequestSchema>;
+export type BboxInfoResponse = z.infer<typeof bboxInfoResponseSchema>;
+export type OfflineRegion = z.infer<typeof offlineRegionSchema>;
 
 export interface GeoJSONPolygon {
   type: "Polygon";

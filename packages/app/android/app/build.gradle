@@ -88,13 +88,14 @@ android {
 
     namespace 'org.magnum.app'
     defaultConfig {
+        // detox-plugin-default-config
+        testBuildType System.getProperty('testBuildType', 'debug')
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         applicationId 'org.magnum.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "0.0.1"
-        testBuildType System.getProperty('testBuildType', 'debug')
-        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     signingConfigs {
         debug {
@@ -115,6 +116,10 @@ android {
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // Detox-specific additions to pro-guard
+            def detoxProguardRulesPath = new File(["node", "--print", "require.resolve('detox/package.json')"].execute(null, rootDir).text.trim(), "../android/detox/proguard-rules-app.pro")
+            proguardFile(detoxProguardRulesPath)
+            
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
         }
     }
@@ -149,6 +154,8 @@ android {
 }
 
 dependencies {
+    androidTestImplementation('com.wix:detox:+')
+    implementation 'androidx.appcompat:appcompat:1.6.1'
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
@@ -175,9 +182,4 @@ dependencies {
     } else {
         implementation jscFlavor
     }
-
-    // Detox
-    androidTestImplementation('com.wix:detox:+')
-    androidTestImplementation('androidx.test:runner:1.5.2')
-    androidTestImplementation('androidx.test:rules:1.5.0')
 }

@@ -5,16 +5,6 @@ describe("Offline Flow — Download and Browse", () => {
     await device.launchApp({ newInstance: true });
   });
 
-  it("should show download button on system detail", async () => {
-    await element(by.id("tab-systems")).tap();
-    await waitForScreen("systems-screen");
-    await element(by.id("system-card-hocking-hills-state-park")).tap();
-    await waitForScreen("system-detail-screen");
-
-    await expectVisible("download-container-sys-1");
-    await expectVisible("download-button-sys-1");
-  });
-
   it("should show status indicator on all tabs", async () => {
     await waitForScreen("explore-screen");
     await expectVisible("status-indicator");
@@ -43,13 +33,18 @@ describe("Offline Flow — Download and Browse", () => {
     await expectVisible("profile-pending-section");
   });
 
-  it("should show download button with proper testID", async () => {
+  it("should show download area button on explore map", async () => {
+    await waitForScreen("explore-screen");
+    await expectVisible("explore-download-area");
+  });
+
+  it("should show system detail without old download button", async () => {
     await element(by.id("tab-systems")).tap();
     await waitForScreen("systems-screen");
     await element(by.id("system-card-hocking-hills-state-park")).tap();
     await waitForScreen("system-detail-screen");
 
-    // The download button should render
-    await expectVisible("download-button-sys-1");
+    // Old download button should NOT be present
+    await expectVisible("system-offline-ready");
   });
 });

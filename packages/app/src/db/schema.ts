@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const OFFLINE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -99,18 +99,29 @@ CREATE TABLE IF NOT EXISTS citations (
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS downloaded_packs (
-  system_id TEXT PRIMARY KEY,
-  system_name TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS offline_regions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  base_layer_id TEXT NOT NULL,
+  min_lon REAL NOT NULL,
+  min_lat REAL NOT NULL,
+  max_lon REAL NOT NULL,
+  max_lat REAL NOT NULL,
+  min_zoom INTEGER NOT NULL,
+  max_zoom INTEGER NOT NULL,
+  total_tiles INTEGER NOT NULL DEFAULT 0,
   tile_size_bytes INTEGER NOT NULL DEFAULT 0,
   geojson_size_bytes INTEGER NOT NULL DEFAULT 0,
   wiki_size_bytes INTEGER NOT NULL DEFAULT 0,
-  mbtiles_data BLOB,
-  geojson_data BLOB,
-  wiki_data TEXT,
+  tiles_path TEXT,
   generated_at TEXT,
-  last_synced TEXT
+  last_synced TEXT,
+  created_at TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_offline_regions_bbox ON offline_regions(min_lon, min_lat, max_lon, max_lat);
+
+DROP TABLE IF EXISTS downloaded_packs;
 
 CREATE TABLE IF NOT EXISTS pending_contributions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

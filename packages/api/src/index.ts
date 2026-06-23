@@ -29,7 +29,7 @@ app.route("/api/features", featuresRoute);
 app.route("/api/wiki-pages", wikiRoute);
 app.route("/api/citations", citationsRoute);
 app.route("/api/revisions", revisionsRoute);
-app.route("/api/offline-packs", offlineRoute);
+app.route("/api/offline-bbox", offlineRoute);
 app.route("/api/sync", syncRoute);
 app.route("/api/media", mediaRoute);
 app.route("/api/segments", segmentDetailRoute);

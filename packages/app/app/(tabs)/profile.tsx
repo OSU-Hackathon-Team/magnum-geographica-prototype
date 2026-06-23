@@ -7,7 +7,7 @@ import { StorageManager } from "../../src/components/offline/StorageManager";
 import { PendingQueue, type PendingItem } from "../../src/components/offline/PendingQueue";
 import {
   getPendingContributions,
-  removeDownloadedPack as removePack,
+  deleteOfflineRegion as deleteRegion,
   deletePendingContribution,
 } from "../../src/services/offlineDataService";
 import { syncContributions } from "../../src/services/syncService";
@@ -49,10 +49,9 @@ export default function ProfileScreen() {
     [refreshPending],
   );
 
-  const handleDeletePack = useCallback(
-    async (systemId: string) => {
-      await removePack(systemId);
-      useOfflineStore.getState().removeDownloadedPack(systemId);
+  const handleDeleteRegion = useCallback(
+    async (regionId: string) => {
+      await deleteRegion(regionId);
     },
     [],
   );
@@ -76,7 +75,7 @@ export default function ProfileScreen() {
       </Card>
 
       <Card>
-        <StorageManager onDeletePack={handleDeletePack} />
+        <StorageManager onDeleteRegion={handleDeleteRegion} />
       </Card>
 
       <View testID="profile-pending-section">

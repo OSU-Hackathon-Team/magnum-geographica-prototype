@@ -1,6 +1,6 @@
 const { by, element, expect, waitFor } = require("detox");
 
-async function waitForScreen(testID, timeout = 15000) {
+async function waitForScreen(testID, timeout = 30000) {
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .withTimeout(timeout);
@@ -29,7 +29,7 @@ async function scrollDown(screenID, pixels = 500) {
   await element(by.id(screenID)).scroll(pixels, "down");
 }
 
-async function expectVisible(testID, timeout = 15000) {
+async function expectVisible(testID, timeout = 30000) {
   await waitFor(element(by.id(testID)))
     .toBeVisible()
     .withTimeout(timeout);

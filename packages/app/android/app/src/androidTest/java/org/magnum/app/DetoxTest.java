@@ -1,5 +1,5 @@
 package org.magnum.app;
-
+    
 import com.wix.detox.Detox;
 import com.wix.detox.config.DetoxConfig;
 

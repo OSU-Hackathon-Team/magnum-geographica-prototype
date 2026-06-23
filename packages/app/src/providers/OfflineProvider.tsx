@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { Platform } from "react-native";
 import { useOfflineStore } from "../stores/offlineStore";
 import { getPendingCount } from "../services/offlineDataService";
-import { loadDownloadedPacksIntoStore } from "../services/offlinePackService";
+import { loadOfflineRegionsIntoStore } from "../services/offlinePackService";
 import { syncContributions, fetchUpdates } from "../services/syncService";
 import { useAuthStore } from "../stores/authStore";
 
@@ -14,7 +14,7 @@ async function refreshFromDb() {
     // DB not ready
   }
   try {
-    await loadDownloadedPacksIntoStore();
+    await loadOfflineRegionsIntoStore();
   } catch {
     // DB not ready
   }

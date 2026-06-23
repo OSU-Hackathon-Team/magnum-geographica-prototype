@@ -12,7 +12,7 @@
   "behavior": {
     "init": {
       "reinstallApp": true,
-      "launchApp": false
+      "launchApp": true
     }
   },
   "apps": {

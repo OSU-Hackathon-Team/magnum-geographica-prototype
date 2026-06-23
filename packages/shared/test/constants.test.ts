@@ -15,6 +15,10 @@ import {
   OFFLINE_TILE_ZOOM_OVERVIEW_MAX,
   ATTESTATION_QUORUM_DEFAULT,
   ATTESTATION_TRACK_OVERLAP_THRESHOLD,
+  QUALITY_LEVELS,
+  QUALITY_LEVEL_ORDER,
+  DEFAULT_OFFLINE_QUALITY,
+  DEFAULT_OFFLINE_MIN_ZOOM,
 } from "../src/constants.js";
 
 describe("enum coverage", () => {
@@ -79,5 +83,42 @@ describe("attestation constants", () => {
   test("overlap threshold is in (0, 1]", () => {
     expect(ATTESTATION_TRACK_OVERLAP_THRESHOLD).toBeGreaterThan(0);
     expect(ATTESTATION_TRACK_OVERLAP_THRESHOLD).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("quality levels", () => {
+  test("all ordered keys map to valid levels", () => {
+    for (const key of QUALITY_LEVEL_ORDER) {
+      const level = QUALITY_LEVELS[key];
+      expect(level).toBeDefined();
+      expect(level.key).toBe(key);
+      expect(level.minZoom).toBeLessThanOrEqual(level.maxZoom);
+      expect(level.minZoom).toBeGreaterThanOrEqual(0);
+      expect(level.maxZoom).toBeLessThanOrEqual(18);
+    }
+  });
+
+  test("ordered levels have non-decreasing max zoom", () => {
+    let prevMax = 0;
+    for (const key of QUALITY_LEVEL_ORDER) {
+      expect(QUALITY_LEVELS[key]!.maxZoom).toBeGreaterThanOrEqual(prevMax);
+      prevMax = QUALITY_LEVELS[key]!.maxZoom;
+    }
+  });
+
+  test("default quality exists in ordered list", () => {
+    expect(QUALITY_LEVELS[DEFAULT_OFFLINE_QUALITY]).toBeDefined();
+    expect(QUALITY_LEVEL_ORDER).toContain(DEFAULT_OFFLINE_QUALITY);
+  });
+
+  test("default min zoom is 2", () => {
+    expect(DEFAULT_OFFLINE_MIN_ZOOM).toBe(2);
+  });
+
+  test("each quality level has a label string", () => {
+    for (const key of QUALITY_LEVEL_ORDER) {
+      expect(typeof QUALITY_LEVELS[key]!.label).toBe("string");
+      expect(QUALITY_LEVELS[key]!.label.length).toBeGreaterThan(0);
+    }
   });
 });
