@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { WikiPageView } from "../../src/components/wiki/WikiPageView";
 import { DownloadButton } from "../../src/components/offline/DownloadButton";
 import { downloadSystemPack, fetchPackInfo } from "../../src/services/offlinePackService";
 import { isSystemDownloaded, getSystemTrails, getWikiPage as getLocalWikiPage } from "../../src/services/offlineDataService";
@@ -43,89 +44,91 @@ export default function SystemDetail() {
   const isOnline = useOfflineStore((s) => s.isOnline);
   const downloadedPacks = useOfflineStore((s) => s.downloadedPacks);
 
-  useEffect(() => {
-    if (!slug || typeof slug !== "string") return;
-    const client = createMagnumClient(API_URL);
+  useFocusEffect(
+    useCallback(() => {
+      if (!slug || typeof slug !== "string") return;
+      const client = createMagnumClient(API_URL);
 
-    if (!isOnline) {
-      const pack = downloadedPacks.find(
-        (p) => p.systemName.toLowerCase().replace(/[^a-z0-9]+/g, "-") === slug,
-      );
-      if (pack) {
-        setSystem({
-          id: pack.systemId,
-          name: pack.systemName,
-          slug: slug,
-          description: null,
-          boundary: null,
-          ownership_source: null,
-          source_date: null,
-          external_url: null,
-          created_at: "",
-          updated_at: "",
-        } as System);
-        setIsDownloaded(true);
-        getSystemTrails(pack.systemId).then((localTrails) =>
-          setTrails(
-            localTrails.map((t) => ({
-              id: t.id,
-              name: t.name,
-              slug: t.slug,
-              description: t.description,
-              difficulty: t.difficulty as Trail["difficulty"],
-              length_meters: t.length_meters,
-              elevation_gain_meters: t.elevation_gain_meters,
-              geometry: null,
-              created_at: "",
-              updated_at: "",
-              verified: Boolean(t.verified),
-            })),
-          ),
+      if (!isOnline) {
+        const pack = downloadedPacks.find(
+          (p) => p.systemName.toLowerCase().replace(/[^a-z0-9]+/g, "-") === slug,
         );
-        getLocalWikiPage("system", pack.systemId).then((localWiki) => {
-          if (localWiki) {
-            setWikiPage({
-              id: String(localWiki.id),
-              target_type: "system",
-              target_id: pack.systemId,
-              title: String(localWiki.title),
-              content_md: String(localWiki.content_md),
-              rendered_html: "",
-              created_at: String(localWiki.updated_at),
-              updated_at: String(localWiki.updated_at),
-            });
-          }
-        });
-      } else {
-        setError("Offline and not downloaded");
-      }
-      return;
-    }
-
-    client
-      .getSystemBySlug(slug)
-      .then(async (s) => {
-        setSystem(s);
-        const [t, w] = await Promise.all([
-          client.listSystemTrails(s.id).catch(() => ({ items: [] as Trail[], total: 0 })),
-          client.getWikiPage("system", s.id).catch(() => null),
-        ]);
-        setTrails(t.items);
-        if (w) setWikiPage(w as WikiPage);
-
-        const downloaded = await isSystemDownloaded(s.id).catch(() => false);
-        setIsDownloaded(downloaded);
-        if (!downloaded) {
-          try {
-            const info = await fetchPackInfo(s.id);
-            setPackSize(info.total_size_bytes);
-          } catch {
-            setPackSize(undefined);
-          }
+        if (pack) {
+          setSystem({
+            id: pack.systemId,
+            name: pack.systemName,
+            slug: slug,
+            description: null,
+            boundary: null,
+            ownership_source: null,
+            source_date: null,
+            external_url: null,
+            created_at: "",
+            updated_at: "",
+          } as System);
+          setIsDownloaded(true);
+          getSystemTrails(pack.systemId).then((localTrails) =>
+            setTrails(
+              localTrails.map((t) => ({
+                id: t.id,
+                name: t.name,
+                slug: t.slug,
+                description: t.description,
+                difficulty: t.difficulty as Trail["difficulty"],
+                length_meters: t.length_meters,
+                elevation_gain_meters: t.elevation_gain_meters,
+                geometry: null,
+                created_at: "",
+                updated_at: "",
+                verified: Boolean(t.verified),
+              })),
+            ),
+          );
+          getLocalWikiPage("system", pack.systemId).then((localWiki) => {
+            if (localWiki) {
+              setWikiPage({
+                id: String(localWiki.id),
+                target_type: "system",
+                target_id: pack.systemId,
+                title: String(localWiki.title),
+                content_md: String(localWiki.content_md),
+                rendered_html: "",
+                created_at: String(localWiki.updated_at),
+                updated_at: String(localWiki.updated_at),
+              });
+            }
+          });
+        } else {
+          setError("Offline and not downloaded");
         }
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
-  }, [slug, isOnline, downloadedPacks]);
+        return;
+      }
+
+      client
+        .getSystemBySlug(slug)
+        .then(async (s) => {
+          setSystem(s);
+          const [t, w] = await Promise.all([
+            client.listSystemTrails(s.id).catch(() => ({ items: [] as Trail[], total: 0 })),
+            client.getWikiPage("system", s.id).catch(() => null),
+          ]);
+          setTrails(t.items);
+          if (w) setWikiPage(w as WikiPage);
+
+          const downloaded = await isSystemDownloaded(s.id).catch(() => false);
+          setIsDownloaded(downloaded);
+          if (!downloaded) {
+            try {
+              const info = await fetchPackInfo(s.id);
+              setPackSize(info.total_size_bytes);
+            } catch {
+              setPackSize(undefined);
+            }
+          }
+        })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
+    }, [slug, isOnline, downloadedPacks]),
+  );
 
   useEffect(() => {
     if (!system) return;
@@ -189,34 +192,6 @@ export default function SystemDetail() {
           ) : null}
         </View>
 
-        <View style={styles.section} testID="system-wiki">
-          <View style={styles.row}>
-            <Text style={styles.h2}>Wiki</Text>
-            <Button
-              variant={wikiPage ? "ghost" : "primary"}
-              size="small"
-              onPress={() =>
-                router.push(`/wiki/edit/system/${system.id}` as never)
-              }
-              testID="system-wiki-edit"
-            >
-              {wikiPage ? "Edit" : "Create"}
-            </Button>
-          </View>
-          {wikiPage ? (
-            <Pressable
-              onPress={() => router.push(`/wiki/system/${system.id}` as never)}
-              testID="system-wiki-view"
-            >
-              <Text style={styles.wikiPreview} numberOfLines={3}>
-                {wikiPage.content_md || "No content yet."}
-              </Text>
-            </Pressable>
-          ) : (
-            <Text style={styles.body}>No wiki page yet for this system.</Text>
-          )}
-        </View>
-
         <View style={styles.section} testID="system-trails">
           <Text style={styles.h2}>Trails ({trails.length})</Text>
           {trails.length === 0 ? (
@@ -246,6 +221,37 @@ export default function SystemDetail() {
             ))
           )}
         </View>
+
+        <View style={styles.section} testID="system-wiki">
+          <View style={styles.row}>
+            <Text style={styles.h2}>Wiki</Text>
+            <Button
+              variant={wikiPage ? "ghost" : "primary"}
+              size="small"
+              onPress={() =>
+                router.push({
+                  pathname: "/wiki/edit/system/[targetId]" as never,
+                  params: { targetId: system.id, defaultTitle: system.name },
+                } as never)
+              }
+              testID="system-wiki-edit"
+            >
+              {wikiPage ? "Edit" : "Create"}
+            </Button>
+          </View>
+          {wikiPage ? (
+            <Pressable
+              onPress={() => router.push(`/wiki/system/${system.id}` as never)}
+              testID="system-wiki-view"
+            >
+              <View style={styles.wikiPreviewBox}>
+                <WikiPageView wikiPage={wikiPage} compact />
+              </View>
+            </Pressable>
+          ) : (
+            <Text style={styles.body}>No wiki page yet for this system.</Text>
+          )}
+        </View>
       </ScrollView>
     </>
   );
@@ -265,14 +271,11 @@ const styles = StyleSheet.create({
   linkText: { fontSize: 13, color: "#22c55e" },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { fontSize: 15, fontWeight: "600" },
-  wikiPreview: {
-    fontSize: 13,
-    color: "#555",
-    lineHeight: 18,
+  wikiPreviewBox: {
     backgroundColor: "#f9fafb",
-    padding: 12,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#e8e8e8",
+    padding: 4,
   },
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -27,6 +27,7 @@ export interface WikiPageEditorProps {
   citations?: Citation[];
   onAddCitation?: (citation: { url?: string; title: string }) => void;
   onDeleteCitation?: (citationId: string) => void;
+  defaultTitle?: string;
 }
 
 export function WikiPageEditor({
@@ -41,12 +42,20 @@ export function WikiPageEditor({
   citations,
   onAddCitation,
   onDeleteCitation,
+  defaultTitle,
 }: WikiPageEditorProps) {
-  const [title, setTitle] = useState(wikiPage?.title ?? "");
+  const [title, setTitle] = useState(wikiPage?.title ?? defaultTitle ?? "");
   const [content, setContent] = useState(wikiPage?.content_md ?? "");
   const [editSummary, setEditSummary] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [tab, setTab] = useState<"edit" | "revisions" | "citations">("edit");
+
+  useEffect(() => {
+    setTitle(wikiPage?.title ?? defaultTitle ?? "");
+    setContent(wikiPage?.content_md ?? "");
+    setEditSummary("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wikiPage?.id]);
 
   if (isLoading) {
     return (

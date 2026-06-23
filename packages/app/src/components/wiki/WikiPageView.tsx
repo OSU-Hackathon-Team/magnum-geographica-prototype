@@ -116,6 +116,7 @@ export interface WikiPageViewProps {
   lastRevision?: Revision | null;
   onEdit?: () => void;
   onViewHistory?: () => void;
+  compact?: boolean;
 }
 
 export function WikiPageView({
@@ -125,40 +126,43 @@ export function WikiPageView({
   lastRevision,
   onEdit,
   onViewHistory,
+  compact = false,
 }: WikiPageViewProps) {
   const blocks = renderMarkdown(wikiPage.content_md);
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title} testID="wiki-page-title">{wikiPage.title}</Text>
-        <View style={styles.metaRow}>
-          <Text style={styles.meta} testID="wiki-page-meta">
-            Updated {formatDate(wikiPage.updated_at)}
-          </Text>
-          {lastRevision ? (
-            <Text style={styles.meta} testID="wiki-page-contributor">
-              {" "}· by {lastRevision.contributor_name}
+      {compact ? null : (
+        <View style={styles.header}>
+          <Text style={styles.title} testID="wiki-page-title">{wikiPage.title}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.meta} testID="wiki-page-meta">
+              Updated {formatDate(wikiPage.updated_at)}
             </Text>
-          ) : null}
+            {lastRevision ? (
+              <Text style={styles.meta} testID="wiki-page-contributor">
+                {" "}· by {lastRevision.contributor_name}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.actionRow}>
+            {revisionCount > 0 ? (
+              <Pressable onPress={onViewHistory} testID="wiki-view-history" style={styles.actionBtn}>
+                <Ionicons name="time-outline" size={12} color="#666" />
+                <Text style={styles.actionText}>{revisionCount} revision{revisionCount !== 1 ? "s" : ""}</Text>
+              </Pressable>
+            ) : null}
+            {citationCount > 0 ? (
+              <Text style={styles.actionText} testID="wiki-citation-count">{citationCount} citation{citationCount !== 1 ? "s" : ""}</Text>
+            ) : null}
+            {onEdit ? (
+              <Button variant="primary" size="small" onPress={onEdit} testID="wiki-edit-button">
+                Edit
+              </Button>
+            ) : null}
+          </View>
         </View>
-        <View style={styles.actionRow}>
-          {revisionCount > 0 ? (
-            <Pressable onPress={onViewHistory} testID="wiki-view-history" style={styles.actionBtn}>
-              <Ionicons name="time-outline" size={12} color="#666" />
-              <Text style={styles.actionText}>{revisionCount} revision{revisionCount !== 1 ? "s" : ""}</Text>
-            </Pressable>
-          ) : null}
-          {citationCount > 0 ? (
-            <Text style={styles.actionText} testID="wiki-citation-count">{citationCount} citation{citationCount !== 1 ? "s" : ""}</Text>
-          ) : null}
-          {onEdit ? (
-            <Button variant="primary" size="small" onPress={onEdit} testID="wiki-edit-button">
-              Edit
-            </Button>
-          ) : null}
-        </View>
-      </View>
+      )}
 
       <View style={styles.content} testID="wiki-page-content">
         {blocks.length === 0 ? (
