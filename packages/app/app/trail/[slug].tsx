@@ -33,7 +33,7 @@ import {
 } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
-const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
+const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
 function TrailMapPreview() {
   return (

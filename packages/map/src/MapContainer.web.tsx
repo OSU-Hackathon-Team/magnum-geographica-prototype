@@ -9,6 +9,7 @@ import { defaultMapConfig } from "./shared/config.js";
 import { createTrailsLayer } from "./layers/TrailsLayer.js";
 import { createSystemsLayer } from "./layers/SystemsLayer.js";
 import { createFeaturesLayer } from "./layers/FeaturesLayer.js";
+import { createSuperSystemsLayer } from "./layers/SuperSystemsLayer.js";
 import type { MapContainerProps } from "./types.js";
 
 export type { MapContainerProps };
@@ -18,9 +19,10 @@ const LAYER_NAME_BY_LAYER = {
   segments: "segments",
   systems: "systems",
   features: "features",
+  superSystems: "super_systems",
 } as const;
 
-type FeatureSelectLayer = (typeof LAYER_NAME_BY_LAYER)[keyof typeof LAYER_NAME_BY_LAYER];
+type FeatureSelectLayer = keyof typeof LAYER_NAME_BY_LAYER;
 
 function readStringId(value: unknown): string | null {
   if (typeof value === "string" && value.length > 0) return value;
@@ -51,10 +53,12 @@ export default function MapContainer({ config, onReady, onClick, onFeatureSelect
 
     const layers: Layer[] = [new TileLayer({ source: new OSM({ url: baseTileUrl }) })];
 
-    const systemsLayer = createSystemsLayer(merged);
-    if (systemsLayer) layers.push(systemsLayer);
+    const superSystemsLayer = createSuperSystemsLayer(merged);
+    if (superSystemsLayer) layers.push(superSystemsLayer);
     const trailsLayer = createTrailsLayer(merged);
     if (trailsLayer) layers.push(trailsLayer);
+    const systemsLayer = createSystemsLayer(merged);
+    if (systemsLayer) layers.push(systemsLayer);
     const featuresLayer = createFeaturesLayer(merged);
     if (featuresLayer) layers.push(featuresLayer);
 
@@ -84,9 +88,9 @@ export default function MapContainer({ config, onReady, onClick, onFeatureSelect
         if (!id) return null;
         const slug = readStringId(feature.get("slug"));
         const name = readStringId(feature.get("name"));
-        const matched = (Object.values(LAYER_NAME_BY_LAYER) as string[]).find((n) => n === layerName);
-        if (!matched) return null;
-        return { id, layer: matched as FeatureSelectLayer, slug, name };
+        const entry = Object.entries(LAYER_NAME_BY_LAYER).find(([, v]) => v === layerName);
+        if (!entry?.[0]) return null;
+        return { id, layer: entry[0] as FeatureSelectLayer, slug, name };
       });
 
       if (hit) {

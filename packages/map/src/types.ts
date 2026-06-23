@@ -12,7 +12,7 @@ export interface MapContainerProps {
   onLongClick?: (lon: number, lat: number) => void;
   onFeatureSelect?: (selection: {
     id: string;
-    layer: "trails" | "segments" | "systems" | "features";
+    layer: "trails" | "segments" | "systems" | "features" | "superSystems";
     slug?: string | null;
     name?: string | null;
   }) => void;

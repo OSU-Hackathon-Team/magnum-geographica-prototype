@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MapContainer } from "@magnum/map";
 import { createMagnumClient, type Feature as ApiFeature, type System, type Trail } from "@magnum/shared";
@@ -17,7 +17,7 @@ import {
 import type { OfflineMapData } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
-const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
+const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
 const MIN_QUERY_LENGTH = 1;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -54,6 +54,9 @@ export default function ExploreScreen() {
   const [showResults, setShowResults] = useState(false);
   const [offlineData, setOfflineData] = useState<OfflineMapData | null>(null);
   const [isPlacing, setIsPlacing] = useState(false);
+  const [selectedSystemSlug, setSelectedSystemSlug] = useState<string | null>(null);
+  const [selectedSystem, setSelectedSystem] = useState<System | null>(null);
+  const [systemLoading, setSystemLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestRef = useRef(0);
 
@@ -82,6 +85,22 @@ export default function ExploreScreen() {
     }),
     [initialCenter, initialZoom],
   );
+
+  useEffect(() => {
+    if (!selectedSystemSlug) {
+      setSelectedSystem(null);
+      return;
+    }
+    let cancelled = false;
+    setSystemLoading(true);
+    const client = createMagnumClient(API_URL);
+    client.raw
+      .request<System>("GET", `/api/systems/by-slug/${selectedSystemSlug}`)
+      .then((s) => { if (!cancelled) setSelectedSystem(s); })
+      .catch(() => { if (!cancelled) setSelectedSystem(null); })
+      .finally(() => { if (!cancelled) setSystemLoading(false); });
+    return () => { cancelled = true };
+  }, [selectedSystemSlug]);
 
   // Load offline map data when offline with downloaded packs
   useEffect(() => {
@@ -150,9 +169,9 @@ export default function ExploreScreen() {
     (s: System) => {
       setShowResults(false);
       setQuery("");
-      router.push(`/system/${s.slug}` as never);
+      setSelectedSystemSlug(s.slug);
     },
-    [router],
+    [],
   );
 
   const handleTrail = useCallback(
@@ -174,13 +193,13 @@ export default function ExploreScreen() {
   );
 
   const handleFeatureSelect = useCallback(
-    (selection: { id: string; layer: "trails" | "segments" | "systems" | "features"; slug?: string | null }) => {
+    (selection: { id: string; layer: "trails" | "segments" | "systems" | "features" | "superSystems"; slug?: string | null }) => {
       if (selection.layer === "trails" && selection.slug) {
         router.push(`/trail/${selection.slug}` as never);
         return;
       }
       if (selection.layer === "systems" && selection.slug) {
-        router.push(`/system/${selection.slug}` as never);
+        setSelectedSystemSlug(selection.slug);
         return;
       }
       if (selection.layer === "features") {
@@ -213,6 +232,11 @@ export default function ExploreScreen() {
 
   const handleCancelPlacing = useCallback(() => {
     setIsPlacing(false);
+  }, []);
+
+  const handleDismissSystemPopup = useCallback(() => {
+    setSelectedSystemSlug(null);
+    setSelectedSystem(null);
   }, []);
 
   return (
@@ -268,6 +292,52 @@ export default function ExploreScreen() {
         </View>
       ) : null}
 
+      {selectedSystemSlug ? (
+        <View style={styles.systemPopupOverlay} testID="explore-system-popup">
+          <View style={styles.systemPopup}>
+            <View style={styles.systemPopupHeader}>
+              <View style={styles.systemPopupTitleRow}>
+                {selectedSystem?.color ? (
+                  <View style={[styles.systemColorDot, { backgroundColor: selectedSystem.color }]} />
+                ) : null}
+                {systemLoading ? (
+                  <ActivityIndicator size="small" />
+                ) : (
+                  <Text style={styles.systemPopupTitle}>
+                    {selectedSystem?.name ?? selectedSystemSlug}
+                  </Text>
+                )}
+              </View>
+              <Pressable
+                onPress={handleDismissSystemPopup}
+                style={styles.systemPopupClose}
+                testID="system-popup-close"
+                accessibilityLabel="Close"
+              >
+                <Text style={styles.systemPopupCloseText}>×</Text>
+              </Pressable>
+            </View>
+            {selectedSystem?.description ? (
+              <Text style={styles.systemPopupDesc} numberOfLines={4}>
+                {selectedSystem.description}
+              </Text>
+            ) : null}
+            <View style={styles.systemPopupActions}>
+              <Pressable
+                style={styles.systemPopupLink}
+                onPress={() => {
+                  handleDismissSystemPopup();
+                  router.push(`/system/${selectedSystemSlug}` as never);
+                }}
+                testID="system-popup-detail"
+              >
+                <Text style={styles.systemPopupLinkText}>View details →</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {isPlacing ? (
         <View style={styles.placingBanner} testID="explore-placing-banner">
           <Text style={styles.placingText}>
@@ -319,6 +389,79 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   coordsText: { color: "#fff", fontSize: 12 },
+  systemPopupOverlay: {
+    position: "absolute",
+    bottom: 24,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+  },
+  systemPopup: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    gap: 10,
+  },
+  systemPopupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  systemPopupTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  systemColorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.15)",
+  },
+  systemPopupTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#111",
+    flexShrink: 1,
+  },
+  systemPopupClose: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  systemPopupCloseText: {
+    fontSize: 22,
+    color: "#888",
+    lineHeight: 26,
+  },
+  systemPopupDesc: {
+    fontSize: 13,
+    color: "#555",
+    lineHeight: 18,
+  },
+  systemPopupActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  systemPopupLink: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  systemPopupLinkText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#22c55e",
+  },
   placingBanner: {
     position: "absolute",
     top: 0,

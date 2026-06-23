@@ -51,8 +51,8 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
 
       function updateLayerVisibility(){
         if(!map)return;
-        var olayers = tileLayers.base?[tileLayers.base,tileLayers.trails,tileLayers.segments,tileLayers.systems,tileLayers.features].filter(Boolean):[];
-        var vlayers = vectorLayers.trails?[vectorLayers.trails,vectorLayers.systems,vectorLayers.features].filter(Boolean):[];
+        var olayers = tileLayers.base?[tileLayers.superSystems,tileLayers.base,tileLayers.trails,tileLayers.segments,tileLayers.systems,tileLayers.features].filter(Boolean):[];
+        var vlayers = vectorLayers.trails?[vectorLayers.superSystems,vectorLayers.trails,vectorLayers.systems,vectorLayers.features].filter(Boolean):[];
         olayers.forEach(function(l){l.setVisible(!offlineMode)})
         vlayers.forEach(function(l){l.setVisible(offlineMode)})
         document.getElementById('offlineBar').style.display = offlineMode?'block':'none'
@@ -96,35 +96,72 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
         allLayers.push(tileLayers.base);
 
         if(martinUrl){
+          // Super systems: dotted outlines at zoom 2-8
+          var ssSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/super_systems/{z}/{x}/{y}'});
+          vectorSources.superSystems=ssSrc;
+          tileLayers.superSystems=new ol.layer.VectorTile({source:ssSrc,minZoom:2,maxZoom:8,
+            style:function(f){
+              return new ol.style.Style({
+                stroke:new ol.style.Stroke({color:'#8B8B8B',width:2,lineDash:[8,6]}),
+                fill:new ol.style.Fill({color:'rgba(128,128,128,0.04)'}),
+                text:new ol.style.Text({text:f.get('name')||'',font:'bold 13px system-ui, sans-serif',fill:new ol.style.Fill({color:'#666'}),stroke:new ol.style.Stroke({color:'#fff',width:3}),overflow:true})
+              })
+            },visible:!offlineMode});
+          tileLayers.superSystems.set('name','super_systems');
+          allLayers.push(tileLayers.superSystems);
+          tileLayers.superSystems.on('click',function(e){var f=e.feature;if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'superSystems',slug:f.get('slug'),name:f.get('name')})});
+
           var trailSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/trails/{z}/{x}/{y}'});
           vectorSources.trails=trailSrc;
-          tileLayers.trails=new ol.layer.VectorTile({source:trailSrc,style:baseStyle,visible:!offlineMode});
+          tileLayers.trails=new ol.layer.VectorTile({source:trailSrc,minZoom:9,maxZoom:18,style:baseStyle,visible:!offlineMode});
           tileLayers.trails.set('name','trails');
           allLayers.push(tileLayers.trails);
           tileLayers.trails.on('click',function(e){var f=e.feature;if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'trails',slug:f.get('slug'),name:f.get('name')})});
 
           var segSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/segments/{z}/{x}/{y}'});
           vectorSources.segments=segSrc;
-          tileLayers.segments=new ol.layer.VectorTile({source:segSrc,style:baseStyle,visible:!offlineMode});
+          tileLayers.segments=new ol.layer.VectorTile({source:segSrc,minZoom:12,maxZoom:18,style:baseStyle,visible:!offlineMode});
           tileLayers.segments.set('name','segments');
           allLayers.push(tileLayers.segments);
 
           var sysSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/systems/{z}/{x}/{y}'});
           vectorSources.systems=sysSrc;
-          tileLayers.systems=new ol.layer.VectorTile({source:sysSrc,style:function(f){return new ol.style.Style({fill:new ol.style.Fill({color:'rgba(34,197,94,0.08)'}),stroke:new ol.style.Stroke({color:'#22c55e',width:1.5})})},visible:!offlineMode});
+          tileLayers.systems=new ol.layer.VectorTile({source:sysSrc,minZoom:5,maxZoom:12,
+            style:function(f){
+              var color=String(f.get('color')||'#22c55e');
+              var match=/^#?([a-f\\d]{2})([a-f\\d]{2})([a-f\\d]{2})$/i.exec(color);
+              var rgba='rgba(34,197,94,0.25)';
+              if(match){rgba='rgba('+parseInt(match[1],16)+','+parseInt(match[2],16)+','+parseInt(match[3],16)+',0.25)'}
+              return new ol.style.Style({
+                fill:new ol.style.Fill({color:rgba}),
+                stroke:new ol.style.Stroke({color:color,width:2}),
+                text:new ol.style.Text({text:f.get('name')||'',font:'bold 12px system-ui, sans-serif',fill:new ol.style.Fill({color:'#222'}),stroke:new ol.style.Stroke({color:'#fff',width:3}),overflow:true})
+              })
+            },visible:!offlineMode});
           tileLayers.systems.set('name','systems');
           allLayers.push(tileLayers.systems);
           tileLayers.systems.on('click',function(e){var f=e.feature;if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'systems',slug:f.get('slug'),name:f.get('name')})});
 
           var featSrc=new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/features/{z}/{x}/{y}'});
           vectorSources.features=featSrc;
-          tileLayers.features=new ol.layer.VectorTile({source:featSrc,style:createFeatureVectorStyle(),visible:!offlineMode});
+          tileLayers.features=new ol.layer.VectorTile({source:featSrc,minZoom:12,maxZoom:18,style:createFeatureVectorStyle(),visible:!offlineMode});
           tileLayers.features.set('name','features');
           allLayers.push(tileLayers.features);
           tileLayers.features.on('click',function(e){var f=e.feature;if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'features',slug:f.get('slug'),name:f.get('name')})});
         }
 
         // Offline vector layers (hidden by default, shown when offline)
+        vectorLayers.superSystems=new ol.layer.Vector({source:new ol.source.Vector(),
+          style:function(f){
+            return new ol.style.Style({
+              stroke:new ol.style.Stroke({color:'#8B8B8B',width:2,lineDash:[8,6]}),
+              fill:new ol.style.Fill({color:'rgba(128,128,128,0.04)'}),
+              text:new ol.style.Text({text:f.get('name')||'',font:'bold 13px sans-serif',fill:new ol.style.Fill({color:'#666'}),stroke:new ol.style.Stroke({color:'#fff',width:3}),overflow:true})
+            })
+          },visible:offlineMode});
+        vectorLayers.superSystems.set('name','super_systems');
+        allLayers.push(vectorLayers.superSystems);
+
         vectorLayers.trails=new ol.layer.Vector({source:new ol.source.Vector(),style:createTrailVectorStyle(),visible:offlineMode});
         vectorLayers.trails.set('name','trails');
         allLayers.push(vectorLayers.trails);
@@ -154,6 +191,11 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
         highlightTrail:function(a){highlightedId=a&&a.id;applyHighlight()},
         setOfflineMode:function(a){offlineMode=!!a.offline;updateLayerVisibility()},
         setOfflineData:function(a){
+          if(a.superSystems&&vectorLayers.superSystems){
+            var ssf=(new ol.format.GeoJSON()).readFeatures(a.superSystems,{featureProjection:'EPSG:3857'});
+            vectorLayers.superSystems.getSource().clear();
+            vectorLayers.superSystems.getSource().addFeatures(ssf);
+          }
           if(a.trails&&vectorLayers.trails){
             var tf=(new ol.format.GeoJSON()).readFeatures(a.trails,{featureProjection:'EPSG:3857'});
             vectorLayers.trails.getSource().clear();
@@ -324,7 +366,7 @@ function handleBridgeEvent(
     onClick?: (lon: number, lat: number) => void;
     onFeatureSelect?: (selection: {
       id: string;
-      layer: "trails" | "segments" | "systems" | "features";
+      layer: "trails" | "segments" | "systems" | "features" | "superSystems";
       slug?: string | null;
       name?: string | null;
     }) => void;
@@ -338,7 +380,7 @@ function handleBridgeEvent(
       handlers.onClick?.(event.lon, event.lat);
       return;
     case "featureSelect": {
-      const layer = (["trails", "segments", "systems", "features"] as const).find(
+      const layer = (["trails", "segments", "systems", "features", "superSystems"] as const).find(
         (l) => l === event.layer,
       );
       if (!layer) return;

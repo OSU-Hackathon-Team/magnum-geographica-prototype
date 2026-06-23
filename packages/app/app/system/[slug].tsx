@@ -14,7 +14,7 @@ import { isSystemDownloaded, getSystemTrails, getWikiPage as getLocalWikiPage } 
 import { useOfflineStore } from "../../src/stores/offlineStore";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
-const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
+const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
 function SystemMapPreview() {
   return (

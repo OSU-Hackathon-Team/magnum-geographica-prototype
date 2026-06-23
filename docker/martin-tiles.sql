@@ -3,9 +3,72 @@
 -- Apply with: psql $DATABASE_URL -f docker/martin-tiles.sql
 -- Then start Martin pointed at this DB. It will auto-discover these functions.
 
+-- ========== SUPER SYSTEMS ==========
+-- Exposed at: /super_systems/{z}/{x}/{y}
+-- Dotted outline polygons visible at very low zoom levels (2-7).
+
+CREATE OR REPLACE FUNCTION super_systems(
+  z integer, x integer, y integer
+)
+RETURNS bytea
+AS $$
+  WITH bounds AS (
+    SELECT ST_TileEnvelope(z, x, y) AS geom
+  ),
+    tile AS (
+      SELECT
+        ss.id,
+        ss.name,
+        ss.slug,
+        ss.official,
+        ST_AsMVTGeom(
+          ST_Transform(ss.boundary, 3857),
+          bounds.geom,
+          4096, 64, true
+        ) AS geometry
+      FROM super_systems ss, bounds
+      WHERE ss.boundary IS NOT NULL
+        AND ss.boundary && ST_Transform(bounds.geom, 4326)
+    )
+  SELECT ST_AsMVT(tile, 'super_systems', 4096, 'geometry')
+  FROM tile;
+$$ LANGUAGE sql STABLE PARALLEL SAFE;
+
+-- ========== SYSTEMS ==========
+-- Exposed at: /systems/{z}/{x}/{y}
+-- Semi-transparent filled polygons with name labels, visible at mid zoom (5-11).
+
+CREATE OR REPLACE FUNCTION systems(
+  z integer, x integer, y integer
+)
+RETURNS bytea
+AS $$
+  WITH bounds AS (
+    SELECT ST_TileEnvelope(z, x, y) AS geom
+  ),
+    tile AS (
+      SELECT
+        s.id,
+        s.name,
+        s.slug,
+        s.color,
+        s.ownership_source,
+        ST_AsMVTGeom(
+          ST_Transform(s.boundary, 3857),
+          bounds.geom,
+          4096, 64, true
+        ) AS geometry
+      FROM systems s, bounds
+      WHERE s.boundary IS NOT NULL
+        AND s.boundary && ST_Transform(bounds.geom, 4326)
+    )
+  SELECT ST_AsMVT(tile, 'systems', 4096, 'geometry')
+  FROM tile;
+$$ LANGUAGE sql STABLE PARALLEL SAFE;
+
 -- ========== TRAILS ==========
--- One layer "trails" with line geometries, colored by surface_type.
 -- Exposed at: /trails/{z}/{x}/{y}
+-- Colored lines visible at mid-high zoom (9+).
 
 CREATE OR REPLACE FUNCTION trails(
   z integer, x integer, y integer
@@ -21,6 +84,7 @@ AS $$
         t.name,
         t.slug,
         t.difficulty,
+        t.verified,
         t.length_meters::float8 AS length_m,
         COALESCE(
           (SELECT ts.surface_type FROM trail_segments ts
@@ -33,15 +97,14 @@ AS $$
           4096, 64, true
         ) AS geometry
       FROM trails t, bounds
-      WHERE t.geometry && ST_Transform(bounds.geom, 4326)
+      WHERE t.geometry IS NOT NULL
+        AND t.geometry && ST_Transform(bounds.geom, 4326)
     )
   SELECT ST_AsMVT(tile, 'trails', 4096, 'geometry')
   FROM tile;
 $$ LANGUAGE sql STABLE PARALLEL SAFE;
 
 -- ========== TRAIL SEGMENTS ==========
--- One layer "segments" with line geometries for each segment,
--- colored by surface_type, with hazard flags as properties.
 -- Exposed at: /segments/{z}/{x}/{y}
 
 CREATE OR REPLACE FUNCTION segments(
@@ -75,40 +138,9 @@ AS $$
   FROM tile;
 $$ LANGUAGE sql STABLE PARALLEL SAFE;
 
--- ========== SYSTEMS ==========
--- One layer "systems" with polygon geometries for each system.
--- Fill + stroke styled client-side in OpenLayers.
--- Exposed at: /systems/{z}/{x}/{y}
-
-CREATE OR REPLACE FUNCTION systems(
-  z integer, x integer, y integer
-)
-RETURNS bytea
-AS $$
-  WITH bounds AS (
-    SELECT ST_TileEnvelope(z, x, y) AS geom
-  ),
-    tile AS (
-      SELECT
-        s.id,
-        s.name,
-        s.slug,
-        s.ownership_source,
-        ST_AsMVTGeom(
-          ST_Transform(ST_Centroid(s.boundary), 3857),
-          bounds.geom,
-          4096, 64, true
-        ) AS geometry
-      FROM systems s, bounds
-      WHERE s.boundary && ST_Transform(bounds.geom, 4326)
-    )
-  SELECT ST_AsMVT(tile, 'systems', 4096, 'geometry')
-  FROM tile;
-$$ LANGUAGE sql STABLE PARALLEL SAFE;
-
 -- ========== FEATURES ==========
--- One layer "features" with point geometries, tagged by type_tag.
 -- Exposed at: /features/{z}/{x}/{y}
+-- Point markers visible at high zoom (12+).
 
 CREATE OR REPLACE FUNCTION features(
   z integer, x integer, y integer

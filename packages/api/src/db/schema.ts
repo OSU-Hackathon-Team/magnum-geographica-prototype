@@ -49,17 +49,21 @@ export const superSystems = pgTable("super_systems", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   official: boolean("official").notNull().default(true),
+  boundary: multiPolygon("boundary"),
   description: text("description"),
   externalUrl: text("external_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  boundaryIdx: index("idx_super_systems_boundary").using("gist", t.boundary),
+}));
 
 export const systems = pgTable("systems", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   boundary: multiPolygon("boundary"),
+  color: text("color").notNull().default("#22c55e"),
   ownershipSource: text("ownership_source"),
   sourceDate: date("source_date"),
   description: text("description"),

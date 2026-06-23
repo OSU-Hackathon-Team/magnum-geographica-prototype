@@ -10,6 +10,7 @@ const baseSystemSelect = {
   id: systems.id,
   name: systems.name,
   slug: systems.slug,
+  color: systems.color,
   ownership_source: systems.ownershipSource,
   source_date: systems.sourceDate,
   description: systems.description,

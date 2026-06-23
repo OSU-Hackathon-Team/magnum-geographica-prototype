@@ -7,6 +7,9 @@ import { trailsTileUrl } from "../shared/config.js";
 import { trailStrokeFor, TRAIL_STROKE_WIDTH } from "../shared/styles.js";
 import type { MapConfig } from "../shared/config.js";
 
+export const TRAIL_MIN_ZOOM = 9;
+export const TRAIL_MAX_ZOOM = 18;
+
 export function createTrailsLayer(config: MapConfig): VectorTileLayer | null {
   const url = trailsTileUrl(config);
   if (!url) return null;
@@ -16,6 +19,8 @@ export function createTrailsLayer(config: MapConfig): VectorTileLayer | null {
       url,
       tileGrid: createXYZ(),
     }),
+    minZoom: TRAIL_MIN_ZOOM,
+    maxZoom: TRAIL_MAX_ZOOM,
     style: (feature) => {
       const surface = String(feature.get("surface_type") ?? "natural");
       return new Style({

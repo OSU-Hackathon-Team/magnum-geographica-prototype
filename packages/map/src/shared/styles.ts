@@ -1,8 +1,9 @@
 import { SURFACE_COLORS, DIFFICULTY_COLORS, FEATURE_ICONS } from "@magnum/shared/constants";
 
-export const TRAIL_STROKE_WIDTH = 3;
-export const SYSTEM_FILL_OPACITY = 0.08;
-export const SYSTEM_STROKE_WIDTH = 1.5;
+export const TRAIL_STROKE_WIDTH = 4;
+export const SYSTEM_FILL_OPACITY = 0.25;
+export const SYSTEM_STROKE_WIDTH = 2;
+export const SUPER_SYSTEM_STROKE_WIDTH = 2;
 export const FEATURE_ICON_SIZE = 14;
 
 export function trailStrokeFor(surface: string | null | undefined): string {

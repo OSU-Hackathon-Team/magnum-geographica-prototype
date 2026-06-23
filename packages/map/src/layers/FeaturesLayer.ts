@@ -7,6 +7,9 @@ import { featuresTileUrl } from "../shared/config.js";
 import { featureLabelFor, FEATURE_ICON_SIZE } from "../shared/styles.js";
 import type { MapConfig } from "../shared/config.js";
 
+export const FEATURE_MIN_ZOOM = 12;
+export const FEATURE_MAX_ZOOM = 18;
+
 export function createFeaturesLayer(config: MapConfig): VectorTileLayer | null {
   const url = featuresTileUrl(config);
   if (!url) return null;
@@ -16,6 +19,8 @@ export function createFeaturesLayer(config: MapConfig): VectorTileLayer | null {
       url,
       tileGrid: createXYZ(),
     }),
+    minZoom: FEATURE_MIN_ZOOM,
+    maxZoom: FEATURE_MAX_ZOOM,
     style: (feature) => {
       const typeTag = String(feature.get("type_tag") ?? "other");
       return new Style({

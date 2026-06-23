@@ -6,17 +6,21 @@ import {
   systemSuperSystems,
   trails,
   trailSystems,
+  trailSegments,
+  features,
   wikiPages,
 } from "../db/schema.js";
 
-const OHIO_BBOX =
-  "POLYGON((-84.8203 38.4032, -80.5183 38.4032, -80.5183 41.9775, -84.8203 41.9775, -84.8203 38.4032))";
+const SUPER_SYSTEM_BOUNDARY =
+  "MULTIPOLYGON(((-84.9 38.3, -80.4 38.3, -80.4 42.1, -84.9 42.1, -84.9 38.3)))";
 
 const OHIO_SYSTEMS: ReadonlyArray<{
   name: string;
   slug: string;
   description: string;
   externalUrl: string;
+  color: string;
+  boundary: string;
   lon: number;
   lat: number;
 }> = [
@@ -25,6 +29,9 @@ const OHIO_SYSTEMS: ReadonlyArray<{
     slug: "hocking-hills-state-park",
     description: "A state park in southeastern Ohio known for its rugged terrain and gorges.",
     externalUrl: "https://ohiodnr.gov/go-and-do/places-to-go/state-parks/hocking-hills",
+    color: "#22c55e",
+    boundary:
+      "MULTIPOLYGON(((-82.65 39.38, -82.40 39.38, -82.40 39.52, -82.65 39.52, -82.65 39.38)))",
     lon: -82.5318,
     lat: 39.4465,
   },
@@ -33,6 +40,9 @@ const OHIO_SYSTEMS: ReadonlyArray<{
     slug: "cuyahoga-valley-national-park",
     description: "A national park between Cleveland and Akron with the Ohio & Erie Canal Towpath Trail.",
     externalUrl: "https://www.nps.gov/cuva/",
+    color: "#3b82f6",
+    boundary:
+      "MULTIPOLYGON(((-81.70 41.17, -81.40 41.17, -81.40 41.32, -81.70 41.32, -81.70 41.17)))",
     lon: -81.55,
     lat: 41.24,
   },
@@ -41,6 +51,9 @@ const OHIO_SYSTEMS: ReadonlyArray<{
     slug: "wayne-national-forest",
     description: "Ohio's only national forest, covering parts of southeastern Ohio.",
     externalUrl: "https://www.fs.usda.gov/wayne",
+    color: "#f97316",
+    boundary:
+      "MULTIPOLYGON(((-82.56 39.38, -82.31 39.38, -82.31 39.52, -82.56 39.52, -82.56 39.38)))",
     lon: -82.45,
     lat: 39.45,
   },
@@ -53,6 +66,8 @@ const OHIO_TRAILS: ReadonlyArray<{
   difficulty: "easy" | "moderate" | "hard" | "expert";
   lengthMeters: number;
   elevationGainMeters: number;
+  geometry: string;
+  systemIdx: number;
 }> = [
   {
     name: "Buckeye Trail",
@@ -61,6 +76,9 @@ const OHIO_TRAILS: ReadonlyArray<{
     difficulty: "moderate",
     lengthMeters: 2_324_200,
     elevationGainMeters: 8500,
+    geometry:
+      "MULTILINESTRING((-82.54 39.44, -82.52 39.46, -82.49 39.47, -82.46 39.48, -82.43 39.47, -82.40 39.45))",
+    systemIdx: 0,
   },
   {
     name: "Ohio Erie Trail",
@@ -69,6 +87,9 @@ const OHIO_TRAILS: ReadonlyArray<{
     difficulty: "easy",
     lengthMeters: 532_000,
     elevationGainMeters: 1200,
+    geometry:
+      "MULTILINESTRING((-81.58 41.22, -81.56 41.24, -81.54 41.25, -81.52 41.26, -81.50 41.25, -81.48 41.23))",
+    systemIdx: 1,
   },
   {
     name: "Little Miami Scenic Trail",
@@ -77,6 +98,9 @@ const OHIO_TRAILS: ReadonlyArray<{
     difficulty: "easy",
     lengthMeters: 102_000,
     elevationGainMeters: 320,
+    geometry:
+      "MULTILINESTRING((-82.47 39.45, -82.44 39.46, -82.41 39.47, -82.38 39.48, -82.35 39.49))",
+    systemIdx: 2,
   },
   {
     name: "Hocking Hills Indian Run",
@@ -85,6 +109,9 @@ const OHIO_TRAILS: ReadonlyArray<{
     difficulty: "moderate",
     lengthMeters: 6_400,
     elevationGainMeters: 180,
+    geometry:
+      "MULTILINESTRING((-82.54 39.43, -82.52 39.45, -82.50 39.47, -82.48 39.49, -82.50 39.47, -82.52 39.45, -82.54 39.43))",
+    systemIdx: 0,
   },
   {
     name: "Towpath Trail",
@@ -93,6 +120,9 @@ const OHIO_TRAILS: ReadonlyArray<{
     difficulty: "easy",
     lengthMeters: 154_500,
     elevationGainMeters: 200,
+    geometry:
+      "MULTILINESTRING((-81.60 41.20, -81.58 41.22, -81.56 41.24, -81.54 41.26, -81.52 41.28, -81.49 41.29))",
+    systemIdx: 1,
   },
 ];
 
@@ -101,14 +131,17 @@ const OHIO_FEATURES: ReadonlyArray<{
   typeTag: string;
   systemIdx: number;
   description?: string;
+  lon: number;
+  lat: number;
 }> = [
-  { name: "Old Man's Cave", typeTag: "scenic_point", systemIdx: 0, description: "Recessed gorge with waterfall." },
-  { name: "Ash Cave Trailhead", typeTag: "trailhead", systemIdx: 0 },
-  { name: "Ledges Overlook", typeTag: "scenic_point", systemIdx: 0 },
-  { name: "Blue Hen Falls", typeTag: "water_source", systemIdx: 1 },
-  { name: "Boston Mill Visitor Center", typeTag: "trailhead", systemIdx: 1 },
-  { name: "Pine Hollow Parking", typeTag: "parking", systemIdx: 2 },
-  { name: "Covered Bridge Trailhead", typeTag: "trailhead", systemIdx: 2 },
+  { name: "Old Man's Cave", typeTag: "scenic_point", systemIdx: 0, description: "Recessed gorge with waterfall.", lon: -82.5410, lat: 39.4400 },
+  { name: "Ash Cave Trailhead", typeTag: "trailhead", systemIdx: 0, lon: -82.5450, lat: 39.4480 },
+  { name: "Cedar Falls Overlook", typeTag: "scenic_point", systemIdx: 0, lon: -82.5350, lat: 39.4550 },
+  { name: "Ledges Overlook", typeTag: "scenic_point", systemIdx: 1, lon: -81.5600, lat: 41.2450 },
+  { name: "Boston Mill Visitor Center", typeTag: "trailhead", systemIdx: 1, lon: -81.5550, lat: 41.2500 },
+  { name: "Blue Hen Falls", typeTag: "water_source", systemIdx: 1, lon: -81.5400, lat: 41.2300 },
+  { name: "Pine Hollow Parking", typeTag: "parking", systemIdx: 2, lon: -82.4600, lat: 39.4450 },
+  { name: "Covered Bridge Trailhead", typeTag: "trailhead", systemIdx: 2, lon: -82.4400, lat: 39.4600 },
 ];
 
 export interface SeedResult {
@@ -141,14 +174,20 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
     })
     .onConflictDoNothing()
     .returning();
-  if (ohioErie) result.super_systems = 1;
+  if (ohioErie) {
+    await database.execute(
+      sql`UPDATE super_systems SET boundary = ST_Multi(ST_GeomFromText('${sql.raw(SUPER_SYSTEM_BOUNDARY)}', 4326))::geometry(MultiPolygon,4326)
+          WHERE id = ${ohioErie.id}`,
+    );
+    result.super_systems = 1;
+  }
 
   await database.execute(
-    sql`INSERT INTO systems (name, slug, description, external_url, ownership_source, source_date, boundary)
+    sql`INSERT INTO systems (name, slug, description, external_url, ownership_source, source_date, color, boundary)
         VALUES ${sql.join(
           OHIO_SYSTEMS.map(
             (s) =>
-              sql`(${s.name}, ${s.slug}, ${s.description}, ${s.externalUrl}, 'ODNR / NPS / USFS', DATE '2024-01-01', ST_Multi(ST_GeomFromText('${sql.raw(OHIO_BBOX)}', 4326))::geometry(MultiPolygon,4326))`,
+              sql`(${s.name}, ${s.slug}, ${s.description}, ${s.externalUrl}, 'ODNR / NPS / USFS', DATE '2024-01-01', ${s.color}, ST_Multi(ST_GeomFromText('${sql.raw(s.boundary)}', 4326))::geometry(MultiPolygon,4326))`,
           ),
           sql.raw(", "),
         )}
@@ -170,7 +209,7 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
         VALUES ${sql.join(
           OHIO_TRAILS.map(
             (t) =>
-              sql`(${t.name}, ${t.slug}, ${t.description}, ${t.difficulty}, ${t.lengthMeters}, ${t.elevationGainMeters}, TRUE, ST_Multi(ST_GeomFromText('${sql.raw(`MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))`)}', 4326))::geometry(MultiLineString,4326))`,
+              sql`(${t.name}, ${t.slug}, ${t.description}, ${t.difficulty}, ${t.lengthMeters}, ${t.elevationGainMeters}, TRUE, ST_Multi(ST_GeomFromText('${sql.raw(t.geometry)}', 4326))::geometry(MultiLineString,4326))`,
           ),
           sql.raw(", "),
         )}
@@ -180,37 +219,44 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
   const allTrails = await database.select().from(trails);
   result.trails = allTrails.length;
 
-  if (allSystems.length > 0) {
-    await database
-      .insert(trailSystems)
-      .values(
-        allTrails.map((t) => ({ trailId: t.id, systemId: allSystems[0]!.id })),
-      )
-      .onConflictDoNothing();
+  for (const t of OHIO_TRAILS) {
+    if (allSystems.length > 0 && allTrails.length > 0) {
+      const sys = allSystems[Math.min(t.systemIdx, allSystems.length - 1)];
+      const trail = allTrails.find((tr) => tr.slug === t.slug);
+      if (trail && sys) {
+        await database
+          .insert(trailSystems)
+          .values({ trailId: trail.id, systemId: sys.id })
+          .onConflictDoNothing();
+      }
+    }
   }
 
   for (const trail of allTrails) {
+    const t = OHIO_TRAILS.find((ot) => ot.slug === trail.slug);
+    const geom = t ? t.geometry : "MULTILINESTRING((-82.5 39.45, -82.48 39.46))";
+    const surface = trail.slug === "little-miami-scenic-trail" ? "paved"
+      : trail.slug === "towpath-trail" ? "gravel"
+      : "natural";
     await database.execute(
       sql`INSERT INTO trail_segments (trail_id, name, sort_order, surface_type, geometry)
-          SELECT ${trail.id}, 'Main segment', 0, 'natural',
-                  ST_Multi(ST_GeomFromText('${sql.raw(`MULTILINESTRING((${-82.9} ${39.96}, ${-82.91} ${39.97}))`)}', 4326))::geometry(MultiLineString,4326)
-          WHERE NOT EXISTS (SELECT 1 FROM trail_segments WHERE trail_id = ${trail.id} AND sort_order = 0)`,
+          VALUES (${trail.id}, 'Main segment', 0, ${surface},
+                  ST_Multi(ST_GeomFromText('${sql.raw(geom)}', 4326))::geometry(MultiLineString,4326))
+          ON CONFLICT DO NOTHING`,
     );
     result.segments += 1;
   }
 
-  if (allSystems.length > 0) {
-    for (const f of OHIO_FEATURES) {
-      const sys = allSystems[Math.min(f.systemIdx, allSystems.length - 1)]!;
-      const coords = OHIO_SYSTEMS[Math.min(f.systemIdx, OHIO_SYSTEMS.length - 1)]!;
-      await database.execute(
-        sql`INSERT INTO features (name, type_tag, system_id, description, point)
-            SELECT ${f.name}, ${f.typeTag}, ${sys.id}, ${f.description ?? null},
-                   ST_SetSRID(ST_MakePoint(${coords.lon}, ${coords.lat}), 4326)::geometry(Point,4326)
-            WHERE NOT EXISTS (SELECT 1 FROM features WHERE name = ${f.name} AND system_id = ${sys.id})`,
-      );
-      result.features += 1;
-    }
+  for (const f of OHIO_FEATURES) {
+    const sys = allSystems[Math.min(f.systemIdx, allSystems.length - 1)];
+    if (!sys) continue;
+    await database.execute(
+      sql`INSERT INTO features (name, type_tag, system_id, description, point)
+          VALUES (${f.name}, ${f.typeTag}, ${sys.id}, ${f.description ?? null},
+                  ST_SetSRID(ST_MakePoint(${f.lon}, ${f.lat}), 4326)::geometry(Point,4326))
+          ON CONFLICT DO NOTHING`,
+    );
+    result.features += 1;
   }
 
   for (const trail of allTrails.slice(0, 3)) {

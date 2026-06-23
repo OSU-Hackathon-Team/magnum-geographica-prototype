@@ -29,6 +29,7 @@ export const systemSchema = z.object({
   id: uuidSchema,
   name: z.string().min(1).max(200),
   slug: slugSchema,
+  color: z.string().min(1).max(7).optional(),
   boundary: z.unknown().nullable().optional(),
   ownership_source: z.string().max(500).nullable().optional(),
   source_date: z.string().date().nullable().optional(),
