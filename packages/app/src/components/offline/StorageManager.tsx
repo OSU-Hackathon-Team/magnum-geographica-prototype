@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { STORAGE_SOFT_WARN_BYTES, STORAGE_HARD_CAP_BYTES } from "@magnum/shared";
-import { useOfflineStore, type DownloadedPack } from "../../stores/offlineStore";
+import { useOfflineStore } from "../../stores/offlineStore";
 import { Button } from "../ui/Button";
 
 function formatSize(bytes: number): string {

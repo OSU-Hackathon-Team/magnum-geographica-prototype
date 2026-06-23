@@ -29,7 +29,6 @@ import {
   getWikiPage as getLocalWikiPage,
   updateLocalSegment,
   deleteLocalSegment,
-  insertLocalSegment,
   reorderLocalSegments,
 } from "../../src/services/offlineDataService";
 

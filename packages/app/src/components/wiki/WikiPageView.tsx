@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { WikiPage, Citation, Revision } from "@magnum/shared";
+import type { WikiPage, Revision } from "@magnum/shared";
 import { Button } from "../ui/Button";
 
 function renderMarkdown(md: string): Array<{ type: "h1" | "h2" | "h3" | "p" | "li" | "hr"; text: string; url?: string }> {
@@ -100,30 +99,6 @@ function renderInline(text: string): Array<{ type: "text" | "bold" | "italic" | 
   if (current) parts.push({ type: "text", text: current });
 
   return parts;
-}
-
-function InlineText({ parts }: { parts: ReturnType<typeof renderInline> }) {
-  return (
-    <Text>
-      {parts.map((p, idx) => {
-        if (p.type === "link") {
-          return (
-            <Text
-              key={idx}
-              style={{ color: "#22c55e", textDecorationLine: "underline" }}
-              onPress={() => p.url && Linking.openURL(p.url)}
-            >
-              {p.text}
-            </Text>
-          );
-        }
-        if (p.type === "bold") return <Text key={idx} style={{ fontWeight: "700" }}>{p.text}</Text>;
-        if (p.type === "italic") return <Text key={idx} style={{ fontStyle: "italic" }}>{p.text}</Text>;
-        if (p.type === "code") return <Text key={idx} style={{ fontFamily: "monospace", backgroundColor: "#f1f1f1" }}>{p.text}</Text>;
-        return <Text key={idx}>{p.text}</Text>;
-      })}
-    </Text>
-  );
 }
 
 function formatDate(iso: string): string {

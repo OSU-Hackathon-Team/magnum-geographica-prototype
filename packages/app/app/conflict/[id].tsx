@@ -157,9 +157,9 @@ export default function ConflictScreen() {
         </View>
 
         <Text style={styles.hint}>
-          "Keep My Version" overwrites the server version with yours.
+          &ldquo;Keep My Version&rdquo; overwrites the server version with yours.
           {"\n"}
-          "Discard My Changes" removes your local edit.
+          &ldquo;Discard My Changes&rdquo; removes your local edit.
         </Text>
       </ScrollView>
     </>

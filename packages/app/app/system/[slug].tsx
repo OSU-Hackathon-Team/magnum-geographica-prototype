@@ -8,7 +8,6 @@ import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
-import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
 import { DownloadButton } from "../../src/components/offline/DownloadButton";
 import { downloadSystemPack, fetchPackInfo } from "../../src/services/offlinePackService";
 import { isSystemDownloaded, getSystemTrails, getWikiPage as getLocalWikiPage } from "../../src/services/offlineDataService";

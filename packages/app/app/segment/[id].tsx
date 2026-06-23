@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -21,6 +21,7 @@ export default function SegmentDetailScreen() {
   const [segment, setSegment] = useState<TrailSegment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLocalRef = useRef(false);
 
   useEffect(() => {
     if (!id || typeof id !== "string") return;
@@ -36,6 +37,7 @@ export default function SegmentDetailScreen() {
           (s: Record<string, unknown>) => String(s.id) === id,
         );
         if (match && !cancelled) {
+          hasLocalRef.current = true;
           setSegment({
             id: String(match.id),
             trail_id: String(match.trail_id ?? ""),
@@ -72,14 +74,14 @@ export default function SegmentDetailScreen() {
           if (!cancelled) setSegment(fresh);
         } catch (e: unknown) {
           if (
-            segment ||
+            hasLocalRef.current ||
             !e ||
             typeof e !== "object" ||
             !("status" in e) ||
             (e as { status: number }).status !== 404
           ) {
             // Keep local data if available
-          } else if (!segment) {
+          } else if (!hasLocalRef.current) {
             setError("Segment not found");
           }
         }
