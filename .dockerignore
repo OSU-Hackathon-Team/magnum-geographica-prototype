@@ -1,0 +1,65 @@
+# Node / Bun dependencies
+node_modules/
+**/node_modules/
+
+# Gradle / Android build outputs (887MB+ of pure bloat for the API image)
+packages/app/android/
+packages/*/android/
+**/android/build/
+**/android/.gradle/
+**/android/app/build/
+**/android/app/.cxx/
+
+# Built web/native artifacts
+packages/app/dist/
+packages/app/.expo/
+**/.expo/
+tests/e2e/.app/
+tests/e2e/.results/
+playwright-report/
+test-results/
+e2e/.results/
+detox_artifacts/
+
+# Build caches
+.turbo/
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+
+# Tooling caches
+.eslintcache
+.cache/
+.parcel-cache/
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Dev artifacts
+screenshot-test.png
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+coverage/
+*.tsbuildinfo
+
+# Docker meta (don't recurse)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Detox e2e (run on host, not in image)
+e2e/
