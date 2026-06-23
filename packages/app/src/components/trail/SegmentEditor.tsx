@@ -392,7 +392,7 @@ export function SegmentEditList({
       </View>
 
       <View style={styles.mergeBar} testID="segment-merge-bar">
-        <Text style={styles.mergeHint}>
+        <Text style={styles.mergeHint} testID="segment-merge-count">
           Select two segments to merge ({selectedForMerge.size}/2)
         </Text>
         <Button
