@@ -219,3 +219,73 @@ export const searchQuerySchema = z.object({
   type: z.enum(["system", "trail", "feature", "all"]).default("all"),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
+
+export const updateFeatureInputSchema = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    type_tag: z.enum(FEATURE_TYPES).optional(),
+    description: z.string().max(10_000).nullable().optional(),
+    trail_id: uuidSchema.nullable().optional(),
+    system_id: uuidSchema.nullable().optional(),
+  })
+  .strict();
+
+export const createMediaInputSchema = z.object({
+  feature_id: uuidSchema.optional(),
+  trail_id: uuidSchema.optional(),
+  system_id: uuidSchema.optional(),
+  data: z.string().min(1),
+  mime_type: z.string().min(1).max(120),
+  caption: z.string().max(500).optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+});
+
+export const createSegmentInputSchema = z
+  .object({
+    name: z.string().max(200).nullable().optional(),
+    geometry: z.unknown(),
+    sort_order: z.number().int().nonnegative().optional(),
+    surface_type: z.enum(SURFACE_TYPES).nullable().optional(),
+    hazards: z.array(z.string().max(120)).max(20).optional(),
+    is_road_connector: z.boolean().optional(),
+    steep_grade: z.boolean().optional(),
+    one_way: z.boolean().optional(),
+    description: z.string().max(10_000).nullable().optional(),
+  })
+  .strict();
+
+export const updateSegmentInputSchema = z
+  .object({
+    name: z.string().max(200).nullable().optional(),
+    sort_order: z.number().int().nonnegative().optional(),
+    surface_type: z.enum(SURFACE_TYPES).nullable().optional(),
+    hazards: z.array(z.string().max(120)).max(20).optional(),
+    is_road_connector: z.boolean().optional(),
+    steep_grade: z.boolean().optional(),
+    one_way: z.boolean().optional(),
+    description: z.string().max(10_000).nullable().optional(),
+  })
+  .strict();
+
+export const reorderSegmentsInputSchema = z.object({
+  ordered_ids: z.array(uuidSchema).min(1),
+});
+
+export const splitSegmentInputSchema = z.object({
+  segment_id: uuidSchema,
+  split_at: z.number().min(0).max(1),
+  name_a: z.string().max(200).optional(),
+  name_b: z.string().max(200).optional(),
+});
+
+export const mergeSegmentsInputSchema = z.object({
+  segment_id_a: uuidSchema,
+  segment_id_b: uuidSchema,
+  name: z.string().max(200).optional(),
+});
+
+export const mediaListResponseSchema = z.object({
+  items: z.array(mediaSchema.omit({ data: true }).extend({ thumbnail_url: z.string() })),
+  total: z.number().int().nonnegative(),
+});

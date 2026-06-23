@@ -1,21 +1,36 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
-import { createMagnumClient, type Trail, type TrailSegment, type Feature, type WikiPage } from "@magnum/shared";
+import {
+  createMagnumClient,
+  type Trail,
+  type TrailSegment,
+  type Feature,
+  type WikiPage,
+  type UpdateSegmentInput,
+} from "@magnum/shared";
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
 import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
+import { SegmentEditList } from "../../src/components/trail/SegmentEditor";
 import { useOfflineStore } from "../../src/stores/offlineStore";
+import { useAuthStore } from "../../src/stores/authStore";
 import {
+  addPendingContribution,
   getTrailBySlug,
   getTrailSegments,
   getTrailFeatures,
+  getPendingCount,
   getWikiPage as getLocalWikiPage,
+  updateLocalSegment,
+  deleteLocalSegment,
+  insertLocalSegment,
+  reorderLocalSegments,
 } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -44,7 +59,56 @@ export default function TrailDetail() {
   const [features, setFeatures] = useState<Feature[]>([]);
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [splittingId, setSplittingId] = useState<string | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [reordering, setReordering] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const isOnline = useOfflineStore((s) => s.isOnline);
+  const setPendingCount = useOfflineStore((s) => s.setPendingCount);
+  const contributorName = useAuthStore((s) => s.contributorName);
+
+  const refreshSegments = useCallback(async (trailId: string) => {
+    if (isOnline) {
+      const client = createMagnumClient(API_URL);
+      try {
+        const segs = await client.listTrailSegments(trailId);
+        setSegments(segs.items);
+        return;
+      } catch {
+        // fall through to local
+      }
+    }
+    const localSegs = await getTrailSegments(trailId);
+    setSegments(
+      localSegs.map((s) => ({
+        id: String(s.id),
+        trail_id: trailId,
+        name: s.name ? String(s.name) : null,
+        geometry: null,
+        sort_order: Number(s.sort_order ?? 0),
+        surface_type: s.surface_type
+          ? String(s.surface_type) as TrailSegment["surface_type"]
+          : null,
+        hazards: (() => {
+          try {
+            return JSON.parse(String(s.hazards ?? "[]"));
+          } catch {
+            return [];
+          }
+        })(),
+        is_road_connector: Boolean(s.is_road_connector),
+        steep_grade: Boolean(s.steep_grade),
+        one_way: Boolean(s.one_way),
+        description: s.description ? String(s.description) : null,
+        length_meters: s.length_meters ? Number(s.length_meters) : null,
+        created_at: "",
+        updated_at: "",
+      })),
+    );
+  }, [isOnline]);
 
   useEffect(() => {
     if (!slug || typeof slug !== "string") return;
@@ -64,7 +128,9 @@ export default function TrailDetail() {
           description: localTrail.description ? String(localTrail.description) : null,
           difficulty: localTrail.difficulty as Trail["difficulty"],
           length_meters: localTrail.length_meters ? Number(localTrail.length_meters) : null,
-          elevation_gain_meters: localTrail.elevation_gain_meters ? Number(localTrail.elevation_gain_meters) : null,
+          elevation_gain_meters: localTrail.elevation_gain_meters
+            ? Number(localTrail.elevation_gain_meters)
+            : null,
           geometry: null,
           created_at: "",
           updated_at: "",
@@ -82,8 +148,16 @@ export default function TrailDetail() {
             name: s.name ? String(s.name) : null,
             geometry: null,
             sort_order: Number(s.sort_order ?? 0),
-            surface_type: s.surface_type ? String(s.surface_type) as TrailSegment["surface_type"] : null,
-            hazards: (() => { try { return JSON.parse(String(s.hazards ?? "[]")); } catch { return []; } })(),
+            surface_type: s.surface_type
+              ? String(s.surface_type) as TrailSegment["surface_type"]
+              : null,
+            hazards: (() => {
+              try {
+                return JSON.parse(String(s.hazards ?? "[]"));
+              } catch {
+                return [];
+              }
+            })(),
             is_road_connector: Boolean(s.is_road_connector),
             steep_grade: Boolean(s.steep_grade),
             one_way: Boolean(s.one_way),
@@ -98,7 +172,9 @@ export default function TrailDetail() {
             id: String(f.id),
             name: String(f.name),
             type_tag: String(f.type_tag) as Feature["type_tag"],
-            point: f.lon != null && f.lat != null ? { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] } : null,
+            point: f.lon != null && f.lat != null
+              ? { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] }
+              : null,
             description: f.description ? String(f.description) : null,
             trail_id: f.trail_id ? String(f.trail_id) : null,
             system_id: f.system_id ? String(f.system_id) : null,
@@ -140,6 +216,235 @@ export default function TrailDetail() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
   }, [slug, isOnline]);
 
+  const handleSegmentUpdate = async (id: string, body: UpdateSegmentInput) => {
+    if (!trail) return;
+    setSavingId(id);
+    setPendingId(id);
+    try {
+      if (isOnline) {
+        const client = createMagnumClient(API_URL);
+        await client.updateSegment(id, body);
+        await refreshSegments(trail.id);
+      } else {
+        await addPendingContribution(
+          "trail_segment",
+          "update",
+          { id, ...body },
+          contributorName || "anonymous",
+          id,
+        );
+        await updateLocalSegment(id, {
+          name: body.name,
+          surface_type: body.surface_type,
+          hazards: body.hazards,
+          is_road_connector: body.is_road_connector,
+          steep_grade: body.steep_grade,
+          one_way: body.one_way,
+          description: body.description,
+        });
+        const newCount = await getPendingCount();
+        setPendingCount(newCount);
+        await refreshSegments(trail.id);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to save segment";
+      if (!isOnline && /network|fetch|timeout/i.test(msg)) {
+        try {
+          await addPendingContribution(
+            "trail_segment",
+            "update",
+            { id, ...body },
+            contributorName || "anonymous",
+            id,
+          );
+          await updateLocalSegment(id, {
+            name: body.name,
+            surface_type: body.surface_type,
+            hazards: body.hazards,
+            is_road_connector: body.is_road_connector,
+            steep_grade: body.steep_grade,
+            one_way: body.one_way,
+            description: body.description,
+          });
+          const newCount = await getPendingCount();
+          setPendingCount(newCount);
+          await refreshSegments(trail.id);
+          return;
+        } catch (queueErr) {
+          setError(queueErr instanceof Error ? queueErr.message : "Failed to queue");
+        }
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setSavingId(null);
+      setPendingId(null);
+    }
+  };
+
+  const handleSegmentDelete = async (id: string) => {
+    if (!trail) return;
+    setDeletingId(id);
+    try {
+      if (isOnline) {
+        const client = createMagnumClient(API_URL);
+        await client.deleteSegment(id);
+        await refreshSegments(trail.id);
+      } else {
+        await addPendingContribution(
+          "trail_segment",
+          "delete",
+          { id },
+          contributorName || "anonymous",
+          id,
+        );
+        await deleteLocalSegment(id);
+        const newCount = await getPendingCount();
+        setPendingCount(newCount);
+        await refreshSegments(trail.id);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete segment";
+      if (!isOnline && /network|fetch|timeout/i.test(msg)) {
+        try {
+          await addPendingContribution(
+            "trail_segment",
+            "delete",
+            { id },
+            contributorName || "anonymous",
+            id,
+          );
+          await deleteLocalSegment(id);
+          const newCount = await getPendingCount();
+          setPendingCount(newCount);
+          await refreshSegments(trail.id);
+          return;
+        } catch (queueErr) {
+          setError(queueErr instanceof Error ? queueErr.message : "Failed to queue");
+        }
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleSegmentSplit = async (
+    id: string,
+    splitAt: number,
+    nameA?: string,
+    nameB?: string,
+  ) => {
+    if (!trail) return;
+    setSplittingId(id);
+    try {
+      if (isOnline) {
+        const client = createMagnumClient(API_URL);
+        const res = await client.splitSegment(trail.id, {
+          segment_id: id,
+          split_at: splitAt,
+          name_a: nameA,
+          name_b: nameB,
+        });
+        setSegments(res.items);
+      } else {
+        await addPendingContribution(
+          "trail_segment",
+          "split",
+          { id, split_at: splitAt, name_a: nameA, name_b: nameB },
+          contributorName || "anonymous",
+          id,
+        );
+        const newCount = await getPendingCount();
+        setPendingCount(newCount);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to split segment";
+      setError(msg);
+    } finally {
+      setSplittingId(null);
+    }
+  };
+
+  const handleSegmentMerge = async (idA: string, idB: string) => {
+    if (!trail) return;
+    setMerging(true);
+    try {
+      if (isOnline) {
+        const client = createMagnumClient(API_URL);
+        await client.mergeSegments(trail.id, {
+          segment_id_a: idA,
+          segment_id_b: idB,
+        });
+        await refreshSegments(trail.id);
+      } else {
+        await addPendingContribution(
+          "trail_segment",
+          "merge",
+          { segment_id_a: idA, segment_id_b: idB },
+          contributorName || "anonymous",
+          idA,
+        );
+        const newCount = await getPendingCount();
+        setPendingCount(newCount);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to merge segments";
+      setError(msg);
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const handleReorder = async (orderedIds: string[]) => {
+    if (!trail) return;
+    setReordering(true);
+    try {
+      if (isOnline) {
+        const client = createMagnumClient(API_URL);
+        const res = await client.reorderSegments(trail.id, { ordered_ids: orderedIds });
+        setSegments(res.items);
+      } else {
+        await addPendingContribution(
+          "trail_segment",
+          "reorder",
+          { ordered_ids: orderedIds },
+          contributorName || "anonymous",
+          trail.id,
+        );
+        await reorderLocalSegments(trail.id, orderedIds);
+        const newCount = await getPendingCount();
+        setPendingCount(newCount);
+        await refreshSegments(trail.id);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to reorder segments";
+      if (!isOnline && /network|fetch|timeout/i.test(msg)) {
+        try {
+          await addPendingContribution(
+            "trail_segment",
+            "reorder",
+            { ordered_ids: orderedIds },
+            contributorName || "anonymous",
+            trail.id,
+          );
+          await reorderLocalSegments(trail.id, orderedIds);
+          const newCount = await getPendingCount();
+          setPendingCount(newCount);
+          await refreshSegments(trail.id);
+          return;
+        } catch (queueErr) {
+          setError(queueErr instanceof Error ? queueErr.message : "Failed to queue");
+        }
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setReordering(false);
+    }
+  };
+
   if (error) {
     return (
       <View style={styles.centered} testID="trail-detail-error">
@@ -152,6 +457,30 @@ export default function TrailDetail() {
       <View style={styles.centered} testID="trail-detail-loading">
         <ActivityIndicator />
       </View>
+    );
+  }
+
+  if (editMode) {
+    return (
+      <>
+        <Stack.Screen options={{ title: `${trail.name} — Edit Segments`, headerShown: true }} />
+        <SegmentEditList
+          segments={segments}
+          onUpdate={handleSegmentUpdate}
+          onDelete={handleSegmentDelete}
+          onSplit={handleSegmentSplit}
+          onMerge={handleSegmentMerge}
+          onReorder={handleReorder}
+          onExit={() => setEditMode(false)}
+          pendingId={pendingId}
+          savingId={savingId}
+          deletingId={deletingId}
+          splittingId={splittingId}
+          merging={merging}
+          reordering={reordering}
+          testID="trail-segment-edit-list"
+        />
+      </>
     );
   }
 
@@ -216,7 +545,17 @@ export default function TrailDetail() {
         </View>
 
         <View style={styles.section} testID="trail-segments">
-          <Text style={styles.h2}>Segments ({segments.length})</Text>
+          <View style={styles.row}>
+            <Text style={styles.h2}>Segments ({segments.length})</Text>
+            <Button
+              variant="ghost"
+              size="small"
+              onPress={() => setEditMode(true)}
+              testID="trail-segments-edit"
+            >
+              Edit Segments
+            </Button>
+          </View>
           {segments.length === 0 ? (
             <Text style={styles.body} testID="trail-segments-empty">No segments yet.</Text>
           ) : (

@@ -40,3 +40,33 @@ test("user can see wiki edit/create button on feature", async ({ page }) => {
   await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
   await expect(page.getByTestId("feature-wiki-edit")).toBeVisible();
 });
+
+test("feature detail shows Add Photo button", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId("feature-media-toggle")).toBeVisible();
+});
+
+test("tapping Add Photo shows the uploader component", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 10000 });
+  await page.getByTestId("feature-media-toggle").click();
+  await expect(page.getByTestId("feature-media-uploader")).toBeVisible();
+  await expect(page.getByTestId("feature-media-uploader-component")).toBeVisible();
+});
+
+test("uploader shows input and attach button", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await page.getByTestId("feature-media-toggle").click();
+  await expect(page.getByTestId("feature-media-uploader-component")).toBeVisible();
+  await expect(page.getByTestId("media-uploader-input")).toBeVisible();
+  await expect(page.getByTestId("media-uploader-attach")).toBeVisible();
+});
+
+test("tapping Cancel hides the uploader", async ({ page }) => {
+  await page.goto("/feature/f-1");
+  await page.getByTestId("feature-media-toggle").click();
+  await expect(page.getByTestId("feature-media-uploader")).toBeVisible();
+  await page.getByTestId("feature-media-toggle").click();
+  await expect(page.getByTestId("feature-media-uploader")).toHaveCount(0);
+});

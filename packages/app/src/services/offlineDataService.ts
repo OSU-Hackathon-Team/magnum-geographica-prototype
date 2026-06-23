@@ -68,6 +68,96 @@ export async function getTrailSegments(trailId: string) {
   return db.exec("SELECT * FROM trail_segments WHERE trail_id = ? ORDER BY sort_order", [trailId]);
 }
 
+export async function updateLocalSegment(segmentId: string, fields: {
+  name?: string | null;
+  surface_type?: string | null;
+  hazards?: string[];
+  is_road_connector?: boolean;
+  steep_grade?: boolean;
+  one_way?: boolean;
+  description?: string | null;
+  sort_order?: number;
+}) {
+  const db = await getOfflineDb();
+  const sets: string[] = [];
+  const params: (string | number)[] = [];
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined) continue;
+    if (k === "hazards") {
+      sets.push("hazards = ?");
+      params.push(JSON.stringify(v));
+    } else {
+      sets.push(`${k} = ?`);
+      params.push(typeof v === "boolean" ? (v ? 1 : 0) : (v as string | number));
+    }
+  }
+  if (sets.length === 0) return;
+  sets.push("updated_at = ?");
+  params.push(new Date().toISOString());
+  params.push(segmentId);
+  await db.execRaw(`UPDATE trail_segments SET ${sets.join(", ")} WHERE id = ?`, params);
+}
+
+export async function deleteLocalSegment(segmentId: string) {
+  const db = await getOfflineDb();
+  await db.execRaw("DELETE FROM trail_segments WHERE id = ?", [segmentId]);
+}
+
+export async function insertLocalSegment(segment: {
+  id: string;
+  trail_id: string;
+  name?: string | null;
+  sort_order: number;
+  surface_type?: string | null;
+  hazards?: string[];
+  is_road_connector?: boolean;
+  steep_grade?: boolean;
+  one_way?: boolean;
+  description?: string | null;
+  length_meters?: number | null;
+}) {
+  const db = await getOfflineDb();
+  await db.execRaw(
+    `INSERT INTO trail_segments (id, trail_id, name, sort_order, surface_type, hazards, is_road_connector, steep_grade, one_way, description, length_meters, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       sort_order = excluded.sort_order,
+       surface_type = excluded.surface_type,
+       hazards = excluded.hazards,
+       is_road_connector = excluded.is_road_connector,
+       steep_grade = excluded.steep_grade,
+       one_way = excluded.one_way,
+       description = excluded.description,
+       length_meters = excluded.length_meters,
+       updated_at = excluded.updated_at`,
+    [
+      segment.id,
+      segment.trail_id,
+      segment.name ?? null,
+      segment.sort_order,
+      segment.surface_type ?? null,
+      JSON.stringify(segment.hazards ?? []),
+      segment.is_road_connector ? 1 : 0,
+      segment.steep_grade ? 1 : 0,
+      segment.one_way ? 1 : 0,
+      segment.description ?? null,
+      segment.length_meters ?? null,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function reorderLocalSegments(trailId: string, orderedIds: string[]) {
+  const db = await getOfflineDb();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.execRaw(
+      "UPDATE trail_segments SET sort_order = ?, updated_at = ? WHERE id = ? AND trail_id = ?",
+      [i, new Date().toISOString(), orderedIds[i], trailId],
+    );
+  }
+}
+
 export async function getTrailFeatures(trailId: string) {
   const db = await getOfflineDb();
   return db.exec("SELECT * FROM features WHERE trail_id = ?", [trailId]);

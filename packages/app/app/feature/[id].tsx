@@ -6,10 +6,14 @@ import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
 import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
 import { MediaGallery, type MediaItem } from "../../src/components/media/MediaGallery";
+import { MediaUploader } from "../../src/components/media/MediaUploader";
 import { ImageViewer } from "../../src/components/media/ImageViewer";
 import { useOfflineStore } from "../../src/stores/offlineStore";
+import { useAuthStore } from "../../src/stores/authStore";
 import {
+  addPendingContribution,
   getFeatureById,
+  getPendingCount,
   getWikiPage as getLocalWikiPage,
 } from "../../src/services/offlineDataService";
 
@@ -23,7 +27,12 @@ export default function FeatureDetail() {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showUploader, setShowUploader] = useState(false);
   const isOnline = useOfflineStore((s) => s.isOnline);
+  const setPendingCount = useOfflineStore((s) => s.setPendingCount);
+  const contributorName = useAuthStore((s) => s.contributorName);
 
   useEffect(() => {
     if (!id || typeof id !== "string") return;
@@ -78,6 +87,75 @@ export default function FeatureDetail() {
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
   }, [id, isOnline]);
+
+  const refreshMedia = async () => {
+    if (!isOnline || !feature) return;
+    const client = createMagnumClient(API_URL);
+    try {
+      const mediaRes = await client.raw.request<{ items: MediaItem[] }>(
+        "GET",
+        `/api/media?feature_id=${feature.id}`,
+      );
+      setMediaItems(mediaRes.items);
+    } catch {
+      // keep current list
+    }
+  };
+
+  const handleMediaSelect = async (base64: string, mimeType: string) => {
+    if (!feature) return;
+    setUploadingMedia(true);
+    setUploadError(null);
+    const payload = {
+      feature_id: feature.id,
+      data: base64,
+      mime_type: mimeType,
+    };
+    try {
+      if (!isOnline) {
+        await addPendingContribution(
+          "media",
+          "create",
+          payload,
+          contributorName || "anonymous",
+          feature.id,
+        );
+        const newCount = await getPendingCount();
+        setPendingCount(newCount);
+        setShowUploader(false);
+        return;
+      }
+      const client = createMagnumClient(API_URL);
+      await client.createMedia(payload as Parameters<typeof client.createMedia>[0]);
+      await refreshMedia();
+      setShowUploader(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to upload photo";
+      if (!isOnline && /network|fetch|timeout/i.test(msg)) {
+        try {
+          await addPendingContribution(
+            "media",
+            "create",
+            payload,
+            contributorName || "anonymous",
+            feature.id,
+          );
+          const newCount = await getPendingCount();
+          setPendingCount(newCount);
+          setShowUploader(false);
+          return;
+        } catch (queueErr) {
+          setUploadError(
+            queueErr instanceof Error ? queueErr.message : "Failed to queue photo",
+          );
+          return;
+        }
+      }
+      setUploadError(msg);
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
 
   if (error) {
     return (
@@ -139,7 +217,38 @@ export default function FeatureDetail() {
           ) : null}
 
         <View style={styles.section} testID="feature-media">
-          <Text style={styles.h2}>Photos</Text>
+          <View style={styles.row}>
+            <Text style={styles.h2}>Photos</Text>
+            <Button
+              variant={showUploader ? "ghost" : "primary"}
+              size="small"
+              onPress={() => setShowUploader((v) => !v)}
+              testID="feature-media-toggle"
+            >
+              {showUploader ? "Cancel" : "Add Photo"}
+            </Button>
+          </View>
+
+          {showUploader ? (
+            <View testID="feature-media-uploader">
+              {!isOnline ? (
+                <Text style={styles.offlineHint}>
+                  Offline — photo will be saved locally and synced when back online.
+                </Text>
+              ) : null}
+              <MediaUploader
+                onSelect={handleMediaSelect}
+                uploading={uploadingMedia}
+                testID="feature-media-uploader-component"
+              />
+              {uploadError ? (
+                <Text style={styles.errorText} testID="feature-media-upload-error">
+                  {uploadError}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
           <MediaGallery
             items={mediaItems}
             onPress={(item) => setViewerUri(item.thumbnail_url || item.data_url || null)}
@@ -186,5 +295,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#e8e8e8",
+  },
+  offlineHint: {
+    fontSize: 12,
+    color: "#854d0e",
+    backgroundColor: "#fef9c3",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 4,
   },
 });

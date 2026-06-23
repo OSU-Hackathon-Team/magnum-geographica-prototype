@@ -380,13 +380,158 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
   // --- Segments ---
   {
     pattern: /\/api\/segments\/([^/]+)$/,
-    handler: ({ url }) => {
+    handler: ({ url, method, body }) => {
       const id = url.pathname.split("/").pop()!;
+      if (method === "DELETE") {
+        for (const [trailId, segs] of Object.entries(SEGMENTS_BY_TRAIL)) {
+          const arr = segs as Array<{ id: string }>;
+          const idx = arr.findIndex((s) => s.id === id);
+          if (idx >= 0) {
+            arr.splice(idx, 1);
+            SEGMENTS_BY_TRAIL[trailId] = arr;
+            return ok({ ok: true });
+          }
+        }
+        return notFound("segment not found");
+      }
+      if (method === "PUT") {
+        const b = body as { name?: string | null; surface_type?: string | null; hazards?: string[]; is_road_connector?: boolean; steep_grade?: boolean; one_way?: boolean; description?: string | null };
+        for (const [trailId, segs] of Object.entries(SEGMENTS_BY_TRAIL)) {
+          const arr = segs as Array<Record<string, unknown>>;
+          const seg = arr.find((s) => s.id === id);
+          if (seg) {
+            if (b.name !== undefined) seg.name = b.name;
+            if (b.surface_type !== undefined) seg.surface_type = b.surface_type;
+            if (b.hazards !== undefined) seg.hazards = b.hazards;
+            if (b.is_road_connector !== undefined) seg.is_road_connector = b.is_road_connector;
+            if (b.steep_grade !== undefined) seg.steep_grade = b.steep_grade;
+            if (b.one_way !== undefined) seg.one_way = b.one_way;
+            if (b.description !== undefined) seg.description = b.description;
+            seg.updated_at = new Date().toISOString();
+            SEGMENTS_BY_TRAIL[trailId] = arr;
+            return ok(seg);
+          }
+        }
+        return notFound("segment not found");
+      }
       for (const segs of Object.values(SEGMENTS_BY_TRAIL)) {
         const seg = (segs as { id: string }[]).find((s) => s.id === id);
         if (seg) return ok(seg);
       }
       return notFound(`segment ${id} not found`);
+    },
+  },
+  // --- Trail segment operations ---
+  {
+    pattern: /\/api\/trails\/([^/]+)\/segments\/reorder$/,
+    handler: ({ url, body }) => {
+      const trailId = url.pathname.split("/")[3];
+      const b = body as { ordered_ids?: string[] };
+      if (!b?.ordered_ids) return { status: 400, body: { error: "missing ordered_ids" } };
+      const segs = (SEGMENTS_BY_TRAIL[trailId] ?? []) as Array<Record<string, unknown>>;
+      const byId = new Map(segs.map((s) => [s.id as string, s]));
+      const reordered: Array<Record<string, unknown>> = [];
+      for (let i = 0; i < b.ordered_ids.length; i++) {
+        const seg = byId.get(b.ordered_ids[i]!);
+        if (!seg) return { status: 400, body: { error: "unknown id" } };
+        seg.sort_order = i;
+        reordered.push(seg);
+      }
+      SEGMENTS_BY_TRAIL[trailId] = reordered;
+      return ok({ items: reordered, total: reordered.length });
+    },
+  },
+  {
+    pattern: /\/api\/trails\/([^/]+)\/segments\/split$/,
+    handler: ({ url, body }) => {
+      const trailId = url.pathname.split("/")[3];
+      const b = body as { segment_id?: string; split_at?: number; name_a?: string; name_b?: string };
+      if (!b?.segment_id) return { status: 400, body: { error: "missing segment_id" } };
+      const segs = (SEGMENTS_BY_TRAIL[trailId] ?? []) as Array<Record<string, unknown>>;
+      const target = segs.find((s) => s.id === b.segment_id);
+      if (!target) return notFound("segment not found");
+      const at = b.split_at ?? 0.5;
+      const idA = String(target.id);
+      const idB = `seg-split-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const newSeg = {
+        ...target,
+        id: idB,
+        name: b.name_b ?? null,
+        sort_order: (Number(target.sort_order ?? 0) || 0) + 1,
+        length_meters: Number(target.length_meters ?? 0) * (1 - at),
+        updated_at: new Date().toISOString(),
+      };
+      target.name = b.name_a ?? null;
+      target.length_meters = Number(target.length_meters ?? 0) * at;
+      target.sort_order = Number(target.sort_order ?? 0) || 0;
+      target.updated_at = new Date().toISOString();
+      const insertAt = segs.findIndex((s) => s.id === idA) + 1;
+      segs.splice(insertAt, 0, newSeg);
+      for (let i = 0; i < segs.length; i++) segs[i]!.sort_order = i;
+      SEGMENTS_BY_TRAIL[trailId] = segs;
+      return ok({ items: segs, total: segs.length });
+    },
+  },
+  {
+    pattern: /\/api\/trails\/([^/]+)\/segments\/merge$/,
+    handler: ({ url, body }) => {
+      const trailId = url.pathname.split("/")[3];
+      const b = body as { segment_id_a?: string; segment_id_b?: string; name?: string };
+      if (!b?.segment_id_a || !b?.segment_id_b) return { status: 400, body: { error: "missing segment ids" } };
+      const segs = (SEGMENTS_BY_TRAIL[trailId] ?? []) as Array<Record<string, unknown>>;
+      const a = segs.find((s) => s.id === b.segment_id_a);
+      const bSeg = segs.find((s) => s.id === b.segment_id_b);
+      if (!a || !bSeg) return notFound("segment not found");
+      if (a.is_road_connector || bSeg.is_road_connector) {
+        return { status: 400, body: { error: "cannot merge road connectors" } };
+      }
+      const [lo, hi] = (a.sort_order as number) < (bSeg.sort_order as number) ? [a, bSeg] : [bSeg, a];
+      lo.name = b.name ?? lo.name;
+      lo.steep_grade = Boolean(lo.steep_grade) || Boolean(hi.steep_grade);
+      lo.one_way = Boolean(lo.one_way) && Boolean(hi.one_way);
+      const hazardsA = (lo.hazards as string[] | undefined) ?? [];
+      const hazardsB = (hi.hazards as string[] | undefined) ?? [];
+      lo.hazards = Array.from(new Set([...hazardsA, ...hazardsB]));
+      lo.length_meters = Number(lo.length_meters ?? 0) + Number(hi.length_meters ?? 0);
+      lo.updated_at = new Date().toISOString();
+      const idx = segs.findIndex((s) => s.id === hi.id);
+      if (idx >= 0) segs.splice(idx, 1);
+      for (let i = 0; i < segs.length; i++) segs[i]!.sort_order = i;
+      SEGMENTS_BY_TRAIL[trailId] = segs;
+      return ok(lo);
+    },
+  },
+  {
+    pattern: /\/api\/trails\/([^/]+)\/segments$/,
+    handler: ({ url, method, body }) => {
+      const trailId = url.pathname.split("/")[3];
+      if (method === "POST") {
+        const b = body as { name?: string | null; surface_type?: string | null; hazards?: string[]; is_road_connector?: boolean; steep_grade?: boolean; one_way?: boolean; description?: string | null; geometry?: unknown };
+        if (!b?.geometry) return { status: 400, body: { error: "missing geometry" } };
+        const id = `seg-new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const segs = (SEGMENTS_BY_TRAIL[trailId] ?? []) as Array<Record<string, unknown>>;
+        const seg = {
+          id,
+          trail_id: trailId,
+          name: b.name ?? null,
+          sort_order: segs.length,
+          surface_type: b.surface_type ?? null,
+          hazards: b.hazards ?? [],
+          is_road_connector: b.is_road_connector ?? false,
+          steep_grade: b.steep_grade ?? false,
+          one_way: b.one_way ?? false,
+          description: b.description ?? null,
+          length_meters: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        segs.push(seg);
+        SEGMENTS_BY_TRAIL[trailId] = segs;
+        return ok(seg, 201);
+      }
+      // GET is handled by the earlier patterns. Returning nothing here
+      // lets the route handler chain fall through.
+      return undefined;
     },
   },
   // Search

@@ -9,17 +9,31 @@ import {
   createCitationInputSchema,
   wikiPageQuerySchema,
   searchQuerySchema,
+  updateFeatureInputSchema,
+  createMediaInputSchema,
+  createSegmentInputSchema,
+  updateSegmentInputSchema,
+  reorderSegmentsInputSchema,
+  splitSegmentInputSchema,
+  mergeSegmentsInputSchema,
 } from "../schemas/index.js";
 
 export type CreateSystemInput = z.infer<typeof createSystemInputSchema>;
 export type CreateTrailInput = z.infer<typeof createTrailInputSchema>;
 export type CreateFeatureInput = z.infer<typeof createFeatureInputSchema>;
+export type UpdateFeatureInput = z.infer<typeof updateFeatureInputSchema>;
 export type CreateWikiPageInput = z.infer<typeof createWikiPageInputSchema>;
 export type UpdateWikiPageInput = z.infer<typeof updateWikiPageInputSchema>;
 export type RevertWikiPageInput = z.infer<typeof revertWikiPageInputSchema>;
 export type CreateCitationInput = z.infer<typeof createCitationInputSchema>;
 export type WikiPageQuery = z.infer<typeof wikiPageQuerySchema>;
 export type SearchQuery = z.infer<typeof searchQuerySchema>;
+export type CreateMediaInput = z.infer<typeof createMediaInputSchema>;
+export type CreateSegmentInput = z.infer<typeof createSegmentInputSchema>;
+export type UpdateSegmentInput = z.infer<typeof updateSegmentInputSchema>;
+export type ReorderSegmentsInput = z.infer<typeof reorderSegmentsInputSchema>;
+export type SplitSegmentInput = z.infer<typeof splitSegmentInputSchema>;
+export type MergeSegmentsInput = z.infer<typeof mergeSegmentsInputSchema>;
 
 export type ApiRequest<TRoute extends keyof ApiRoutes> = ApiRoutes[TRoute]["request"];
 export type ApiResponse<TRoute extends keyof ApiRoutes> = ApiRoutes[TRoute]["response"];
@@ -100,5 +114,49 @@ export interface ApiRoutes {
   getFeature: {
     request: { id: string };
     response: import("../types/index.js").Feature;
+  };
+  updateFeature: {
+    request: { id: string; body: UpdateFeatureInput };
+    response: import("../types/index.js").Feature;
+  };
+  deleteFeature: {
+    request: { id: string };
+    response: { ok: boolean };
+  };
+  listMedia: {
+    request: { feature_id?: string; trail_id?: string; system_id?: string };
+    response: { items: import("../types/index.js").Media[]; total: number };
+  };
+  createMedia: {
+    request: { body: CreateMediaInput };
+    response: import("../types/index.js").Media;
+  };
+  deleteMedia: {
+    request: { id: string };
+    response: { ok: boolean };
+  };
+  createSegment: {
+    request: { trail_id: string; body: CreateSegmentInput };
+    response: import("../types/index.js").TrailSegment;
+  };
+  updateSegment: {
+    request: { id: string; body: UpdateSegmentInput };
+    response: import("../types/index.js").TrailSegment;
+  };
+  deleteSegment: {
+    request: { id: string };
+    response: { ok: boolean };
+  };
+  reorderSegments: {
+    request: { trail_id: string; body: ReorderSegmentsInput };
+    response: { items: import("../types/index.js").TrailSegment[]; total: number };
+  };
+  splitSegment: {
+    request: { trail_id: string; body: SplitSegmentInput };
+    response: { items: import("../types/index.js").TrailSegment[]; total: number };
+  };
+  mergeSegments: {
+    request: { trail_id: string; body: MergeSegmentsInput };
+    response: import("../types/index.js").TrailSegment;
   };
 }

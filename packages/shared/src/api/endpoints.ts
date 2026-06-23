@@ -6,17 +6,26 @@ import type {
   WikiPage,
   Citation,
   Revision,
+  Media,
+  TrailSegment,
   PaginatedResponse,
 } from "../types/index.js";
 import type {
   CreateSystemInput,
   CreateTrailInput,
   CreateFeatureInput,
+  UpdateFeatureInput,
   CreateWikiPageInput,
   UpdateWikiPageInput,
   RevertWikiPageInput,
   CreateCitationInput,
   SearchQuery,
+  CreateMediaInput,
+  CreateSegmentInput,
+  UpdateSegmentInput,
+  ReorderSegmentsInput,
+  SplitSegmentInput,
+  MergeSegmentsInput,
 } from "./types.js";
 
 export function createMagnumClient(baseUrl: string, opts?: {
@@ -94,6 +103,32 @@ export function createMagnumClient(baseUrl: string, opts?: {
 
     createFeature: (body: CreateFeatureInput) => client.post<Feature>("/api/features", body),
     getFeature: (id: string) => client.get<Feature>(`/api/features/${id}`),
+    updateFeature: (id: string, body: UpdateFeatureInput) =>
+      client.put<Feature>(`/api/features/${id}`, body),
+    deleteFeature: (id: string) => client.delete<{ ok: boolean }>(`/api/features/${id}`),
+
+    listMedia: (params: { feature_id?: string; trail_id?: string; system_id?: string }) =>
+      client.get<{ items: Media[]; total: number }>("/api/media", params),
+    createMedia: (body: CreateMediaInput) => client.post<Media>("/api/media", body),
+    deleteMedia: (id: string) => client.delete<{ ok: boolean }>(`/api/media/${id}`),
+
+    createSegment: (trailId: string, body: CreateSegmentInput) =>
+      client.post<TrailSegment>(`/api/trails/${trailId}/segments`, body),
+    updateSegment: (id: string, body: UpdateSegmentInput) =>
+      client.put<TrailSegment>(`/api/segments/${id}`, body),
+    deleteSegment: (id: string) => client.delete<{ ok: boolean }>(`/api/segments/${id}`),
+    reorderSegments: (trailId: string, body: ReorderSegmentsInput) =>
+      client.post<{ items: TrailSegment[]; total: number }>(
+        `/api/trails/${trailId}/segments/reorder`,
+        body,
+      ),
+    splitSegment: (trailId: string, body: SplitSegmentInput) =>
+      client.post<{ items: TrailSegment[]; total: number }>(
+        `/api/trails/${trailId}/segments/split`,
+        body,
+      ),
+    mergeSegments: (trailId: string, body: MergeSegmentsInput) =>
+      client.post<TrailSegment>(`/api/trails/${trailId}/segments/merge`, body),
   };
 }
 
