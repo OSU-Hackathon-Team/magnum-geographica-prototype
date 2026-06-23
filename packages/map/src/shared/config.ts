@@ -54,7 +54,7 @@ export function defaultBaseLayers(martinTilesUrl: string | undefined): BaseLayer
     kind: "raster",
     url: EOX_SENTINEL2_CLOUDLESS_URL,
     minZoom: 0,
-    maxZoom: 13,
+    maxZoom: 18,
     attribution: "Sentinel-2 cloudless by EOX",
   };
   return [simplified, satellite];

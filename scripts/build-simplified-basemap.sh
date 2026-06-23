@@ -62,7 +62,7 @@ else
 fi
 
 # -- run tilemaker ---------------------------------------------------------
-log "Generating simplified basemap tiles (z2-z12)..."
+log "Generating simplified basemap tiles..."
 
 docker run --rm \
   -v "$ROOT/scripts:/scripts:ro" \

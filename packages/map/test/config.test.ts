@@ -52,10 +52,10 @@ describe("defaultBaseLayers", () => {
     expect(simplified.maxZoom).toBe(18);
   });
 
-  test("satellite layer caps at z=13 (EOX composite resolution limit)", () => {
+  test("satellite layer displays up to z18 (source tiles overzoomed beyond EOX z13 cap)", () => {
     const layers = defaultBaseLayers(MARTIN);
     const satellite = layers.find((l) => l.id === SATELLITE_BASE_LAYER_ID)!;
-    expect(satellite.maxZoom).toBe(13);
+    expect(satellite.maxZoom).toBe(18);
   });
 
   test("every layer has an attribution string", () => {

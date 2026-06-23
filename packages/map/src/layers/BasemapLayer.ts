@@ -61,26 +61,34 @@ function styleMvtFeature(feature: { get: (k: string) => unknown }): Style {
   return styleLanduse();
 }
 
+// Maximum zoom at which tile sources actually have data.
+// Beyond this, OpenLayers scales the highest-available tile rather than
+// requesting non-existent tiles (which would show white).
+const SATELLITE_SOURCE_MAXZOOM = 13;
+const SIMPLIFIED_SOURCE_MAXZOOM = 14;
+
 export function createBaseLayer(def: BaseLayerDef): BaseLayer {
   if (def.kind === "raster") {
+    const sourceMaxZoom = Math.min(def.maxZoom ?? SATELLITE_SOURCE_MAXZOOM, SATELLITE_SOURCE_MAXZOOM);
     const layer = new TileLayer({
-      source: new XYZ({ url: def.url, crossOrigin: "anonymous" }),
+      source: new XYZ({ url: def.url, crossOrigin: "anonymous", maxZoom: sourceMaxZoom }),
       minZoom: def.minZoom,
-      maxZoom: def.maxZoom,
+      maxZoom: def.maxZoom ?? 18,
     });
     if (def.attribution) {
       layer.set("attribution", def.attribution);
     }
     return layer;
   }
+  const sourceMaxZoom = Math.min(def.maxZoom ?? SIMPLIFIED_SOURCE_MAXZOOM, SIMPLIFIED_SOURCE_MAXZOOM);
   const layer = new VectorTileLayer({
     source: new VectorTileSource({
       format: new MVT(),
       url: def.url,
-      tileGrid: createXYZ(),
+      tileGrid: createXYZ({ maxZoom: sourceMaxZoom }),
     }),
     minZoom: def.minZoom,
-    maxZoom: def.maxZoom,
+    maxZoom: def.maxZoom ?? 18,
     style: styleMvtFeature as never,
   });
   if (def.attribution) {
