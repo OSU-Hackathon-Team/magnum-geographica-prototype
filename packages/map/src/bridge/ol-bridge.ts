@@ -21,6 +21,8 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.setOfflineMode(${json});`;
     case "setOfflineData":
       return `window.olBridge.setOfflineData(${json});`;
+    case "setBaseLayer":
+      return `window.olBridge.setBaseLayer(${json});`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -40,6 +42,7 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "highlightTrail",
     "setOfflineMode",
     "setOfflineData",
+    "setBaseLayer",
   ].includes(method);
 }
 

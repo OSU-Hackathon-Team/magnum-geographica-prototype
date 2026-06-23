@@ -1,0 +1,39 @@
+{
+  "layers": {
+    "landuse": {
+      "minzoom": 5,
+      "maxzoom": 12,
+      "simplify_below": 12,
+      "simplify_level": 0.0004,
+      "simplify_length": 2.0,
+      "simplify_ratio": 4.0
+    },
+    "water": {
+      "minzoom": 2,
+      "maxzoom": 12,
+      "simplify_below": 12,
+      "simplify_level": 0.0003,
+      "simplify_length": 2.0,
+      "simplify_ratio": 4.0
+    },
+    "roads": {
+      "minzoom": 4,
+      "maxzoom": 12,
+      "simplify_below": 12,
+      "simplify_level": 0.0003,
+      "simplify_length": 2.0,
+      "simplify_ratio": 4.0
+    }
+  },
+  "settings": {
+    "minzoom": 2,
+    "maxzoom": 12,
+    "basezoom": 12,
+    "include_ids": false,
+    "name": "Magnum simplified basemap",
+    "version": "1.0",
+    "description": "Heavily simplified OSM base layer — major roads, water, parks/forests",
+    "compress": "gzip",
+    "file_metadata": {}
+  }
+}

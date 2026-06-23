@@ -44,7 +44,7 @@ bun.lockb
 *.sqlite
 *.sqlite-journal
 
-# OSM / data
+# OSM / basemap artifacts
 *.osm.pbf
 *.mbtiles
 *.geojson

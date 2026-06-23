@@ -169,3 +169,13 @@ AS $$
   SELECT ST_AsMVT(tile, 'features', 4096, 'geometry')
   FROM tile;
 $$ LANGUAGE sql STABLE PARALLEL SAFE;
+
+-- ========== BASEMAP ==========
+-- Exposed at: /basemap/{z}/{x}/{y}
+-- Served from a pre-generated MBTiles file produced by:
+--   scripts/build-simplified-basemap.sh
+-- The script runs tilemaker against an OSM PBF extract and outputs a compact
+-- .mbtiles file containing landuse, water, and roads layers at zooms z2-z12.
+-- Martin auto-discovers .mbtiles files mounted into its container.
+-- When the basemap MBTiles is not present, the satellite layer still works;
+-- generate the basemap with:  ./scripts/build-simplified-basemap.sh ohio

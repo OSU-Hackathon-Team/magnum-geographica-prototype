@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, View, StyleSheet } from "react-native";
 import WebView, { type WebViewMessageEvent } from "react-native-webview";
-import { defaultMapConfig } from "./shared/config.js";
+import {
+  defaultMapConfig,
+  resolveBaseLayers,
+  resolveDefaultBaseLayerId,
+  type BaseLayerDef,
+} from "./shared/config.js";
 import { commandToScript, isBridgeEvent } from "./bridge/ol-bridge.js";
 import type { MapContainerProps } from "./types.js";
 import type { BridgeCommand, BridgeEvent } from "./bridge/types.js";
@@ -10,8 +15,19 @@ export type { MapContainerProps };
 
 const OFFLINE_BG_COLOR = "#e8e8e8";
 
-function buildMapHtml(martinUrl: string | null, offline: boolean): string {
+function buildMapHtml(
+  martinUrl: string | null,
+  offline: boolean,
+  baseLayers: BaseLayerDef[],
+  baseLayerId: string,
+  center: [number, number],
+  zoom: number,
+): string {
   const safeMartin = JSON.stringify(martinUrl);
+  const safeBaseLayers = JSON.stringify(baseLayers);
+  const safeBaseLayerId = JSON.stringify(baseLayerId);
+  const safeCenter = JSON.stringify(center);
+  const safeZoom = JSON.stringify(zoom);
   const isOffline = offline ? "true" : "false";
   return `<!doctype html>
 <html>
@@ -34,7 +50,9 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
           vectorLayers={},
           vectorSources={},
           highlightedId=null,
-          offlineMode=${isOffline};
+          offlineMode=${isOffline},
+          baseLayerImpls={},
+          activeBaseLayer=null;
 
       function postToRN(e){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(e))}}
 
@@ -49,9 +67,67 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
         }
       }
 
+      function styleMvtFeature(f){
+        var name = f.get('layer') || '';
+        if(name === 'water'){
+          return new ol.style.Style({fill:new ol.style.Fill({color:'rgba(170,210,230,0.85)'})});
+        }
+        if(name === 'roads'){
+          var hw = String(f.get('highway') || '').toLowerCase();
+          var color = '#c2bcae';
+          var width = 1.0;
+          if(hw === 'motorway' || hw === 'trunk'){color = '#c8a26e'; width = 1.6;}
+          else if(hw === 'primary'){color = '#b9b3a4'; width = 1.3;}
+          return new ol.style.Style({stroke:new ol.style.Stroke({color:color,width:width})});
+        }
+        var lu = String(f.get('landuse') || '');
+        var le = String(f.get('leisure') || '');
+        var color = 'rgba(180,200,160,0.55)';
+        if(lu === 'forest' || le === 'forest' || lu === 'wood') color = 'rgba(150,180,130,0.65)';
+        else if(lu === 'grass' || lu === 'meadow' || lu === 'grassland') color = 'rgba(200,215,170,0.55)';
+        else if(lu === 'wetland' || le === 'nature_reserve') color = 'rgba(160,190,170,0.55)';
+        return new ol.style.Style({fill:new ol.style.Fill({color:color})});
+      }
+
+      function buildBaseLayer(def){
+        if(def.kind === 'raster'){
+          return new ol.layer.Tile({
+            source: new ol.source.XYZ({url: def.url, crossOrigin: 'anonymous'}),
+            minZoom: typeof def.minZoom === 'number' ? def.minZoom : undefined,
+            maxZoom: typeof def.maxZoom === 'number' ? def.maxZoom : undefined
+          });
+        }
+        return new ol.layer.VectorTile({
+          source: new ol.source.VectorTile({
+            format: new ol.format.MVT(),
+            url: def.url,
+            tileGrid: ol.tilegrid.createXYZ()
+          }),
+          minZoom: typeof def.minZoom === 'number' ? def.minZoom : undefined,
+          maxZoom: typeof def.maxZoom === 'number' ? def.maxZoom : undefined,
+          style: styleMvtFeature
+        });
+      }
+
+      function setActiveBaseLayer(id){
+        if(!map) return;
+        var layers = map.getLayers().getArray();
+        for(var i = layers.length - 1; i >= 0; i--){
+          if(layers[i].get('isBase')) map.removeLayer(layers[i]);
+        }
+        var impl = baseLayerImpls[id];
+        if(!impl) return;
+        impl.set('isBase', true);
+        impl.set('name', 'basemap');
+        impl.setVisible(!offlineMode);
+        map.getLayers().insertAt(0, impl);
+        activeBaseLayer = impl;
+      }
+
       function updateLayerVisibility(){
         if(!map)return;
-        var olayers = tileLayers.base?[tileLayers.superSystems,tileLayers.base,tileLayers.trails,tileLayers.segments,tileLayers.systems,tileLayers.features].filter(Boolean):[];
+        if(activeBaseLayer) activeBaseLayer.setVisible(!offlineMode);
+        var olayers = vectorSources.trails?[tileLayers.superSystems,tileLayers.trails,tileLayers.segments,tileLayers.systems,tileLayers.features].filter(Boolean):[];
         var vlayers = vectorLayers.trails?[vectorLayers.superSystems,vectorLayers.trails,vectorLayers.systems,vectorLayers.features].filter(Boolean):[];
         olayers.forEach(function(l){l.setVisible(!offlineMode)})
         vlayers.forEach(function(l){l.setVisible(offlineMode)})
@@ -90,10 +166,16 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
       function buildMap(){
         var allLayers=[];
         var martinUrl=${safeMartin};
+        var baseLayerDefs=${safeBaseLayers};
+        var initialBaseId=${safeBaseLayerId};
+        var initCenter=${safeCenter};
+        var initZoom=${safeZoom};
 
-        // Online tile layers
-        tileLayers.base=new ol.layer.Tile({source:new ol.source.OSM(),visible:!offlineMode});
-        allLayers.push(tileLayers.base);
+        // Pre-build all base layer implementations (only the active one is added to the map).
+        for(var i = 0; i < baseLayerDefs.length; i++){
+          var d = baseLayerDefs[i];
+          baseLayerImpls[d.id] = buildBaseLayer(d);
+        }
 
         if(martinUrl){
           // Super systems: dotted outlines at zoom 2-8
@@ -176,13 +258,29 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
         allLayers.push(vectorLayers.features);
         vectorLayers.features.on('click',function(e){var f=map.forEachFeatureAtPixel(e.pixel,function(f){return f});if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'features',slug:f.get('slug'),name:f.get('name')})});
 
-        map=new ol.Map({target:'map',layers:allLayers,view:new ol.View({center:ol.proj.fromLonLat([-82.9988,39.9612]),zoom:6})});
+        map=new ol.Map({target:'map',layers:allLayers,view:new ol.View({center:ol.proj.fromLonLat(initCenter),zoom:initZoom})});
+        setActiveBaseLayer(initialBaseId);
         map.on('click',function(e){var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]})});
         map.on('moveend',function(){var v=map.getView();var c=ol.proj.toLonLat(v.getCenter());postToRN({type:'moveEnd',center:c,zoom:v.getZoom()})});
       }
 
       window.olBridge={
-        init:function(opts){buildMap();postToRN({type:'ready'})},
+        init:function(opts){
+          // If init is called with explicit baseLayer / center / zoom, use them;
+          // otherwise the buildMap() defaults (embedded in the HTML) are used.
+          if(opts && opts.baseLayers){
+            for(var i = 0; i < opts.baseLayers.length; i++){
+              var d = opts.baseLayers[i];
+              baseLayerImpls[d.id] = buildBaseLayer(d);
+            }
+            if(opts.baseLayerId) setActiveBaseLayer(opts.baseLayerId);
+          }
+          if(opts && opts.center && typeof opts.zoom === 'number'){
+            map.getView().setCenter(ol.proj.fromLonLat(opts.center));
+            map.getView().setZoom(opts.zoom);
+          }
+          postToRN({type:'ready'})
+        },
         setViewport:function(a){if(!map)return;map.getView().setCenter(ol.proj.fromLonLat(a.center));if(typeof a.zoom==='number')map.getView().setZoom(a.zoom)},
         flyTo:function(a){if(!map)return;map.getView().animate({center:ol.proj.fromLonLat([a.lon,a.lat]),zoom:a.zoom||map.getView().getZoom(),duration:500})},
         setTrails:function(a){if(!vectorSources.trails)return;var f=(new ol.format.GeoJSON()).readFeatures(a.geojson,{featureProjection:'EPSG:3857'});vectorSources.trails.clear();vectorSources.trails.addFeatures(f);applyHighlight()},
@@ -190,6 +288,7 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
         setFeatures:function(a){if(!vectorSources.features)return;var f=(new ol.format.GeoJSON()).readFeatures(a.geojson,{featureProjection:'EPSG:3857'});vectorSources.features.clear();vectorSources.features.addFeatures(f)},
         highlightTrail:function(a){highlightedId=a&&a.id;applyHighlight()},
         setOfflineMode:function(a){offlineMode=!!a.offline;updateLayerVisibility()},
+        setBaseLayer:function(a){if(a && a.id) setActiveBaseLayer(a.id)},
         setOfflineData:function(a){
           if(a.superSystems&&vectorLayers.superSystems){
             var ssf=(new ol.format.GeoJSON()).readFeatures(a.superSystems,{featureProjection:'EPSG:3857'});
@@ -221,6 +320,7 @@ function buildMapHtml(martinUrl: string | null, offline: boolean): string {
 
 export default function MapContainer({
   config,
+  baseLayerId,
   onReady,
   onClick,
   onFeatureSelect,
@@ -232,12 +332,17 @@ export default function MapContainer({
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
+  const baseLayerDefs = useMemo(
+    () => resolveBaseLayers(merged),
+    [merged],
+  );
+  const defaultBaseLayerId = useMemo(
+    () => resolveDefaultBaseLayerId(merged, baseLayerDefs),
+    [merged, baseLayerDefs],
+  );
   const [mapUri, setMapUri] = useState<string | null>(null);
   const initSentRef = useRef(false);
 
-  // Capture the initial center/zoom so we can apply them once after the WebView
-  // initializes — the HTML no longer hardcodes them. We intentionally do NOT
-  // recreate the WebView when these change; camera moves go through flyTo.
   const initialCenter = merged.initialCenter ?? defaultMapConfig.initialCenter;
   const initialZoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
 
@@ -275,8 +380,15 @@ export default function MapContainer({
           if (jsData) await FS.writeAsStringAsync(jsPath, jsData);
         }
 
-        // Write map HTML
-        const html = buildMapHtml(merged.martinTilesUrl ?? null, false);
+        // Write map HTML (with basemap info baked in).
+        const html = buildMapHtml(
+          merged.martinTilesUrl ?? null,
+          false,
+          baseLayerDefs,
+          defaultBaseLayerId,
+          initialCenter,
+          initialZoom,
+        );
         await FS.writeAsStringAsync(htmlPath, html);
 
         if (!cancelled) setMapUri(htmlPath);
@@ -285,11 +397,19 @@ export default function MapContainer({
       }
     })();
     return () => { cancelled = true };
-  }, [merged.martinTilesUrl]);
+  }, [merged.martinTilesUrl, baseLayerDefs, defaultBaseLayerId, initialCenter, initialZoom]);
 
   const htmlFallback = useMemo(
-    () => buildMapHtml(merged.martinTilesUrl ?? null, false),
-    [merged.martinTilesUrl],
+    () =>
+      buildMapHtml(
+        merged.martinTilesUrl ?? null,
+        false,
+        baseLayerDefs,
+        defaultBaseLayerId,
+        initialCenter,
+        initialZoom,
+      ),
+    [merged.martinTilesUrl, baseLayerDefs, defaultBaseLayerId, initialCenter, initialZoom],
   );
 
   const handleMessage = useCallback(
@@ -314,18 +434,24 @@ export default function MapContainer({
   const onLoadEnd = useCallback(() => {
     if (initSentRef.current) return;
     initSentRef.current = true;
+    // Init is a no-op on the JS side (the HTML already has baseLayerDefaults
+    // baked in). Keep it for symmetry with the web MapContainer and to allow
+    // future pre-init configuration.
     send({ method: "init", args: {} as never });
-    // Apply the initial viewport once the map is ready (HTML no longer hardcodes it).
-    send({
-      method: "setViewport",
-      args: { center: [initialCenter[0], initialCenter[1]], zoom: initialZoom },
-    });
-  }, [send, initialCenter, initialZoom]);
+  }, [send]);
 
   // Expose send function to parent
   useEffect(() => {
     onMapRef?.(send);
   }, [send, onMapRef]);
+
+  // Sync base layer choice to the WebView. The HTML's `init` already inserted
+  // the default; this effect only fires if the user later switches layers.
+  useEffect(() => {
+    if (!initSentRef.current) return;
+    const id = baseLayerId ?? defaultBaseLayerId;
+    send({ method: "setBaseLayer", args: { id } });
+  }, [baseLayerId, defaultBaseLayerId, send]);
 
   // Sync offline mode to WebView
   useEffect(() => {

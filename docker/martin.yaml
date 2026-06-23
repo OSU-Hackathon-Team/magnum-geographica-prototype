@@ -1,0 +1,37 @@
+# Martin tile server config — Magnum
+#
+# Server started with:  martin --config /etc/martin.yaml
+# See https://maplibre.org/martin/configuration
+#
+# Uses the Martin v1.x config format with explicit PostGIS function sources
+# and file-based MBTiles sources.
+
+postgres:
+  connection_string: ${DATABASE_URL}
+  auto_publish:
+    tables: false
+    functions: false
+  functions:
+    super_systems:
+      schema: public
+      function: super_systems
+    systems:
+      schema: public
+      function: systems
+    trails:
+      schema: public
+      function: trails
+    segments:
+      schema: public
+      function: segments
+    features:
+      schema: public
+      function: features
+
+mbtiles:
+  paths: /data
+  sources:
+    basemap: /data/basemap.mbtiles
+
+pmtiles:
+  paths: /data
