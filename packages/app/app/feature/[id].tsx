@@ -1,9 +1,10 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { createMagnumClient, type Feature, type WikiPage } from "@magnum/shared";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { WikiPageView } from "../../src/components/wiki/WikiPageView";
 import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
 import { MediaGallery, type MediaItem } from "../../src/components/media/MediaGallery";
 import { MediaUploader } from "../../src/components/media/MediaUploader";
@@ -34,59 +35,61 @@ export default function FeatureDetail() {
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
 
-  useEffect(() => {
-    if (!id || typeof id !== "string") return;
+  useFocusEffect(
+    useCallback(() => {
+      if (!id || typeof id !== "string") return;
 
-    if (!isOnline) {
-      const loadOffline = async () => {
-        const local = await getFeatureById(id);
-        if (!local) {
-          setError("Feature not downloaded for offline use");
-          return;
-        }
-        setFeature({
-          id: String(local.id),
-          name: String(local.name),
-          type_tag: String(local.type_tag) as Feature["type_tag"],
-          point: local.lon != null && local.lat != null ? { type: "Point", coordinates: [Number(local.lon), Number(local.lat)] } : null,
-          description: local.description ? String(local.description) : null,
-          trail_id: local.trail_id ? String(local.trail_id) : null,
-          system_id: local.system_id ? String(local.system_id) : null,
-          created_at: "",
-          updated_at: "",
-        });
-        const localWiki = await getLocalWikiPage("feature", id);
-        if (localWiki) {
-          setWikiPage({
-            id: String(localWiki.id),
-            target_type: "feature",
-            target_id: id,
-            title: String(localWiki.title),
-            content_md: String(localWiki.content_md),
-            rendered_html: "",
-            created_at: String(localWiki.updated_at),
-            updated_at: String(localWiki.updated_at),
+      if (!isOnline) {
+        const loadOffline = async () => {
+          const local = await getFeatureById(id);
+          if (!local) {
+            setError("Feature not downloaded for offline use");
+            return;
+          }
+          setFeature({
+            id: String(local.id),
+            name: String(local.name),
+            type_tag: String(local.type_tag) as Feature["type_tag"],
+            point: local.lon != null && local.lat != null ? { type: "Point", coordinates: [Number(local.lon), Number(local.lat)] } : null,
+            description: local.description ? String(local.description) : null,
+            trail_id: local.trail_id ? String(local.trail_id) : null,
+            system_id: local.system_id ? String(local.system_id) : null,
+            created_at: "",
+            updated_at: "",
           });
-        }
-      };
-      void loadOffline();
-      return;
-    }
+          const localWiki = await getLocalWikiPage("feature", id);
+          if (localWiki) {
+            setWikiPage({
+              id: String(localWiki.id),
+              target_type: "feature",
+              target_id: id,
+              title: String(localWiki.title),
+              content_md: String(localWiki.content_md),
+              rendered_html: "",
+              created_at: String(localWiki.updated_at),
+              updated_at: String(localWiki.updated_at),
+            });
+          }
+        };
+        void loadOffline();
+        return;
+      }
 
-    const client = createMagnumClient(API_URL);
-    client
-      .getFeature(id)
-      .then(async (f) => {
-        setFeature(f);
-        const [w, mediaRes] = await Promise.all([
-          client.getWikiPage("feature", f.id).catch(() => null),
-          client.raw.request<{ items: MediaItem[] }>("GET", `/api/media?feature_id=${f.id}`).catch(() => ({ items: [] as MediaItem[] })),
-        ]);
-        if (w) setWikiPage(w as WikiPage);
-        setMediaItems(mediaRes.items);
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
-  }, [id, isOnline]);
+      const client = createMagnumClient(API_URL);
+      client
+        .getFeature(id)
+        .then(async (f) => {
+          setFeature(f);
+          const [w, mediaRes] = await Promise.all([
+            client.getWikiPage("feature", f.id).catch(() => null),
+            client.raw.request<{ items: MediaItem[] }>("GET", `/api/media?feature_id=${f.id}`).catch(() => ({ items: [] as MediaItem[] })),
+          ]);
+          if (w) setWikiPage(w as WikiPage);
+          setMediaItems(mediaRes.items);
+        })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
+    }, [id, isOnline]),
+  );
 
   const refreshMedia = async () => {
     if (!isOnline || !feature) return;
@@ -202,35 +205,7 @@ export default function FeatureDetail() {
           <ViewOnMapButton center={feature.center ?? null} zoom={14} testID="feature-view-on-map" />
         </View>
 
-        {feature ? (
-          <View style={styles.section} testID="feature-wiki">
-            <View style={styles.row}>
-              <Text style={styles.h2}>Wiki</Text>
-              <Button
-                variant={wikiPage ? "ghost" : "primary"}
-                size="small"
-                onPress={() =>
-                  router.push(`/wiki/edit/feature/${feature.id}` as never)
-                }
-                testID="feature-wiki-edit"
-              >
-                {wikiPage ? "Edit" : "Create"}
-              </Button>
-            </View>
-            {wikiPage ? (
-              <Pressable
-                onPress={() => router.push(`/wiki/feature/${feature.id}` as never)}
-                testID="feature-wiki-view"
-              >
-                <Text style={styles.wikiPreview} numberOfLines={3}>
-                  {wikiPage.content_md || "No content yet."}
-                </Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.body}>No wiki page yet for this feature.</Text>
-            )}
-          </View>
-          ) : null}
+        {feature ? null : null}
 
         <View style={styles.section} testID="feature-media">
           <View style={styles.row}>
@@ -271,6 +246,39 @@ export default function FeatureDetail() {
             testID="feature-media-gallery"
           />
         </View>
+
+        {feature ? (
+          <View style={styles.section} testID="feature-wiki">
+            <View style={styles.row}>
+              <Text style={styles.h2}>Wiki</Text>
+              <Button
+                variant={wikiPage ? "ghost" : "primary"}
+                size="small"
+                onPress={() =>
+                  router.push({
+                    pathname: "/wiki/edit/feature/[targetId]" as never,
+                    params: { targetId: feature.id, defaultTitle: feature.name },
+                  } as never)
+                }
+                testID="feature-wiki-edit"
+              >
+                {wikiPage ? "Edit" : "Create"}
+              </Button>
+            </View>
+            {wikiPage ? (
+              <Pressable
+                onPress={() => router.push(`/wiki/feature/${feature.id}` as never)}
+                testID="feature-wiki-view"
+              >
+                <View style={styles.wikiPreviewBox}>
+                  <WikiPageView wikiPage={wikiPage} compact />
+                </View>
+              </Pressable>
+            ) : (
+              <Text style={styles.body}>No wiki page yet for this feature.</Text>
+            )}
+          </View>
+        ) : null}
       </ScrollView>
 
       <ImageViewer
@@ -302,15 +310,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  wikiPreview: {
-    fontSize: 13,
-    color: "#555",
-    lineHeight: 18,
+  wikiPreviewBox: {
     backgroundColor: "#f9fafb",
-    padding: 12,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#e8e8e8",
+    padding: 4,
   },
   offlineHint: {
     fontSize: 12,

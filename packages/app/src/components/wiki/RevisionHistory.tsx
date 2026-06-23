@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Revision } from "@magnum/shared";
+import { Button } from "../ui/Button";
 
 function formatDate(iso: string): string {
   try {
@@ -24,6 +26,18 @@ export interface RevisionHistoryProps {
 }
 
 export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
+  const [pendingRevertId, setPendingRevertId] = useState<string | null>(null);
+
+  const pending = pendingRevertId
+    ? revisions.find((r) => r.id === pendingRevertId) ?? null
+    : null;
+
+  function confirmRevert() {
+    if (!pendingRevertId || !onRevert) return;
+    onRevert(pendingRevertId);
+    setPendingRevertId(null);
+  }
+
   if (revisions.length === 0) {
     return (
       <Text style={styles.empty} testID="revisions-empty">No revisions yet.</Text>
@@ -50,7 +64,7 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
           </View>
           {onRevert ? (
             <Pressable
-              onPress={() => onRevert(rev.id)}
+              onPress={() => setPendingRevertId(rev.id)}
               style={styles.revertBtn}
               testID={`revision-revert-${rev.id}`}
             >
@@ -59,6 +73,42 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
           ) : null}
         </View>
       ))}
+
+      <Modal
+        visible={pending !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingRevertId(null)}
+        testID="revert-confirm-modal"
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.dialog} testID="revert-confirm-dialog">
+            <Text style={styles.title}>Revert to this revision?</Text>
+            {pending ? (
+              <Text style={styles.body}>
+                By {pending.contributor_name} on {formatDate(pending.created_at)} at {formatTime(pending.created_at)}.
+                {"\n\n"}This will create a new revision with the old content. The current content is not lost.
+              </Text>
+            ) : null}
+            <View style={styles.actions}>
+              <Button
+                variant="ghost"
+                size="small"
+                onPress={() => setPendingRevertId(null)}
+                testID="revert-confirm-cancel"
+                title="Cancel"
+              />
+              <Button
+                variant="primary"
+                size="small"
+                onPress={confirmRevert}
+                testID="revert-confirm-confirm"
+                title="Revert"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -81,4 +131,22 @@ const styles = StyleSheet.create({
   revMeta: { fontSize: 11, color: "#888" },
   revSummary: { fontSize: 12, color: "#555", marginTop: 2 },
   revertBtn: { padding: 6 },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  dialog: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    gap: 12,
+    width: "100%",
+    maxWidth: 400,
+  },
+  title: { fontSize: 16, fontWeight: "700", color: "#222" },
+  body: { fontSize: 13, color: "#555", lineHeight: 19 },
+  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 4 },
 });

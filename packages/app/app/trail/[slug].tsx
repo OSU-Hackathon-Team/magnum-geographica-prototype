@@ -1,5 +1,5 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
@@ -16,6 +16,7 @@ import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { WikiPageView } from "../../src/components/wiki/WikiPageView";
 import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
 import { SegmentEditList } from "../../src/components/trail/SegmentEditor";
 import { useOfflineStore } from "../../src/stores/offlineStore";
@@ -109,111 +110,113 @@ export default function TrailDetail() {
     );
   }, [isOnline]);
 
-  useEffect(() => {
-    if (!slug || typeof slug !== "string") return;
+  useFocusEffect(
+    useCallback(() => {
+      if (!slug || typeof slug !== "string") return;
 
-    if (!isOnline) {
-      const loadOffline = async () => {
-        const localTrail = await getTrailBySlug(slug);
-        if (!localTrail) {
-          setError("Trail not downloaded for offline use");
-          return;
-        }
-        const trailId = String(localTrail.id);
-        setTrail({
-          id: trailId,
-          name: String(localTrail.name),
-          slug: String(localTrail.slug),
-          description: localTrail.description ? String(localTrail.description) : null,
-          difficulty: localTrail.difficulty as Trail["difficulty"],
-          length_meters: localTrail.length_meters ? Number(localTrail.length_meters) : null,
-          elevation_gain_meters: localTrail.elevation_gain_meters
-            ? Number(localTrail.elevation_gain_meters)
-            : null,
-          geometry: null,
-          created_at: "",
-          updated_at: "",
-          verified: Boolean(localTrail.verified),
-        });
-        const [localSegs, localFeats, localWiki] = await Promise.all([
-          getTrailSegments(trailId),
-          getTrailFeatures(trailId),
-          getLocalWikiPage("trail", trailId),
-        ]);
-        setSegments(
-          localSegs.map((s) => ({
-            id: String(s.id),
-            trail_id: trailId,
-            name: s.name ? String(s.name) : null,
+      if (!isOnline) {
+        const loadOffline = async () => {
+          const localTrail = await getTrailBySlug(slug);
+          if (!localTrail) {
+            setError("Trail not downloaded for offline use");
+            return;
+          }
+          const trailId = String(localTrail.id);
+          setTrail({
+            id: trailId,
+            name: String(localTrail.name),
+            slug: String(localTrail.slug),
+            description: localTrail.description ? String(localTrail.description) : null,
+            difficulty: localTrail.difficulty as Trail["difficulty"],
+            length_meters: localTrail.length_meters ? Number(localTrail.length_meters) : null,
+            elevation_gain_meters: localTrail.elevation_gain_meters
+              ? Number(localTrail.elevation_gain_meters)
+              : null,
             geometry: null,
-            sort_order: Number(s.sort_order ?? 0),
-            surface_type: s.surface_type
-              ? String(s.surface_type) as TrailSegment["surface_type"]
-              : null,
-            hazards: (() => {
-              try {
-                return JSON.parse(String(s.hazards ?? "[]"));
-              } catch {
-                return [];
-              }
-            })(),
-            is_road_connector: Boolean(s.is_road_connector),
-            steep_grade: Boolean(s.steep_grade),
-            one_way: Boolean(s.one_way),
-            description: s.description ? String(s.description) : null,
-            length_meters: s.length_meters ? Number(s.length_meters) : null,
             created_at: "",
             updated_at: "",
-          })),
-        );
-        setFeatures(
-          localFeats.map((f) => ({
-            id: String(f.id),
-            name: String(f.name),
-            type_tag: String(f.type_tag) as Feature["type_tag"],
-            point: f.lon != null && f.lat != null
-              ? { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] }
-              : null,
-            description: f.description ? String(f.description) : null,
-            trail_id: f.trail_id ? String(f.trail_id) : null,
-            system_id: f.system_id ? String(f.system_id) : null,
-            created_at: "",
-            updated_at: "",
-          })),
-        );
-        if (localWiki) {
-          setWikiPage({
-            id: String(localWiki.id),
-            target_type: "trail",
-            target_id: trailId,
-            title: String(localWiki.title),
-            content_md: String(localWiki.content_md),
-            rendered_html: "",
-            created_at: String(localWiki.updated_at),
-            updated_at: String(localWiki.updated_at),
+            verified: Boolean(localTrail.verified),
           });
-        }
-      };
-      void loadOffline();
-      return;
-    }
+          const [localSegs, localFeats, localWiki] = await Promise.all([
+            getTrailSegments(trailId),
+            getTrailFeatures(trailId),
+            getLocalWikiPage("trail", trailId),
+          ]);
+          setSegments(
+            localSegs.map((s) => ({
+              id: String(s.id),
+              trail_id: trailId,
+              name: s.name ? String(s.name) : null,
+              geometry: null,
+              sort_order: Number(s.sort_order ?? 0),
+              surface_type: s.surface_type
+                ? String(s.surface_type) as TrailSegment["surface_type"]
+                : null,
+              hazards: (() => {
+                try {
+                  return JSON.parse(String(s.hazards ?? "[]"));
+                } catch {
+                  return [];
+                }
+              })(),
+              is_road_connector: Boolean(s.is_road_connector),
+              steep_grade: Boolean(s.steep_grade),
+              one_way: Boolean(s.one_way),
+              description: s.description ? String(s.description) : null,
+              length_meters: s.length_meters ? Number(s.length_meters) : null,
+              created_at: "",
+              updated_at: "",
+            })),
+          );
+          setFeatures(
+            localFeats.map((f) => ({
+              id: String(f.id),
+              name: String(f.name),
+              type_tag: String(f.type_tag) as Feature["type_tag"],
+              point: f.lon != null && f.lat != null
+                ? { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] }
+                : null,
+              description: f.description ? String(f.description) : null,
+              trail_id: f.trail_id ? String(f.trail_id) : null,
+              system_id: f.system_id ? String(f.system_id) : null,
+              created_at: "",
+              updated_at: "",
+            })),
+          );
+          if (localWiki) {
+            setWikiPage({
+              id: String(localWiki.id),
+              target_type: "trail",
+              target_id: trailId,
+              title: String(localWiki.title),
+              content_md: String(localWiki.content_md),
+              rendered_html: "",
+              created_at: String(localWiki.updated_at),
+              updated_at: String(localWiki.updated_at),
+            });
+          }
+        };
+        void loadOffline();
+        return;
+      }
 
-    const client = createMagnumClient(API_URL);
-    client
-      .getTrailBySlug(slug)
-      .then(async (t) => {
-        setTrail(t);
-        const [segs, feats, wiki] = await Promise.all([
-          client.listTrailSegments(t.id).catch(() => ({ items: [] as TrailSegment[], total: 0 })),
-          client.listTrailFeatures(t.id).catch(() => ({ items: [] as Feature[], total: 0 })),
-          client.getWikiPage("trail", t.id).catch(() => null),
-        ]);
-        setSegments(segs.items);
-        setFeatures(feats.items);
-        if (wiki) setWikiPage(wiki as WikiPage);
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
-  }, [slug, isOnline]);
+      const client = createMagnumClient(API_URL);
+      client
+        .getTrailBySlug(slug)
+        .then(async (t) => {
+          setTrail(t);
+          const [segs, feats, wiki] = await Promise.all([
+            client.listTrailSegments(t.id).catch(() => ({ items: [] as TrailSegment[], total: 0 })),
+            client.listTrailFeatures(t.id).catch(() => ({ items: [] as Feature[], total: 0 })),
+            client.getWikiPage("trail", t.id).catch(() => null),
+          ]);
+          setSegments(segs.items);
+          setFeatures(feats.items);
+          if (wiki) setWikiPage(wiki as WikiPage);
+        })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
+    }, [slug, isOnline]),
+  );
 
   const handleSegmentUpdate = async (id: string, body: UpdateSegmentInput) => {
     if (!trail) return;
@@ -515,34 +518,6 @@ export default function TrailDetail() {
           <ViewOnMapButton center={trail.center ?? null} zoom={11} testID="trail-view-on-map" />
         </View>
 
-        <View style={styles.section} testID="trail-wiki">
-          <View style={styles.row}>
-            <Text style={styles.h2}>Wiki</Text>
-            <Button
-              variant={wikiPage ? "ghost" : "primary"}
-              size="small"
-              onPress={() =>
-                router.push(`/wiki/edit/trail/${trail.id}` as never)
-              }
-              testID="trail-wiki-edit"
-            >
-              {wikiPage ? "Edit" : "Create"}
-            </Button>
-          </View>
-          {wikiPage ? (
-            <Pressable
-              onPress={() => router.push(`/wiki/trail/${trail.id}` as never)}
-              testID="trail-wiki-view"
-            >
-              <Text style={styles.wikiPreview} numberOfLines={3}>
-                {wikiPage.content_md || "No content yet."}
-              </Text>
-            </Pressable>
-          ) : (
-            <Text style={styles.body}>No wiki page yet for this trail.</Text>
-          )}
-        </View>
-
         <View style={styles.section} testID="trail-segments">
           <View style={styles.row}>
             <Text style={styles.h2}>Segments ({segments.length})</Text>
@@ -610,6 +585,37 @@ export default function TrailDetail() {
             ))
           )}
         </View>
+
+        <View style={styles.section} testID="trail-wiki">
+          <View style={styles.row}>
+            <Text style={styles.h2}>Wiki</Text>
+            <Button
+              variant={wikiPage ? "ghost" : "primary"}
+              size="small"
+              onPress={() =>
+                router.push({
+                  pathname: "/wiki/edit/trail/[targetId]" as never,
+                  params: { targetId: trail.id, defaultTitle: trail.name },
+                } as never)
+              }
+              testID="trail-wiki-edit"
+            >
+              {wikiPage ? "Edit" : "Create"}
+            </Button>
+          </View>
+          {wikiPage ? (
+            <Pressable
+              onPress={() => router.push(`/wiki/trail/${trail.id}` as never)}
+              testID="trail-wiki-view"
+            >
+              <View style={styles.wikiPreviewBox}>
+                <WikiPageView wikiPage={wikiPage} compact />
+              </View>
+            </Pressable>
+          ) : (
+            <Text style={styles.body}>No wiki page yet for this trail.</Text>
+          )}
+        </View>
       </ScrollView>
     </>
   );
@@ -643,14 +649,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 3,
   },
-  wikiPreview: {
-    fontSize: 13,
-    color: "#555",
-    lineHeight: 18,
+  wikiPreviewBox: {
     backgroundColor: "#f9fafb",
-    padding: 12,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "#e8e8e8",
+    padding: 4,
   },
 });

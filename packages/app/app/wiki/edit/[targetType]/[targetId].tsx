@@ -20,7 +20,11 @@ import {
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export default function WikiEditScreen() {
-  const { targetType, targetId } = useLocalSearchParams<{ targetType: string; targetId: string }>();
+  const { targetType, targetId, defaultTitle } = useLocalSearchParams<{
+    targetType: string;
+    targetId: string;
+    defaultTitle?: string;
+  }>();
   const router = useRouter();
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [revisions, setRevisions] = useState<Revision[]>([]);
@@ -267,6 +271,7 @@ export default function WikiEditScreen() {
         citations={citations}
         onAddCitation={handleAddCitation}
         onDeleteCitation={handleDeleteCitation}
+        defaultTitle={typeof defaultTitle === "string" ? defaultTitle : undefined}
       />
     </>
   );
