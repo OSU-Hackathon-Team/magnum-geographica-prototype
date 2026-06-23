@@ -45,6 +45,7 @@ export default function ExploreScreen() {
   const params = useLocalSearchParams<{ lat?: string; lon?: string; zoom?: string }>();
   const mapCenter = useMapStore((s) => s.center);
   const mapZoom = useMapStore((s) => s.zoom);
+  const setViewport = useMapStore((s) => s.setViewport);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const downloadedPacks = useOfflineStore((s) => s.downloadedPacks);
 
@@ -61,29 +62,31 @@ export default function ExploreScreen() {
   const lastRequestRef = useRef(0);
 
   const deepLink = useMemo(() => parseDeepLink(params), [params]);
+  // Deep-link coords drive an animated `flyTo` (camera pan) instead of
+  // changing initialCenter/initialZoom. The map is created once and reused,
+  // so this pans the existing camera rather than recreating the whole map.
+  // Deps are the primitive values (not `deepLink` itself) so the memo returns
+  // a stable reference across re-renders that don't change the target —
+  // otherwise every re-render (e.g. after a moveEnd → mapStore update) would
+  // produce a new `flyTo` object and re-trigger the animation, snapping the
+  // camera back to the deep-link position.
   const flyTo = useMemo(
     () => (deepLink ? { lon: deepLink.lon, lat: deepLink.lat, zoom: deepLink.zoom } : null),
-    [deepLink],
+    [deepLink?.lat, deepLink?.lon, deepLink?.zoom],
   );
 
-  const initialCenter = useMemo(
-    () => (deepLink ? ([deepLink.lon, deepLink.lat] as [number, number]) : mapCenter),
-    [deepLink, mapCenter],
-  );
-
-  const initialZoom = useMemo(
-    () => (deepLink ? deepLink.zoom : mapZoom),
-    [deepLink, mapZoom],
-  );
-
+  // The map's initial viewport comes from the persisted mapStore so the
+  // camera position survives navigation (SPA-style). `mapConfig` only feeds
+  // the initial mount; subsequent camera moves go through `flyTo` and
+  // moveEnd → mapStore.
   const mapConfig = useMemo(
     () => ({
       baseTileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       martinTilesUrl: MARTIN_URL,
-      initialCenter,
-      initialZoom,
+      initialCenter: mapCenter,
+      initialZoom: mapZoom,
     }),
-    [initialCenter, initialZoom],
+    [mapCenter, mapZoom],
   );
 
   useEffect(() => {
@@ -164,6 +167,13 @@ export default function ExploreScreen() {
   }, [query]);
 
   const dismissResults = useCallback(() => setShowResults(false), []);
+
+  const handleMoveEnd = useCallback(
+    (center: [number, number], zoom: number) => {
+      setViewport(center, zoom);
+    },
+    [setViewport],
+  );
 
   const handleSystem = useCallback(
     (s: System) => {
@@ -278,6 +288,7 @@ export default function ExploreScreen() {
           config={mapConfig}
           onFeatureSelect={handleFeatureSelect}
           onClick={handleMapClick}
+          onMoveEnd={handleMoveEnd}
           flyTo={flyTo}
           offlineMode={!isOnline}
           offlineData={offlineData}

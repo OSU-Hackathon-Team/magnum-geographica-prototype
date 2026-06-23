@@ -10,6 +10,7 @@ export interface MapContainerProps {
   onReady?: () => void;
   onClick?: (lon: number, lat: number) => void;
   onLongClick?: (lon: number, lat: number) => void;
+  onMoveEnd?: (center: [number, number], zoom: number) => void;
   onFeatureSelect?: (selection: {
     id: string;
     layer: "trails" | "segments" | "systems" | "features" | "superSystems";

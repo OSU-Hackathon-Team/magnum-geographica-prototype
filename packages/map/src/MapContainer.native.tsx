@@ -224,6 +224,7 @@ export default function MapContainer({
   onReady,
   onClick,
   onFeatureSelect,
+  onMoveEnd,
   flyTo,
   offlineMode,
   offlineData,
@@ -233,6 +234,12 @@ export default function MapContainer({
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
   const [mapUri, setMapUri] = useState<string | null>(null);
   const initSentRef = useRef(false);
+
+  // Capture the initial center/zoom so we can apply them once after the WebView
+  // initializes — the HTML no longer hardcodes them. We intentionally do NOT
+  // recreate the WebView when these change; camera moves go through flyTo.
+  const initialCenter = merged.initialCenter ?? defaultMapConfig.initialCenter;
+  const initialZoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
 
   // Write map files to disk for offline-capable loading
   useEffect(() => {
@@ -294,9 +301,9 @@ export default function MapContainer({
         return;
       }
       if (!isBridgeEvent(parsed)) return;
-      handleBridgeEvent(parsed, { onReady, onClick, onFeatureSelect });
+      handleBridgeEvent(parsed, { onReady, onClick, onFeatureSelect, onMoveEnd });
     },
-    [onReady, onClick, onFeatureSelect],
+    [onReady, onClick, onFeatureSelect, onMoveEnd],
   );
 
   const send = useCallback((command: BridgeCommand) => {
@@ -308,7 +315,12 @@ export default function MapContainer({
     if (initSentRef.current) return;
     initSentRef.current = true;
     send({ method: "init", args: {} as never });
-  }, [send]);
+    // Apply the initial viewport once the map is ready (HTML no longer hardcodes it).
+    send({
+      method: "setViewport",
+      args: { center: [initialCenter[0], initialCenter[1]], zoom: initialZoom },
+    });
+  }, [send, initialCenter, initialZoom]);
 
   // Expose send function to parent
   useEffect(() => {
@@ -327,8 +339,21 @@ export default function MapContainer({
     send({ method: "setOfflineData", args: offlineData });
   }, [offlineData, send]);
 
+  // Track the last flyTo values so we only re-send when the target actually
+  // changes (not when the parent passes a new object ref with same values).
+  const lastFlyToRef = useRef<{ lon: number; lat: number; zoom?: number } | null>(null);
+
   useEffect(() => {
     if (!flyTo || !initSentRef.current) return;
+    const last = lastFlyToRef.current;
+    if (
+      last &&
+      last.lon === flyTo.lon &&
+      last.lat === flyTo.lat &&
+      last.zoom === flyTo.zoom
+    )
+      return;
+    lastFlyToRef.current = flyTo;
     send({ method: "flyTo", args: { lon: flyTo.lon, lat: flyTo.lat, zoom: flyTo.zoom } });
   }, [flyTo, send]);
 
@@ -370,6 +395,7 @@ function handleBridgeEvent(
       slug?: string | null;
       name?: string | null;
     }) => void;
+    onMoveEnd?: (center: [number, number], zoom: number) => void;
   },
 ) {
   switch (event.type) {
@@ -392,8 +418,10 @@ function handleBridgeEvent(
       });
       return;
     }
-    case "mapLongPress":
     case "moveEnd":
+      handlers.onMoveEnd?.(event.center, event.zoom);
+      return;
+    case "mapLongPress":
     case "error":
       return;
     default: {

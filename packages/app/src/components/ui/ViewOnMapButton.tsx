@@ -16,7 +16,9 @@ export function ViewOnMapButton({ center, zoom, label, testID }: ViewOnMapButton
   if (!center) return null;
 
   const handlePress = () => {
-    router.push(buildExploreDeepLink({ center, zoom }) as never);
+    // `dismissTo` pops stack screens until the explore tab is reached (reusing
+    // the existing map instance) rather than pushing a duplicate (tabs) entry.
+    router.dismissTo(buildExploreDeepLink({ center, zoom }) as never);
   };
 
   return (
