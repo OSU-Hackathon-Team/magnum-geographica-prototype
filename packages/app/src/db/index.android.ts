@@ -1,3 +1,4 @@
+import { open } from "@op-engineering/op-sqlite";
 import { OFFLINE_SCHEMA_SQL, SCHEMA_VERSION } from "./schema";
 
 type SQLResult = Array<Record<string, unknown>>;
@@ -32,26 +33,27 @@ function normalizeRows(rows: Array<Record<string, unknown>> | undefined): SQLRes
   });
 }
 
-async function initOpSqlite(): Promise<OfflineDatabase> {
-  const { openAsync } = await import("@op-engineering/op-sqlite");
-  const db = await openAsync({ name: "magnum_offline.db" });
+function initOpSqlite(): Promise<OfflineDatabase> {
+  const db = open({ name: "magnum_offline.db" });
 
-  await db.execute("PRAGMA journal_mode = WAL");
-  await db.execute("PRAGMA foreign_keys = ON");
+  return Promise.resolve().then(async () => {
+    await db.execute("PRAGMA journal_mode = WAL");
+    await db.execute("PRAGMA foreign_keys = ON");
 
-  return {
-    async exec(sql: string, params: unknown[] = []) {
-      const result = await db.execute(sql, toOpSqliteParams(params));
-      return normalizeRows(result.rows as Array<Record<string, unknown>> | undefined);
-    },
-    async execRaw(sql: string, params: unknown[] = []) {
-      const result = await db.execute(sql, toOpSqliteParams(params));
-      return normalizeRows(result.rows as Array<Record<string, unknown>> | undefined);
-    },
-    close() {
-      db.close();
-    },
-  };
+    return {
+      async exec(sql: string, params: unknown[] = []) {
+        const result = await db.execute(sql, toOpSqliteParams(params));
+        return normalizeRows(result.rows as Array<Record<string, unknown>> | undefined);
+      },
+      async execRaw(sql: string, params: unknown[] = []) {
+        const result = await db.execute(sql, toOpSqliteParams(params));
+        return normalizeRows(result.rows as Array<Record<string, unknown>> | undefined);
+      },
+      close() {
+        db.close();
+      },
+    };
+  });
 }
 
 export async function initDatabase(): Promise<OfflineDatabase> {

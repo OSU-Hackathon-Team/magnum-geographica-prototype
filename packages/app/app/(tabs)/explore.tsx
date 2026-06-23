@@ -15,7 +15,6 @@ import {
   getDownloadedSystemIds,
 } from "../../src/services/offlineDataService";
 import type { OfflineMapData } from "../../src/services/offlineDataService";
-import { Button } from "../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL;
@@ -54,7 +53,7 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [offlineData, setOfflineData] = useState<OfflineMapData | null>(null);
-  const [pendingPin, setPendingPin] = useState<{ lon: number; lat: number } | null>(null);
+  const [isPlacing, setIsPlacing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestRef = useRef(0);
 
@@ -62,6 +61,26 @@ export default function ExploreScreen() {
   const flyTo = useMemo(
     () => (deepLink ? { lon: deepLink.lon, lat: deepLink.lat, zoom: deepLink.zoom } : null),
     [deepLink],
+  );
+
+  const initialCenter = useMemo(
+    () => (deepLink ? ([deepLink.lon, deepLink.lat] as [number, number]) : mapCenter),
+    [deepLink, mapCenter],
+  );
+
+  const initialZoom = useMemo(
+    () => (deepLink ? deepLink.zoom : mapZoom),
+    [deepLink, mapZoom],
+  );
+
+  const mapConfig = useMemo(
+    () => ({
+      baseTileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      martinTilesUrl: MARTIN_URL,
+      initialCenter,
+      initialZoom,
+    }),
+    [initialCenter, initialZoom],
   );
 
   // Load offline map data when offline with downloaded packs
@@ -89,7 +108,6 @@ export default function ExploreScreen() {
       }
       return;
     }
-    // For offline, search is limited; clear online results
     setResults(null);
     setLoading(false);
   }, [isOnline, query]);
@@ -179,31 +197,23 @@ export default function ExploreScreen() {
     setShowResults(false);
   }, []);
 
-  const handleMapClick = useCallback((lon: number, lat: number) => {
-    setPendingPin({ lon, lat });
+  const handleMapClick = useCallback(
+    (lon: number, lat: number) => {
+      if (isPlacing) {
+        setIsPlacing(false);
+        router.push(`/feature/create?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}` as never);
+      }
+    },
+    [isPlacing, router],
+  );
+
+  const handleStartPlacing = useCallback(() => {
+    setIsPlacing(true);
   }, []);
 
-  const handleAddFeature = useCallback(() => {
-    if (!pendingPin) return;
-    const { lon, lat } = pendingPin;
-    setPendingPin(null);
-    router.push(`/feature/create?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}` as never);
-  }, [pendingPin, router]);
-
-  const handleDismissPin = useCallback(() => {
-    setPendingPin(null);
+  const handleCancelPlacing = useCallback(() => {
+    setIsPlacing(false);
   }, []);
-
-  const handleAddFeatureAtCenter = useCallback(() => {
-    const center = mapCenter ?? [-82.9988, 39.9612];
-    const [lon, lat] = center;
-    router.push(`/feature/create?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}` as never);
-  }, [mapCenter, router]);
-
-  const initialCenter = deepLink
-    ? ([deepLink.lon, deepLink.lat] as [number, number])
-    : mapCenter;
-  const initialZoom = deepLink ? deepLink.zoom : mapZoom;
 
   return (
     <View style={styles.container} testID="explore-screen">
@@ -241,12 +251,7 @@ export default function ExploreScreen() {
 
       <View style={styles.mapContainer} testID="explore-map">
         <MapContainer
-          config={{
-            baseTileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-            martinTilesUrl: MARTIN_URL,
-            initialCenter,
-            initialZoom,
-          }}
+          config={mapConfig}
           onFeatureSelect={handleFeatureSelect}
           onClick={handleMapClick}
           flyTo={flyTo}
@@ -263,29 +268,28 @@ export default function ExploreScreen() {
         </View>
       ) : null}
 
-      <Pressable
-        style={styles.addFeatureFab}
-        onPress={handleAddFeatureAtCenter}
-        testID="explore-add-feature"
-      >
-        <Text style={styles.addFeatureFabText}>+</Text>
-      </Pressable>
-
-      {pendingPin ? (
-        <View style={styles.pinBar} testID="explore-pin-bar">
-          <Text style={styles.pinText}>
-            {pendingPin.lat.toFixed(5)}, {pendingPin.lon.toFixed(5)}
+      {isPlacing ? (
+        <View style={styles.placingBanner} testID="explore-placing-banner">
+          <Text style={styles.placingText}>
+            Tap on the map to place your feature
           </Text>
-          <View style={styles.pinActions}>
-            <Button variant="ghost" size="small" onPress={handleDismissPin} testID="explore-pin-cancel">
-              Cancel
-            </Button>
-            <Button variant="primary" size="small" onPress={handleAddFeature} testID="explore-pin-add">
-              Add Feature
-            </Button>
-          </View>
+          <Pressable
+            onPress={handleCancelPlacing}
+            style={styles.placingCancel}
+            testID="explore-placing-cancel"
+          >
+            <Text style={styles.placingCancelText}>Cancel</Text>
+          </Pressable>
         </View>
-      ) : null}
+      ) : (
+        <Pressable
+          style={styles.addFeatureFab}
+          onPress={handleStartPlacing}
+          testID="explore-add-feature"
+        >
+          <Text style={styles.addFeatureFabText}>+</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -315,25 +319,39 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   coordsText: { color: "#fff", fontSize: 12 },
-  pinBar: {
+  placingBanner: {
     position: "absolute",
-    bottom: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#22c55e",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 5,
   },
-  pinText: { fontSize: 13, color: "#333", fontFamily: "monospace" },
-  pinActions: { flexDirection: "row", gap: 8 },
+  placingText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  placingCancel: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 6,
+  },
+  placingCancelText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   addFeatureFab: {
     position: "absolute",
     bottom: 80,

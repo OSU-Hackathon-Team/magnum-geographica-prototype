@@ -4,7 +4,7 @@ import * as schema from "./schema.js";
 
 const databaseUrl =
   process.env.DATABASE_URL ??
-  "postgres://magnum:magnum@localhost:5432/magnum";
+  `postgres://${process.env.DB_USER ?? "magnum"}:${process.env.DB_PASSWORD ?? "changeme"}@${process.env.DB_HOST ?? "localhost"}:${process.env.DB_PORT ?? "5432"}/${process.env.DB_NAME ?? "magnum"}`;
 
 export const pool = new pg.Pool({
   connectionString: databaseUrl,

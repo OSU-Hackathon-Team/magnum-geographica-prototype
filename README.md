@@ -17,6 +17,7 @@ See [PLAN.md](./PLAN.md) for the full architecture and phased build plan, and [o
 ## Quick start
 
 ```bash
+cp .env.example .env                                # copy local env (DB password, ports)
 bun install                                         # workspace install
 docker compose -f docker/docker-compose.yml up -d   # start postgres + martin + api
 bun run --cwd packages/api db:migrate               # apply schema

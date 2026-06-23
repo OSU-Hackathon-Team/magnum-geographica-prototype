@@ -1,7 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { createMagnumClient, type Feature } from "@magnum/shared";
+import { createMagnumClient } from "@magnum/shared";
 import {
   FeatureForm,
   type FeatureFormData,
@@ -38,8 +38,8 @@ export default function CreateFeatureScreen() {
       type_tag: data.type_tag,
       description: data.description,
       point: { type: "Point", coordinates: [data.lon, data.lat] },
-      system_id: systemId || null,
-      trail_id: trailId || null,
+      system_id: data.system_id,
+      trail_id: data.trail_id,
     };
 
     if (!isOnline) {
@@ -86,7 +86,7 @@ export default function CreateFeatureScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Add Feature" }} />
+      <Stack.Screen options={{ title: "Add Feature", headerBackTitle: "Map" }} />
       {error ? (
         <View style={styles.errorBanner} testID="create-feature-error">
           <Text style={styles.errorText}>{error}</Text>
@@ -102,6 +102,8 @@ export default function CreateFeatureScreen() {
       <FeatureForm
         initialLon={parsedLon}
         initialLat={parsedLat}
+        initialSystemId={systemId || null}
+        initialTrailId={trailId || null}
         onSave={handleSave}
         saving={saving}
         submitLabel="Create Feature"

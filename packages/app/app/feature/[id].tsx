@@ -174,7 +174,23 @@ export default function FeatureDetail() {
 
   return (
     <>
-      <Stack.Screen options={{ title: feature.name, headerShown: true }} />
+      <Stack.Screen
+        options={{
+          title: feature.name,
+          headerShown: true,
+          presentation: "modal",
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.back()}
+              style={styles.closeBtn}
+              testID="feature-detail-close"
+              accessibilityLabel="Close"
+            >
+              <Text style={styles.closeBtnText}>×</Text>
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView style={styles.container} testID="feature-detail-screen">
         <View style={styles.section} testID="feature-meta">
           <View style={styles.nameRow}>
@@ -303,5 +319,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 4,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeBtnText: {
+    fontSize: 24,
+    color: "#666",
+    lineHeight: 28,
   },
 });

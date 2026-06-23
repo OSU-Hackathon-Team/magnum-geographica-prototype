@@ -4,12 +4,13 @@ WORKDIR /app
 
 RUN apk add --no-cache curl
 
+COPY packages/shared/ ./shared/
+
 COPY packages/api/package.json packages/api/bun.lock* ./
-COPY packages/shared/package.json ../shared/
+RUN sed -i 's|workspace:\*|file:./shared|' package.json
 RUN bun install --no-save
 
 COPY packages/api/ ./
-COPY packages/shared/ ../shared/
 
 ENV NODE_ENV=production
 ENV API_PORT=3000
