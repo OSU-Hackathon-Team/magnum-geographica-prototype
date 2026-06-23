@@ -61,3 +61,7 @@ coverage/
 
 # Generated API clients
 packages/api/openapi.json
+
+
+# Other
+.playwright-mcp/
