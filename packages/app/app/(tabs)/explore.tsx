@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { MapContainer } from "@magnum/map";
+import { MapContainer, resolveBaseLayers } from "@magnum/map";
 import { createMagnumClient, type Feature as ApiFeature, type System, type Trail } from "@magnum/shared";
 import { SearchBar } from "../../src/components/ui/SearchBar";
 import {
   SearchResultsDropdown,
   type SearchResults,
 } from "../../src/components/ui/SearchResultsDropdown";
+import { BaseLayerSwitcher } from "../../src/components/map/BaseLayerSwitcher";
 import { useMapStore } from "../../src/stores/mapStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
+import { useBaseLayerStore } from "../../src/stores/baseLayerStore";
 import {
   loadOfflineMapData,
   getDownloadedSystemIds,
@@ -48,6 +50,11 @@ export default function ExploreScreen() {
   const setViewport = useMapStore((s) => s.setViewport);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const downloadedPacks = useOfflineStore((s) => s.downloadedPacks);
+  const baseLayerId = useBaseLayerStore((s) => s.baseLayerId);
+  const baseLayerDefs = useMemo(
+    () => resolveBaseLayers({ martinTilesUrl: MARTIN_URL }),
+    [],
+  );
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -78,15 +85,17 @@ export default function ExploreScreen() {
   // The map's initial viewport comes from the persisted mapStore so the
   // camera position survives navigation (SPA-style). `mapConfig` only feeds
   // the initial mount; subsequent camera moves go through `flyTo` and
-  // moveEnd → mapStore.
+  // moveEnd → mapStore. The base layer is selected separately via
+  // `baseLayerId` (from baseLayerStore) so it can be swapped without
+  // re-rendering the map or recreating the OL/WebView instance.
   const mapConfig = useMemo(
     () => ({
-      baseTileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       martinTilesUrl: MARTIN_URL,
+      baseLayers: baseLayerDefs,
       initialCenter: mapCenter,
       initialZoom: mapZoom,
     }),
-    [mapCenter, mapZoom],
+    [mapCenter, mapZoom, baseLayerDefs],
   );
 
   useEffect(() => {
@@ -286,12 +295,17 @@ export default function ExploreScreen() {
       <View style={styles.mapContainer} testID="explore-map">
         <MapContainer
           config={mapConfig}
+          baseLayerId={baseLayerId}
           onFeatureSelect={handleFeatureSelect}
           onClick={handleMapClick}
           onMoveEnd={handleMoveEnd}
           flyTo={flyTo}
           offlineMode={!isOnline}
           offlineData={offlineData}
+        />
+        <BaseLayerSwitcher
+          layers={baseLayerDefs}
+          testID="explore-base-layer-switcher"
         />
       </View>
 

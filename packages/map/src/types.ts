@@ -1,12 +1,14 @@
 export interface MapContainerProps {
   config?: {
-    baseTileUrl?: string;
     martinTilesUrl?: string;
+    baseLayers?: import("./shared/config.js").BaseLayerDef[];
+    defaultBaseLayerId?: string;
     initialCenter?: [number, number];
     initialZoom?: number;
     minZoom?: number;
     maxZoom?: number;
   };
+  baseLayerId?: string;
   onReady?: () => void;
   onClick?: (lon: number, lat: number) => void;
   onLongClick?: (lon: number, lat: number) => void;
@@ -24,5 +26,5 @@ export interface MapContainerProps {
     systems?: unknown;
     features?: unknown;
   } | null;
-  onMapRef?: (send: (cmd: { method: string; args: unknown }) => void) => void;
+  onMapRef?: (send: (cmd: import("./bridge/types.js").BridgeCommand) => void) => void;
 }

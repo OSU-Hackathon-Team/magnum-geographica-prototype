@@ -41,7 +41,6 @@ function TrailMapPreview() {
     <View style={styles.mapPreview}>
       <MapContainer
         config={{
-          baseTileUrl: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
           martinTilesUrl: MARTIN_URL,
           initialCenter: [-82.9988, 39.9612],
           initialZoom: 8,

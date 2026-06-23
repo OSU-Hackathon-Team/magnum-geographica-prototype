@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Map, View } from "ol";
 import type { Layer } from "ol/layer.js";
-import TileLayer from "ol/layer/Tile.js";
-import OSM from "ol/source/OSM.js";
 import "ol/ol.css";
 import { fromLonLat, toLonLat } from "ol/proj.js";
-import { defaultMapConfig } from "./shared/config.js";
+import {
+  defaultMapConfig,
+  resolveBaseLayers,
+  resolveDefaultBaseLayerId,
+} from "./shared/config.js";
 import { createTrailsLayer } from "./layers/TrailsLayer.js";
 import { createSystemsLayer } from "./layers/SystemsLayer.js";
 import { createFeaturesLayer } from "./layers/FeaturesLayer.js";
 import { createSuperSystemsLayer } from "./layers/SuperSystemsLayer.js";
+import { applyBaseLayer } from "./layers/BaseLayer.js";
 import type { MapContainerProps } from "./types.js";
 
 export type { MapContainerProps };
@@ -32,6 +35,7 @@ function readStringId(value: unknown): string | null {
 
 export default function MapContainer({
   config,
+  baseLayerId,
   onReady,
   onClick,
   onFeatureSelect,
@@ -53,6 +57,14 @@ export default function MapContainer({
   onMoveEndRef.current = onMoveEnd;
 
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
+  const baseLayerDefs = useMemo(
+    () => resolveBaseLayers(merged),
+    [merged],
+  );
+  const defaultBaseLayerId = useMemo(
+    () => resolveDefaultBaseLayerId(merged, baseLayerDefs),
+    [merged, baseLayerDefs],
+  );
 
   // Create the OpenLayers map exactly once. Camera changes are handled via the
   // flyTo effect below, so this effect intentionally has no reactive deps —
@@ -61,13 +73,12 @@ export default function MapContainer({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const baseTileUrl = merged.baseTileUrl ?? defaultMapConfig.baseTileUrl;
     const center = merged.initialCenter ?? defaultMapConfig.initialCenter;
     const zoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
     const minZoom = merged.minZoom ?? defaultMapConfig.minZoom;
     const maxZoom = merged.maxZoom ?? defaultMapConfig.maxZoom;
 
-    const layers: Layer[] = [new TileLayer({ source: new OSM({ url: baseTileUrl }) })];
+    const layers: Layer[] = [];
 
     const superSystemsLayer = createSuperSystemsLayer(merged);
     if (superSystemsLayer) layers.push(superSystemsLayer);
@@ -84,6 +95,10 @@ export default function MapContainer({
       view: new View({ center: fromLonLat(center), zoom, minZoom, maxZoom }),
     });
     mapRef.current = map;
+
+    // Insert the basemap at index 0 so it sits beneath trails/systems/etc.
+    // Uses the active id if provided, otherwise the config's default.
+    applyBaseLayer(map, baseLayerDefs, defaultBaseLayerId);
 
     map.on("click", (evt) => {
       const pixel = map.getEventPixel(evt.originalEvent);
@@ -148,6 +163,15 @@ export default function MapContainer({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Swap the basemap in place when the active id changes. The map is not
+  // recreated — the old layer is disposed and a fresh one is inserted at
+  // the same index, preserving z-order with overlays.
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const id = baseLayerId ?? defaultBaseLayerId;
+    applyBaseLayer(mapRef.current, baseLayerDefs, id);
+  }, [baseLayerId, baseLayerDefs, defaultBaseLayerId]);
 
   // Pan the camera (animate) when a flyTo target is provided. This is what
   // "View on map" uses — it reuses the existing map instance instead of

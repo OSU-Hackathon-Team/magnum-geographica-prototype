@@ -40,6 +40,11 @@ $START_ALL && { START_API=true; START_APP=true; START_EMULATOR=true; }
 
 # ── Docker backend (Postgres + Martin) ──────────────────────────────
 if $START_API || $START_APP; then
+  if [ ! -f data/basemap.mbtiles ]; then
+    warn "Basemap MBTiles not found. Generate it first:"
+    warn "  ./scripts/build-simplified-basemap.sh ohio"
+    warn "The satellite layer will still work without it."
+  fi
   log "Starting Docker services (postgres + martin)..."
   docker compose -f docker/docker-compose.yml up -d postgres martin 2>&1 | sed 's/^/  /'
 fi
