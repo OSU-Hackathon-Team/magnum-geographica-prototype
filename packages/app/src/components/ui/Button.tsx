@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 export interface ButtonProps {
   title?: string;
-  onPress: () => void;
+  onPress?: () => void;
   variant?: "primary" | "secondary" | "ghost";
   size?: "small" | "medium";
   disabled?: boolean;
@@ -25,7 +25,7 @@ export function Button({
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || !onPress}
       style={({ pressed }) => [
         styles.base,
         styles[size],

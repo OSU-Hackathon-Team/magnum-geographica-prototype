@@ -85,5 +85,6 @@ export const DEFAULT_OFFLINE_QUALITY: QualityLevelKey = "high";
 
 export const DEFAULT_OFFLINE_MIN_ZOOM = 2;
 
+export const USER_ROLES = ["contributor", "moderator", "admin", "banned"] as const;
 export const ATTESTATION_QUORUM_DEFAULT = 3;
 export const ATTESTATION_TRACK_OVERLAP_THRESHOLD = 0.8;

@@ -15,6 +15,13 @@
       "when": 1782338992356,
       "tag": "0001_slimy_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782340207153,
+      "tag": "0002_free_rictor",
+      "breakpoints": true
     }
   ]
 }

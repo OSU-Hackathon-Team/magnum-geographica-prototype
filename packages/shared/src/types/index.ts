@@ -15,6 +15,9 @@ import {
   bboxDownloadRequestSchema,
   bboxInfoResponseSchema,
   offlineRegionSchema,
+  userSchema,
+  loginRequestSchema,
+  registerRequestSchema,
 } from "../schemas/index.js";
 
 export type Difficulty = "easy" | "moderate" | "hard" | "expert";
@@ -33,6 +36,7 @@ export type FeatureType =
   | "intersection"
   | "other";
 export type WikiTargetType = "super_system" | "system" | "sub_system" | "trail" | "feature";
+export type UserRole = "contributor" | "moderator" | "admin" | "banned";
 export type SyncAction = "create" | "update" | "delete";
 export type SyncStatus = "pending" | "syncing" | "conflict" | "synced";
 
@@ -51,6 +55,9 @@ export type PendingContribution = z.infer<typeof pendingContributionSchema>;
 export type BboxDownloadRequest = z.infer<typeof bboxDownloadRequestSchema>;
 export type BboxInfoResponse = z.infer<typeof bboxInfoResponseSchema>;
 export type OfflineRegion = z.infer<typeof offlineRegionSchema>;
+export type User = z.infer<typeof userSchema>;
+export type LoginRequest = z.infer<typeof loginRequestSchema>;
+export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 
 export interface GeoJSONPolygon {
   type: "Polygon";

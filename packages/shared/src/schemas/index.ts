@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DIFFICULTIES, SURFACE_TYPES, FEATURE_TYPES, WIKI_TARGET_TYPES } from "../constants.js";
+import { DIFFICULTIES, SURFACE_TYPES, FEATURE_TYPES, WIKI_TARGET_TYPES, USER_ROLES } from "../constants.js";
 
 const uuidSchema = z.string().uuid();
 const isoDateSchema = z.string().datetime({ offset: true });
@@ -366,4 +366,51 @@ export const bboxPackGenerateResponseSchema = z.object({
     features: z.number().int().nonnegative(),
     wikiPages: z.number().int().nonnegative(),
   }),
+});
+
+export const userSchema = z.object({
+  id: uuidSchema,
+  username: z.string().min(1).max(80),
+  display_name: z.string().max(120).nullable().optional(),
+  email: z.string().email().max(254),
+  password_hash: z.string(),
+  role: z.enum(USER_ROLES),
+  trust_score: z.number(),
+  created_at: isoDateSchema,
+  updated_at: isoDateSchema,
+});
+
+export const registerRequestSchema = z.object({
+  username: z
+    .string()
+    .min(1)
+    .max(80)
+    .regex(/^[a-zA-Z0-9_-]+$/, "username must be alphanumeric, dashes, underscores"),
+  email: z.string().email().max(254),
+  password: z.string().min(8).max(128),
+  display_name: z.string().max(120).optional(),
+});
+
+export const loginRequestSchema = z.object({
+  email: z.string().email().max(254),
+  password: z.string().min(1).max(128),
+});
+
+export const authTokensSchema = z.object({
+  access_token: z.string(),
+  refresh_token: z.string(),
+  expires_in: z.number(),
+  user: userSchema.omit({ password_hash: true }),
+});
+
+export const userProfileSchema = userSchema.omit({ password_hash: true });
+
+export const userUpdateSchema = z.object({
+  display_name: z.string().max(120).nullable().optional(),
+  username: z
+    .string()
+    .min(1)
+    .max(80)
+    .regex(/^[a-zA-Z0-9_-]+$/)
+    .optional(),
 });

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { corsMiddleware } from "./middleware/cors.js";
+import { rateLimit } from "./middleware/rate-limit.js";
 import { healthRoute } from "./routes/health.js";
 import { systemsRoute } from "./routes/systems.js";
 import { trailsRoute } from "./routes/trails.js";
@@ -14,11 +15,15 @@ import { offlineRoute } from "./routes/offline.js";
 import { syncRoute } from "./routes/sync.js";
 import { mediaRoute } from "./routes/media.js";
 import { segmentDetailRoute, trailSegmentsRoute } from "./routes/segments.js";
+import { authRoute } from "./routes/auth.js";
+import { usersRoute } from "./routes/users.js";
+import { adminRoute } from "./routes/admin.js";
 import { metroProxy } from "./middleware/metro-proxy.js";
 
 const app = new Hono();
 
 app.use("*", corsMiddleware());
+app.use("*", rateLimit());
 
 app.route("/api/health", healthRoute);
 app.route("/api/systems", systemsRoute);
@@ -35,6 +40,9 @@ app.route("/api/sync", syncRoute);
 app.route("/api/media", mediaRoute);
 app.route("/api/segments", segmentDetailRoute);
 app.route("/api/trails", trailSegmentsRoute);
+app.route("/api/auth", authRoute);
+app.route("/api/users", usersRoute);
+app.route("/api/admin", adminRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));
 

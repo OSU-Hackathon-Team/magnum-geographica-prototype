@@ -20,6 +20,7 @@ const APP_TABLES = [
   "revisions",
   "media",
   "offline_packs",
+  "users",
 ] as const;
 
 const databaseUrl =

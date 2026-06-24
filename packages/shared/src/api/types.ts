@@ -16,6 +16,8 @@ import {
   reorderSegmentsInputSchema,
   splitSegmentInputSchema,
   mergeSegmentsInputSchema,
+  registerRequestSchema,
+  loginRequestSchema,
 } from "../schemas/index.js";
 
 export type CreateSystemInput = z.infer<typeof createSystemInputSchema>;
@@ -34,6 +36,8 @@ export type UpdateSegmentInput = z.infer<typeof updateSegmentInputSchema>;
 export type ReorderSegmentsInput = z.infer<typeof reorderSegmentsInputSchema>;
 export type SplitSegmentInput = z.infer<typeof splitSegmentInputSchema>;
 export type MergeSegmentsInput = z.infer<typeof mergeSegmentsInputSchema>;
+export type RegisterInput = z.infer<typeof registerRequestSchema>;
+export type LoginInput = z.infer<typeof loginRequestSchema>;
 
 export type ApiRequest<TRoute extends keyof ApiRoutes> = ApiRoutes[TRoute]["request"];
 export type ApiResponse<TRoute extends keyof ApiRoutes> = ApiRoutes[TRoute]["response"];

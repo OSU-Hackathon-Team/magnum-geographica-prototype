@@ -75,6 +75,9 @@ const PENDING_CONTRIBUTIONS: { id: number; entity_type: string; action: string; 
   [];
 let nextPendingId = 1;
 
+const MOCK_USERS: Record<string, { id: string; username: string; email: string; role: string; trust_score: number }> = {};
+let nextUserId = 900;
+
 // Wiki page key: `${targetType}:${targetId}`
 function wikiKey(targetType: string, targetId: string) {
   return `${targetType}:${targetId}`;
@@ -85,6 +88,66 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     pattern: /\/api\/health$/,
     handler: () =>
       ok({ status: "ok", version: "0.0.1", time: new Date().toISOString(), database: "ok" }),
+  },
+  // --- Auth ---
+  {
+    pattern: /\/api\/auth\/register$/,
+    handler: ({ method, body }) => {
+      if (method !== "POST") return undefined;
+      const b = body as { username?: string; email?: string; password?: string };
+      if (!b?.username || !b?.email || !b?.password)
+        return { status: 400, body: { error: "invalid_input", message: "all fields required" } };
+      if (Object.values(MOCK_USERS).some((u) => u.email === b.email))
+        return conflict("email already registered");
+      const id = String(nextUserId++);
+      const user = {
+        id,
+        username: b.username,
+        email: b.email,
+        role: "contributor",
+        trust_score: 0,
+      };
+      MOCK_USERS[id] = user;
+      return ok(
+        {
+          access_token: `mock-access-${id}`,
+          refresh_token: `mock-refresh-${id}`,
+          expires_in: 900,
+          user,
+        },
+        201,
+      );
+    },
+  },
+  {
+    pattern: /\/api\/auth\/login$/,
+    handler: ({ method, body }) => {
+      if (method !== "POST") return undefined;
+      const b = body as { email?: string; password?: string };
+      if (!b?.email || !b?.password)
+        return { status: 400, body: { error: "invalid_input", message: "email and password required" } };
+      const user = Object.values(MOCK_USERS).find((u) => u.email === b.email);
+      if (!user) return { status: 401, body: { error: "unauthorized", message: "invalid email or password" } };
+      return ok({
+        access_token: `mock-access-${user.id}`,
+        refresh_token: `mock-refresh-${user.id}`,
+        expires_in: 900,
+        user,
+      });
+    },
+  },
+  {
+    pattern: /\/api\/auth\/me$/,
+    handler: ({ method }) => {
+      if (method !== "GET") return undefined;
+      const user = Object.values(MOCK_USERS)[0];
+      if (!user) return { status: 401, body: { error: "unauthorized", message: "authentication required" } };
+      return ok(user);
+    },
+  },
+  {
+    pattern: /\/api\/auth\/refresh$/,
+    handler: () => ok({ access_token: "mock-access-refreshed", expires_in: 900 }),
   },
   {
     pattern: /\/api\/systems\/by-slug\/([^/]+)$/,

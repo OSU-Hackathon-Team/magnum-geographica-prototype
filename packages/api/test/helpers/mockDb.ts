@@ -47,6 +47,7 @@ export interface MockState {
   wikiPages: Array<Record<string, unknown>>;
   revisions: Array<Record<string, unknown>>;
   citations: Array<Record<string, unknown>>;
+  users: Array<Record<string, unknown>>;
   insertCalls: Array<{ table: string; values: unknown }>;
   updateCalls: Array<{ table: string; values: unknown; where: unknown }>;
   deleteCalls: Array<{ table: string; where: unknown }>;
@@ -89,6 +90,7 @@ function pickRows(state: MockState, table: unknown): unknown[] {
   if (name === "wiki_pages") return [...state.wikiPages];
   if (name === "revisions") return [...state.revisions];
   if (name === "citations") return [...state.citations];
+  if (name === "users") return [...state.users];
   return [];
 }
 
@@ -113,6 +115,7 @@ export function createMockDb(): { db: Database; state: MockState } {
     wikiPages: [],
     revisions: [],
     citations: [],
+    users: [],
     insertCalls: [],
     updateCalls: [],
     deleteCalls: [],
@@ -190,8 +193,22 @@ export function createMockDb(): { db: Database; state: MockState } {
       };
       chain.returning = () => {
         const call = state.insertCalls[state.insertCalls.length - 1];
+        const values = (call?.values as object) ?? {};
+        const defaults: Record<string, unknown> = {};
+        if (tableName === "users") {
+          defaults.role = "contributor";
+          defaults.trust_score = 0;
+          defaults.created_at = "2026-01-01T00:00:00.000Z";
+          defaults.updated_at = "2026-01-01T00:00:00.000Z";
+          defaults.display_name = null;
+        }
+        if (tableName === "wiki_pages") {
+          defaults.rendered_html = "";
+          defaults.created_at = "2026-01-01T00:00:00.000Z";
+          defaults.updated_at = "2026-01-01T00:00:00.000Z";
+        }
         return Promise.resolve([
-          { id: "00000000-0000-0000-0000-000000000001", ...((call?.values as object) ?? {}) },
+          { id: "00000000-0000-0000-0000-000000000001", ...defaults, ...values },
         ]);
       };
       chain.onConflictDoNothing = () => chain;

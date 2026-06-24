@@ -9,6 +9,7 @@ import type {
   Media,
   TrailSegment,
   PaginatedResponse,
+  User,
 } from "../types/index.js";
 import type {
   CreateSystemInput,
@@ -26,6 +27,8 @@ import type {
   ReorderSegmentsInput,
   SplitSegmentInput,
   MergeSegmentsInput,
+  RegisterInput,
+  LoginInput,
 } from "./types.js";
 
 export function createMagnumClient(
@@ -34,6 +37,7 @@ export function createMagnumClient(
     fetch?: typeof fetch;
     getAdminSecret?: () => string | undefined;
     getContributorName?: () => string | undefined;
+    getAuthToken?: () => string | undefined;
   },
 ) {
   const client = new ApiClient({
@@ -41,6 +45,7 @@ export function createMagnumClient(
     fetch: opts?.fetch,
     getAdminSecret: opts?.getAdminSecret,
     getContributorName: opts?.getContributorName,
+    getAuthToken: opts?.getAuthToken,
   });
 
   return {
@@ -130,6 +135,46 @@ export function createMagnumClient(
       ),
     mergeSegments: (trailId: string, body: MergeSegmentsInput) =>
       client.post<TrailSegment>(`/api/trails/${trailId}/segments/merge`, body),
+
+    register: (body: RegisterInput) =>
+      client.post<{ access_token: string; refresh_token: string; expires_in: number; user: User }>(
+        "/api/auth/register",
+        body,
+      ),
+    login: (body: LoginInput) =>
+      client.post<{ access_token: string; refresh_token: string; expires_in: number; user: User }>(
+        "/api/auth/login",
+        body,
+      ),
+    refreshToken: (refreshToken: string) =>
+      client.post<{ access_token: string; expires_in: number }>("/api/auth/refresh", {
+        refresh_token: refreshToken,
+      }),
+    getMe: () => client.get<User>("/api/auth/me"),
+    getUser: (id: string) => client.get<User>(`/api/users/${id}`),
+    getUserContributions: (id: string, params?: { page?: number; pageSize?: number }) =>
+      client.get<PaginatedResponse<Revision>>(`/api/users/${id}/contributions`, params),
+    updateUser: (id: string, body: { display_name?: string; username?: string }) =>
+      client.put<User>(`/api/users/${id}`, body),
+
+    adminListRevisions: (params?: {
+      page?: number;
+      pageSize?: number;
+      userId?: string;
+      targetType?: string;
+    }) => client.get<PaginatedResponse<Revision>>("/api/admin/revisions", params),
+    adminRevertRevision: (revisionId: string) =>
+      client.post<{ ok: boolean }>(`/api/admin/revisions/${revisionId}/revert`),
+    adminDeleteWikiPage: (id: string) =>
+      client.delete<{ ok: boolean }>(`/api/admin/wiki-pages/${id}`),
+    adminDeleteFeature: (id: string) =>
+      client.delete<{ ok: boolean }>(`/api/admin/features/${id}`),
+    adminListUsers: (params?: { page?: number; pageSize?: number; q?: string }) =>
+      client.get<PaginatedResponse<User>>("/api/admin/users", params),
+    adminBanUser: (id: string) =>
+      client.post<{ ok: boolean }>(`/api/admin/users/${id}/ban`),
+    adminUnbanUser: (id: string) =>
+      client.post<{ ok: boolean }>(`/api/admin/users/${id}/unban`),
   };
 }
 

@@ -276,6 +276,18 @@ export const media = pgTable(
   }),
 );
 
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  username: text("username").notNull().unique(),
+  displayName: text("display_name"),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("contributor"),
+  trustScore: doublePrecision("trust_score").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const offlinePacks = pgTable("offline_packs", {
   id: uuid("id").primaryKey().defaultRandom(),
   systemId: uuid("system_id")
@@ -289,6 +301,8 @@ export const offlinePacks = pgTable("offline_packs", {
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 export type SuperSystem = typeof superSystems.$inferSelect;
 export type NewSuperSystem = typeof superSystems.$inferInsert;
 export type System = typeof systems.$inferSelect;

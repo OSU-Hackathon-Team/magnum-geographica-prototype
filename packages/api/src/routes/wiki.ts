@@ -8,9 +8,11 @@ import {
   revertWikiPageInputSchema,
   wikiPageQuerySchema,
 } from "@magnum/shared";
-import { adminOnly } from "../middleware/auth.js";
+import { adminOnly, type AuthUser } from "../middleware/auth.js";
 
-export const wikiRoute = new Hono();
+type Variables = { user?: AuthUser };
+
+export const wikiRoute = new Hono<{ Variables: Variables }>();
 
 const baseWikiSelect = {
   id: wikiPages.id,
@@ -87,6 +89,7 @@ wikiRoute.post("/", async (c) => {
   }
 
   const { target_type, target_id, title, content_md, contributor_name, edit_summary } = parsed.data;
+  const authUser = c.get("user");
 
   const existing = await db
     .select({ id: wikiPages.id })
@@ -122,6 +125,7 @@ wikiRoute.post("/", async (c) => {
       wikiPageId: wikiPage.id,
       contentMd: content_md,
       contributorName: contributor_name,
+      authorId: authUser?.id ?? null,
       editSummary: edit_summary ?? null,
     });
   }
@@ -141,6 +145,7 @@ wikiRoute.put("/:id", async (c) => {
   }
 
   const { title, content_md, contributor_name, edit_summary, base_revision_id } = parsed.data;
+  const authUser = c.get("user");
 
   const existing = await db
     .select({ id: wikiPages.id })
@@ -180,6 +185,7 @@ wikiRoute.put("/:id", async (c) => {
     wikiPageId,
     contentMd: content_md,
     contributorName: contributor_name,
+    authorId: authUser?.id ?? null,
     editSummary: edit_summary ?? null,
   });
 
@@ -247,6 +253,7 @@ wikiRoute.post("/:id/revert", async (c) => {
   }
 
   const { revision_id, contributor_name, edit_summary } = parsed.data;
+  const authUser = c.get("user");
 
   const wikiExists = await db
     .select({ id: wikiPages.id })
@@ -278,6 +285,7 @@ wikiRoute.post("/:id/revert", async (c) => {
     wikiPageId,
     contentMd: rev.contentMd,
     contributorName: contributor_name,
+    authorId: authUser?.id ?? null,
     editSummary: edit_summary ?? `Reverted to revision ${revision_id}`,
   });
 
