@@ -63,9 +63,15 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       try {
         const NetInfo = await import("@react-native-community/netinfo");
         if (cancelled) return;
-        const initial = await NetInfo.default.fetch();
-        setOnline(Boolean(initial.isConnected && initial.isInternetReachable !== false));
+        // Default to online until NetInfo confirms otherwise. The store
+        // already starts as `isOnline: true`; the listener below will flip
+        // us to offline only when the device actually reports it. This
+        // avoids the brief offline-during-boot window where NetInfo may
+        // transiently report `isConnected: false` before the network is
+        // fully up — which would otherwise put the map in offline mode
+        // and try to load tiles from a non-existent local store.
         unsubNetInfo = NetInfo.default.addEventListener((state) => {
+          if (cancelled) return;
           const online = Boolean(state.isConnected && state.isInternetReachable !== false);
           setOnline(online);
         });

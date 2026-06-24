@@ -636,11 +636,11 @@ export default function MapContainer({
     // ReferenceError that crashes the Chromium WebView process and kills the
     // entire app. If postMessage fails, the command is simply dropped.
     if (!webViewRef.current) {
-      console.log('[MapContainer] send DROPPED (no ref):', command.method);
+      console.log('[MapContainer] send DROPPED (no ref):', command.method, JSON.stringify(command.args));
       return;
     }
     try {
-      console.log('[MapContainer] send OK:', command.method);
+      console.log('[MapContainer] send OK:', command.method, JSON.stringify(command.args));
       webViewRef.current.postMessage(JSON.stringify(command));
     } catch (_e) {
       // postMessage may fail if the WebView hasn't finished loading.
