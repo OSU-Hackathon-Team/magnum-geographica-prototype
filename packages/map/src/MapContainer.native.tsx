@@ -184,11 +184,13 @@ function buildMapHtml(
         var initialBaseId=${safeBaseLayerId};
         var initCenter=${safeCenter};
         var initZoom=${safeZoom};
+        console.log('[map] buildMap start, martinUrl=', martinUrl, 'baseLayerId=', initialBaseId, 'center=', initCenter, 'zoom=', initZoom);
 
         // Pre-build all base layer implementations (only the active one is added to the map).
         for(var i = 0; i < baseLayerDefs.length; i++){
           var d = baseLayerDefs[i];
           baseLayerImpls[d.id] = buildBaseLayer(d);
+          console.log('[map] base layer built:', d.id, 'kind=', d.kind, 'url=', d.url);
         }
 
         if(martinUrl){
@@ -274,6 +276,7 @@ function buildMapHtml(
 
         map=new ol.Map({target:'map',layers:allLayers,view:new ol.View({center:ol.proj.fromLonLat(initCenter),zoom:initZoom})});
         setActiveBaseLayer(initialBaseId);
+        console.log('[map] buildMap done, activeBaseLayer=', initialBaseId, 'layerCount=', map.getLayers().getArray().length);
         map.on('click',function(e){var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]})});
         map.on('moveend',function(){var v=map.getView();var c=ol.proj.toLonLat(v.getCenter());postToRN({type:'moveEnd',center:c,zoom:v.getZoom()})});
       }
@@ -283,8 +286,18 @@ function buildMapHtml(
       // Android WebView runs injected scripts in a separate "about:blank"
       // context where the ol global is undefined. Building the map here
       // guarantees it is ready as soon as OL finishes loading.
-      buildMap();
-      postToRN({type:'ready'});
+      //
+      // On the very first render cycle the WebView may load this HTML inline
+      // (via the htmlFallback path) before ol.js has been written to disk
+      // alongside map.html. When that happens ol is undefined and buildMap
+      // throws — we catch it so the error doesn't pollute the console. The
+      // file-backed reload picks it up correctly.
+      try {
+        buildMap();
+        postToRN({type:'ready'});
+      } catch(e) {
+        console.log('[map] buildMap skipped (ol.js not yet available):', e.message);
+      }
 
       // Handle commands sent from React Native via window.postMessage. This
       // is the only reliable channel on Android because injectJavaScript
