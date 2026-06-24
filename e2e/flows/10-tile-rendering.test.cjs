@@ -34,8 +34,9 @@ describe("10 Tile Rendering — Online", () => {
       { encoding: "utf8", timeout: 10000 },
     );
     assert.ok(html.length > 5000, "map.html must be > 5000 bytes");
+    const martinPort = process.env.MARTIN_HOST_PORT || 3001;
     assert.ok(
-      html.includes("http://localhost:3001/basemap/{z}/{x}/{y}"),
+      html.includes(`http://localhost:${martinPort}/basemap/{z}/{x}/{y}`),
       "must have simplified base layer URL",
     );
     assert.ok(

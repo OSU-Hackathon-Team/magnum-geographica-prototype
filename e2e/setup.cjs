@@ -1,6 +1,32 @@
 const { device } = require("detox");
 const http = require("http");
 const { execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+// Load .env (managed by scripts/ports.sh) so test infra follows shifted
+// ports. Falls back to .env.example if .env is missing.
+function loadEnvFile(file) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/i);
+    if (!m) continue;
+    let v = m[2];
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    ) {
+      v = v.slice(1, -1);
+    }
+    if (!(m[1] in process.env)) process.env[m[1]] = v;
+  }
+}
+loadEnvFile(path.join(__dirname, "..", ".env"));
+loadEnvFile(path.join(__dirname, "..", ".env.example"));
+
+const API_PORT = Number(process.env.API_HOST_PORT || 3000);
+const MARTIN_PORT = Number(process.env.MARTIN_HOST_PORT || 3001);
+const METRO_PORT = Number(process.env.METRO_HOST_PORT || 8081);
 
 /**
  * Check whether a local service is reachable by hitting a URL.
@@ -43,7 +69,7 @@ async function waitForService(url, label, timeoutMs = 20000) {
  * Without these the emulator cannot reach Metro/API/Martin on localhost.
  */
 function checkAdbReverse() {
-  const required = [8081, 3000, 3001];
+  const required = [METRO_PORT, API_PORT, MARTIN_PORT];
   try {
     const out = execSync("adb reverse --list", { encoding: "utf8" }).trim();
     const missing = required.filter(
@@ -74,23 +100,27 @@ beforeAll(async () => {
   const adbMissing = checkAdbReverse();
   if (adbMissing.length > 0) {
     console.error(
-      `[setup] Fix with: adb reverse tcp:3000 tcp:3000 && adb reverse tcp:3001 tcp:3001 && adb reverse tcp:8081 tcp:8081`,
+      `[setup] Fix with: adb reverse tcp:${METRO_PORT} tcp:${METRO_PORT} && adb reverse tcp:${API_PORT} tcp:${API_PORT} && adb reverse tcp:${MARTIN_PORT} tcp:${MARTIN_PORT}`,
     );
   }
 
   const checks = await Promise.all([
-    waitForService("http://localhost:8081/status", "Metro", 25000),
-    waitForService("http://localhost:3000/api/health", "API", 25000),
-    waitForService("http://localhost:3001/catalog", "Martin", 25000),
+    waitForService(`http://localhost:${METRO_PORT}/status`, "Metro", 25000),
+    waitForService(`http://localhost:${API_PORT}/api/health`, "API", 25000),
+    waitForService(`http://localhost:${MARTIN_PORT}/catalog`, "Martin", 25000),
   ]);
 
-  const labels = ["Metro (8081)", "API (3000)", "Martin (3001)"];
+  const labels = [
+    `Metro (${METRO_PORT})`,
+    `API (${API_PORT})`,
+    `Martin (${MARTIN_PORT})`,
+  ];
   const failures = labels.filter((_, i) => !checks[i]);
 
   if (failures.length > 0) {
     throw new Error(
       `\n\nFATAL — Required services not reachable: ${failures.join(", ")}.\n` +
-        `Run:  docker compose -f docker/docker-compose.yml up -d\n` +
+        `Run:  ./scripts/dc.sh up -d\n` +
         `Then:  cd packages/app && npx expo start --dev-client --no-dev\n` +
         `Aborting Detox suite.\n`,
     );

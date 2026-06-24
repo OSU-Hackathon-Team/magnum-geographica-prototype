@@ -31,8 +31,9 @@ describe("09d Offline — Sync Feature Back to Server", () => {
 
   it("verifies the feature reached the server database", async () => {
     try {
+      const apiPort = process.env.API_HOST_PORT || 3000;
       const result = await executeShell(
-        'curl -s "http://localhost:3000/api/features"',
+        `curl -s "http://localhost:${apiPort}/api/features"`,
       );
       await expect(result).toEqual(
         expect.stringContaining("Test Trailhead"),
