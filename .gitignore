@@ -65,3 +65,4 @@ packages/api/openapi.json
 
 # Other
 .playwright-mcp/
+artifacts/
