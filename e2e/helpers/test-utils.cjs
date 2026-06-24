@@ -181,12 +181,37 @@ async function waitForText(text, timeout = 30000) {
 }
 
 /**
- * Launch the app in offline mode. The OfflineProvider detects the
- * `magnum://offline` URL and sets the offline store to `isOnline=false`
- * without actually disabling WiFi (which would break the Metro bridge).
+ * Launch the app in offline mode.  The offline flag is embedded as a query
+ * parameter in the Expo dev-client URL so Metro still connects while the
+ * OfflineProvider's useURL() hook detects it and sets `isOnline = false`.
+ *
+ * Previous versions used `url: "magnum://offline"` which overrode the Expo
+ * dev-client URL entirely, preventing Metro from loading the JS bundle.
  */
 async function launchAppOffline(launchArgs = {}) {
-  return launchAppAndWait({ ...launchArgs, url: "magnum://offline" });
+  // Embed the offline flag into the Expo URL so both Metro and the app
+  // receive it.  Expo ignores extra query params; Linking.getInitialURL()
+  // returns the full URL including &offlineMode=true.
+  const expoUrl =
+    "org.magnum.app://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081&offlineMode=true";
+  return launchAppAndWait({
+    ...launchArgs,
+    url: expoUrl,
+  });
+}
+
+/**
+ * Restore the adb reverse forwards for API and Martin after an offline test
+ * that disabled them.
+ */
+async function restoreReversePorts() {
+  execSync("adb reverse tcp:3000 tcp:3000 2>/dev/null || true", {
+    encoding: "utf8",
+  });
+  execSync("adb reverse tcp:3001 tcp:3001 2>/dev/null || true", {
+    encoding: "utf8",
+  });
+  await sleep(1000);
 }
 
 module.exports = {
@@ -204,6 +229,7 @@ module.exports = {
   forceStopApp,
   launchAppAndWait,
   launchAppOffline,
+  restoreReversePorts,
   waitForText,
   by,
   element,
