@@ -1,5 +1,45 @@
 import type { Database } from "../../src/db/index.js";
 
+/**
+ * Walk a Drizzle `sql` template tree and produce a SQL string with
+ * parameters inlined (`'<value>'`) or rendered as `<param:N>` for non-string
+ * values. Used by the mock `execute()` so tests can match on SQL substrings —
+ * `String(sql)` would otherwise return `"[object Object]"`.
+ *
+ * The walker is deliberately tolerant: anything it doesn't understand is
+ * stringified and inlined. That's fine for test assertions on SQL shape.
+ */
+function materializeSql(node: unknown): string {
+  if (node === null || node === undefined) return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number" || typeof node === "boolean") return String(node);
+  if (typeof node === "object") {
+    const candidate = node as {
+      value?: unknown[] | string;
+      queryChunks?: unknown[];
+      decoder?: unknown;
+    };
+    // StringChunk: drizzle wraps raw SQL fragments as { value: string[] }
+    if (Array.isArray(candidate.value)) {
+      return candidate.value.map((v) => materializeSql(v)).join("");
+    }
+    if (typeof candidate.value === "string") return candidate.value;
+    // SQL template: walk children
+    if (Array.isArray(candidate.queryChunks)) {
+      return candidate.queryChunks.map((c) => materializeSql(c)).join("");
+    }
+  }
+  // Param/Placeholder: render as `'<value>'` (the param's raw value) so tests
+  // can match against it without depending on drizzle's param escaping.
+  const stringified = String(node);
+  if (stringified !== "[object Object]") return stringified;
+  try {
+    return JSON.stringify(node);
+  } catch {
+    return "";
+  }
+}
+
 export interface MockState {
   systems: Array<Record<string, unknown>>;
   trails: Array<Record<string, unknown>>;
@@ -12,6 +52,13 @@ export interface MockState {
   deleteCalls: Array<{ table: string; where: unknown }>;
   executeCalls: Array<{ sql: string }>;
   selectDebug: boolean;
+  /**
+   * Programmatic overrides for `db.execute(sql)`. When the SQL (lowercased)
+   * contains a substring of a key, the corresponding rows are returned
+   * instead of the default `[]`. Allows tests to simulate partial-empty
+   * result sets (e.g. systems returned but no trails/features).
+   */
+  executeRouter: Array<{ match: string; rows: Record<string, unknown>[] }>;
 }
 
 const DRIZZLE_NAME = Symbol.for("drizzle:Name");
@@ -71,6 +118,7 @@ export function createMockDb(): { db: Database; state: MockState } {
     deleteCalls: [],
     executeCalls: [],
     selectDebug: false,
+    executeRouter: [],
   };
 
   function buildChain(rows: unknown[], fromTable: string): Record<string, unknown> {
@@ -121,7 +169,13 @@ export function createMockDb(): { db: Database; state: MockState } {
     select: () => buildChain([], "systems"),
     selectDistinct: () => buildChain([], "systems"),
     execute: (sql: unknown) => {
-      state.executeCalls.push({ sql: String(sql) });
+      const sqlStr = materializeSql(sql);
+      state.executeCalls.push({ sql: sqlStr });
+      for (const route of state.executeRouter) {
+        if (sqlStr.toLowerCase().includes(route.match.toLowerCase())) {
+          return Promise.resolve({ rows: route.rows });
+        }
+      }
       return Promise.resolve({ rows: [] });
     },
     insert: (table: unknown) => {

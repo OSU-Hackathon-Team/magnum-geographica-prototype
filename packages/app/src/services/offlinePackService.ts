@@ -79,28 +79,47 @@ async function extractTar(
   let offset = 0;
   let filesWritten = 0;
 
-  while (offset + 512 <= data.length) {
-    const header = data.slice(offset, offset + 512);
+  // Normalize outputDir so we don't produce `dir//name` (double slash) when
+  // joining with tar entry paths. expo-file-system accepts trailing slash or
+  // no trailing slash, but the join must be a single slash.
+  const base = outputDir.replace(/\/+$/, "");
 
+  while (offset + 512 <= data.length) {
+    const header = data.subarray(offset, offset + 512);
+
+    // Two consecutive zero blocks signal end-of-archive per USTAR spec.
     if (header.every((b) => b === 0)) {
-      const nextHeader = data.slice(offset + 512, offset + 1024);
+      const nextHeader = data.subarray(offset + 512, offset + 1024);
       if (nextHeader.every((b) => b === 0)) break;
     }
 
-    const name = String.fromCharCode(
-      ...header.slice(0, 100).filter((b) => b !== 0),
-    ).trim();
+    // Decode name (null-terminated UTF-8 in first 100 bytes). Use TextDecoder
+    // rather than spread-String.fromCharCode to avoid stack overflow on
+    // large fields and to handle multi-byte characters correctly.
+    const name = new TextDecoder("utf-8")
+      .decode(header.subarray(0, 100))
+      .replace(/\0+$/, "")
+      .trim();
 
-    const sizeStr = String.fromCharCode(
-      ...header.slice(124, 136).filter((b) => b !== 0),
-    ).trim();
+    const sizeStr = new TextDecoder("utf-8")
+      .decode(header.subarray(124, 136))
+      .replace(/\0+$/, "")
+      .trim();
     const size = parseInt(sizeStr, 8) || 0;
 
     offset += 512;
 
     if (name && size > 0 && !name.endsWith("/")) {
-      const fileData = data.slice(offset, offset + size);
-      const filePath = `${outputDir}/${name}`;
+      // Guard against path traversal — tar entries are server-controlled
+      // but we should never write outside the output directory.
+      const safeName = name.replace(/^\/+/, "");
+      if (safeName.includes("..")) {
+        // Skip suspicious entries rather than writing outside base dir.
+        offset += Math.ceil(size / 512) * 512;
+        continue;
+      }
+      const fileData = data.subarray(offset, offset + size);
+      const filePath = `${base}/${safeName}`;
       const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
       await FS.makeDirectoryAsync(dirPath, { intermediates: true }).catch(() => {});
       await FS.writeAsStringAsync(filePath, uint8ArrayToBase64(fileData), {
@@ -208,7 +227,7 @@ export async function downloadRegion(
   for (const t of packData.trails) {
     const geometryStr =
       typeof t.geometry_geojson === "string" ? t.geometry_geojson : JSON.stringify(t.geometry_geojson);
-    let bounds = computeBounds(geometryStr);
+    const bounds = computeBounds(geometryStr);
     await db.execRaw(
       `INSERT INTO trails (id, name, slug, description, difficulty, length_meters, elevation_gain_meters, geometry_wkb, min_lon, max_lon, min_lat, max_lat, verified, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

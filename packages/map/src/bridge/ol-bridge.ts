@@ -23,6 +23,12 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.setOfflineData(${json});`;
     case "setBaseLayer":
       return `window.olBridge.setBaseLayer(${json});`;
+    case "setOfflineBaseLayer":
+      return `window.olBridge.setOfflineBaseLayer(${json});`;
+    case "enterDrawMode":
+      return `window.olBridge.enterDrawMode();`;
+    case "exitDrawMode":
+      return `window.olBridge.exitDrawMode();`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -43,6 +49,9 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "setOfflineMode",
     "setOfflineData",
     "setBaseLayer",
+    "setOfflineBaseLayer",
+    "enterDrawMode",
+    "exitDrawMode",
   ].includes(method);
 }
 

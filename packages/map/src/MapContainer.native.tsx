@@ -332,6 +332,7 @@ function buildMapHtml(
           }else if(m === 'highlightTrail'){
             highlightedId = a && a.id; applyHighlight();
           }else if(m === 'enterDrawMode'){
+            console.log('[MapContainer] enterDrawMode called, olBridge=', !!window.olBridge);
             if(window.olBridge && typeof window.olBridge.enterDrawMode === 'function'){
               window.olBridge.enterDrawMode();
             }
@@ -345,8 +346,23 @@ function buildMapHtml(
         }
       }
 
-      window.addEventListener('message', function(ev){
+      // Command queue for messages that arrive before window.olBridge is
+      // defined (e.g. user taps the download FAB while the page is still
+      // parsing OL). Replay them once the bridge is installed.
+      window.__pendingCmds = window.__pendingCmds || [];
+      function drainPending(){
+        if(!window.olBridge || !window.__pendingCmds.length) return;
+        var q = window.__pendingCmds; window.__pendingCmds = [];
+        for(var i = 0; i < q.length; i++) onHostMessage(q[i]);
+      }
+
+      // react-native-webview dispatches postMessage events on document
+      // (see RNCWebViewManagerImpl.kt - it calls document.dispatchEvent).
+      // Listening on window does NOT catch them on Android WebView, so we
+      // MUST attach the listener to document.
+      document.addEventListener('message', function(ev){
         var data = ev && ev.data;
+        console.log('[WebView] message event, data=', typeof data, data ? String(data).substring(0, 80) : '');
         if(!data) return;
         var payload = null;
         if(typeof data === 'string'){
@@ -354,7 +370,14 @@ function buildMapHtml(
         }else if(typeof data === 'object'){
           payload = data;
         }
-        if(payload && payload.method) onHostMessage(payload);
+        if(!payload || !payload.method) return;
+        console.log('[WebView] dispatching method=', payload.method, 'olBridge=', !!window.olBridge);
+        if(window.olBridge){
+          onHostMessage(payload);
+        }else{
+          // Bridge not installed yet — buffer the command.
+          window.__pendingCmds.push(payload);
+        }
       });
 
       window.olBridge={
@@ -436,6 +459,7 @@ function buildMapHtml(
           }
         },
         enterDrawMode:function(){
+          console.log('[MapContainer] olBridge.enterDrawMode, map=', !!map);
           if(!map)return;
           if(dragBox)exitDrawMode();
           dragLayer=new ol.layer.Vector({source:new ol.source.Vector(),style:new ol.style.Style({fill:new ol.style.Fill({color:'rgba(34,197,94,0.1)'}),stroke:new ol.style.Stroke({color:'#22c55e',width:2,lineDash:[6,4]})})});
@@ -472,6 +496,8 @@ function buildMapHtml(
         }
       };
       window.addEventListener('error',function(e){postToRN({type:'error',message:e.message})});
+      // Replay any commands the host sent before the bridge was installed.
+      drainPending();
     </script>
   </body>
 </html>`;
@@ -504,6 +530,15 @@ export default function MapContainer({
   );
   const [mapUri, setMapUri] = useState<string | null>(null);
   const initSentRef = useRef(false);
+  // Track the latest state we need to sync to the WebView. The useEffect-driven
+  // `send()` only runs once `initSentRef.current` is true, so if the user taps
+  // the download FAB or switches layers before the WebView finishes loading,
+  // those commands are dropped. We capture the latest values in refs and replay
+  // them in onLoadEnd so the WebView always ends up in the correct state.
+  const drawModeRef = useRef<boolean | undefined>(undefined);
+  const baseLayerRef = useRef<string | undefined>(undefined);
+  const offlineModeRef = useRef<boolean | undefined>(undefined);
+  const offlineBaseLayerRef = useRef<MapContainerProps["offlineBaseLayer"] | undefined>(undefined);
 
   const initialCenter = merged.initialCenter ?? defaultMapConfig.initialCenter;
   const initialZoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
@@ -600,12 +635,17 @@ export default function MapContainer({
     // context that doesn't have 'ol' defined, which causes an uncaught
     // ReferenceError that crashes the Chromium WebView process and kills the
     // entire app. If postMessage fails, the command is simply dropped.
-    if (!webViewRef.current) return;
+    if (!webViewRef.current) {
+      console.log('[MapContainer] send DROPPED (no ref):', command.method);
+      return;
+    }
     try {
+      console.log('[MapContainer] send OK:', command.method);
       webViewRef.current.postMessage(JSON.stringify(command));
     } catch (_e) {
       // postMessage may fail if the WebView hasn't finished loading.
       // Retry on the next render — don't use injectJavaScript here.
+      console.log('[MapContainer] send THREW:', command.method);
     }
   }, []);
 
@@ -613,8 +653,32 @@ export default function MapContainer({
     // The WebView auto-initializes the map and posts `{type:'ready'}` to the
     // host as soon as OL finishes loading. The original `injectJavaScript`
     // init call was a no-op on the JS side and is no longer needed.
+    console.log('[MapContainer] onLoadEnd, replaying drawMode=', drawModeRef.current);
     initSentRef.current = true;
-  }, []);
+    // Replay any state changes that happened before the WebView finished
+    // loading. The per-state useEffects gate on `initSentRef.current`, so
+    // commands fired before this point were silently dropped. We use refs
+    // (not the React state values) so the latest state is always read,
+    // even if the state has since toggled back.
+    if (drawModeRef.current !== undefined) {
+      send({
+        method: drawModeRef.current ? "enterDrawMode" : "exitDrawMode",
+        args: {},
+      });
+    }
+    if (baseLayerRef.current !== undefined) {
+      send({ method: "setBaseLayer", args: { id: baseLayerRef.current } });
+    }
+    if (offlineModeRef.current !== undefined) {
+      send({ method: "setOfflineMode", args: { offline: offlineModeRef.current } });
+    }
+    if (offlineBaseLayerRef.current) {
+      send({
+        method: "setOfflineBaseLayer",
+        args: { ...offlineBaseLayerRef.current, active: !!offlineModeRef.current },
+      });
+    }
+  }, [send]);
 
   // Expose send function to parent
   useEffect(() => {
@@ -624,13 +688,15 @@ export default function MapContainer({
   // Sync base layer choice to the WebView. The HTML's `init` already inserted
   // the default; this effect only fires if the user later switches layers.
   useEffect(() => {
-    if (!initSentRef.current) return;
     const id = baseLayerId ?? defaultBaseLayerId;
+    baseLayerRef.current = id;
+    if (!initSentRef.current) return;
     send({ method: "setBaseLayer", args: { id } });
   }, [baseLayerId, defaultBaseLayerId, send]);
 
   // Sync offline mode to WebView
   useEffect(() => {
+    offlineModeRef.current = !!offlineMode;
     if (!initSentRef.current) return;
     send({ method: "setOfflineMode", args: { offline: !!offlineMode } });
   }, [offlineMode, send]);
@@ -643,6 +709,7 @@ export default function MapContainer({
 
   // Sync offline base layer to WebView
   useEffect(() => {
+    offlineBaseLayerRef.current = offlineBaseLayer;
     if (!initSentRef.current) return;
     if (offlineBaseLayer) {
       send({
@@ -654,6 +721,7 @@ export default function MapContainer({
 
   // Sync draw mode to WebView
   useEffect(() => {
+    drawModeRef.current = !!drawMode;
     if (!initSentRef.current) return;
     if (drawMode) {
       send({ method: "enterDrawMode", args: {} });
