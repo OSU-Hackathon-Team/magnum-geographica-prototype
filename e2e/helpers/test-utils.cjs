@@ -121,17 +121,9 @@ async function assertNoExpoError() {
  * (within ~75 s) if the app is stuck on the Expo error screen.
  */
 async function launchAppAndWait(launchArgs = {}) {
-  const url = launchArgs.url
-    ? launchArgs.url
-    : "org.magnum.app://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081";
-
   await device.launchApp({
     newInstance: true,
     ...launchArgs,
-    url,
-    launchArgs: {
-      ...(launchArgs.launchArgs || {}),
-    },
   });
 
   await sleep(15000);

@@ -69,7 +69,9 @@ test("zooming after a deep link does NOT snap the camera back to the deep-link p
   await expect(canvas).toHaveCount(1, { timeout: 15_000 });
 
   // Wait for the flyTo animation to settle and the moveend data attrs to appear.
-  const container = page.locator('[data-testid="explore-map"] > div');
+  // The map container has multiple child divs (map canvas wrapper + overlay
+  // controls); use .first() to get the map canvas container.
+  const container = page.locator('[data-testid="explore-map"] > div').first();
   await expect(container).toHaveAttribute("data-map-zoom", /.+/, { timeout: 10_000 });
   const zoomBefore = parseFloat(await container.getAttribute("data-map-zoom") ?? "0");
   const centerBefore = await container.getAttribute("data-map-center") ?? "";

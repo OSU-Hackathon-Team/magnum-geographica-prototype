@@ -192,9 +192,9 @@ export default function ExploreScreen() {
     (s: System) => {
       setShowResults(false);
       setQuery("");
-      setSelectedSystemSlug(s.slug);
+      router.push(`/system/${s.slug}` as never);
     },
-    [],
+    [router],
   );
 
   const handleTrail = useCallback(
