@@ -115,7 +115,7 @@ offlineRoute.get("/:packId/download", async (c) => {
     return c.json({ error: "not_found", message: "pack not found or expired" }, 404);
   }
 
-  return c.body(pack.tarBuffer, 200, {
+  return c.body(new Uint8Array(pack.tarBuffer), 200, {
     "Content-Type": "application/x-tar",
     "Content-Disposition": `attachment; filename="${packId}.tar"`,
   });
@@ -128,7 +128,7 @@ offlineRoute.get("/:packId/data", async (c) => {
     return c.json({ error: "not_found", message: "pack not found or expired" }, 404);
   }
 
-  return c.body(pack.dataJson, 200, {
+  return c.body(new Uint8Array(pack.dataJson), 200, {
     "Content-Type": "application/json",
   });
 });

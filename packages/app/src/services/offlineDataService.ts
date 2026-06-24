@@ -382,3 +382,21 @@ export async function deleteAllOfflineRegions() {
   await db.execRaw("DELETE FROM features");
   await db.execRaw("DELETE FROM wiki_pages WHERE target_type != 'trail' AND target_type != 'system' AND target_type != 'feature'");
 }
+
+export async function deleteOfflineRegion(regionId: string) {
+  const db = await getOfflineDb();
+  await db.exec("DELETE FROM offline_regions WHERE id = ?", [regionId]);
+  const usages = await db.exec(
+    "SELECT id FROM offline_regions WHERE id = ?",
+    [regionId],
+  );
+  if (usages.length > 0) return;
+  await db.execRaw("DELETE FROM systems");
+  await db.execRaw("DELETE FROM trails");
+  await db.execRaw("DELETE FROM trail_systems");
+  await db.execRaw("DELETE FROM trail_segments");
+  await db.execRaw("DELETE FROM features");
+  await db.execRaw(
+    "DELETE FROM wiki_pages WHERE target_type != 'trail' AND target_type != 'system' AND target_type != 'feature'",
+  );
+}

@@ -41,6 +41,8 @@ interface TileEntry {
   data: Buffer;
 }
 
+export type { TileEntry };
+
 interface BboxPackResult {
   packId: string;
   entries: TileEntry[];

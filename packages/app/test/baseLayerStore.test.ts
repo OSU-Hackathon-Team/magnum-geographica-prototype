@@ -32,6 +32,17 @@ mock.module("react-native", () => ({
   default: {},
 }));
 
+// Mock @magnum/map (default subpath). The store imports the base layer
+// constants from "@magnum/map" (default), whose real index re-exports
+// MapContainer.tsx, which transitively pulls in react-native, expo-asset,
+// and ultimately @react-native/assets-registry — that package's compiled
+// output contains Flow `export type` syntax that Bun cannot parse. We only
+// need the two string constants for this test, so stub the module.
+mock.module("@magnum/map", () => ({
+  SIMPLIFIED_BASE_LAYER_ID: "simplified",
+  SATELLITE_BASE_LAYER_ID: "satellite",
+}));
+
 // Pull constants directly from the map package's shared/config subpath to
 // avoid loading the full @magnum/map index (which transitively imports RN
 // components). Same path is exported in packages/map/package.json#exports.

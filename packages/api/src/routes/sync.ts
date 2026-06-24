@@ -121,7 +121,7 @@ syncRoute.post("/contributions", async (c) => {
           if (data.description !== undefined) (updates as Record<string, string | null>).description = data.description || null;
           await db
             .update(features)
-            .set(updates as Parameters<typeof db.update>[1])
+            .set(updates as never)
             .where(eq(features.id, entityId));
           results.push({ local_id: localId, status: "synced", server_id: entityId });
         } else {

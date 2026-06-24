@@ -128,7 +128,7 @@ export default function SegmentDetailScreen() {
           </Text>
           {segment.surface_type ? (
             <View style={styles.badgeRow}>
-              <SegmentTypeBadge type={segment.surface_type} />
+              <SegmentTypeBadge surface={segment.surface_type} />
             </View>
           ) : null}
         </Card>

@@ -23,8 +23,8 @@ export function MediaUploader({ onSelect, uploading, testID }: MediaUploaderProp
     }
     const match = raw.match(/^data:(image\/\w+);base64,(.+)$/i);
     if (match) {
-      const mimeType = match[1];
-      const base64 = match[2];
+      const mimeType = match[1] ?? "image/jpeg";
+      const base64 = match[2] ?? "";
       setPreview(`data:${mimeType};base64,${base64}`);
       onSelect(base64, mimeType);
       return;

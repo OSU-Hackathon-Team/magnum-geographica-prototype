@@ -9,6 +9,18 @@ import {
   FEATURES,
 } from "../fixtures/data.js";
 
+// Deep-clone the initial fixture data so `resetApiMock()` can restore it
+// after tests mutate the segment/feature state.
+const INITIAL_SEGMENTS_BY_TRAIL: Record<string, unknown[]> = Object.fromEntries(
+  Object.entries(SEGMENTS_BY_TRAIL).map(([k, v]) => [k, v.map((s) => ({ ...s }))]),
+);
+const INITIAL_FEATURES: Record<string, unknown> = Object.fromEntries(
+  Object.entries(FEATURES).map(([k, v]) => [k, { ...v }]),
+);
+const INITIAL_FEATURES_BY_TRAIL: Record<string, unknown[]> = Object.fromEntries(
+  Object.entries(FEATURES_BY_TRAIL).map(([k, v]) => [k, v.map((f) => ({ ...f }))]),
+);
+
 type Json = unknown;
 type Handler = (params: {
   url: URL;
@@ -29,7 +41,7 @@ function conflict(message = "conflict") {
   return { status: 409, body: { error: "conflict", message } };
 }
 
-const WIKI_PAGES: Record<string, { id: string; content_md: string; contributor_name: string; updated_at: string }> = {};
+const WIKI_PAGES: Record<string, { id: string; title: string; content_md: string; contributor_name: string; updated_at: string }> = {};
 const WIKI_REVISIONS: Record<string, { id: string; wiki_page_id: string; content_md: string; contributor_name: string; edit_summary: string; created_at: string }[]> = {};
 const CITATIONS: Record<string, { id: string; title: string; url: string | null }[]> = {};
 const MEDIA_ITEMS: { id: string; feature_id: string | null; trail_id: string | null; caption: string | null }[] = [];
@@ -149,7 +161,7 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
         if (WIKI_PAGES[key]) return conflict("wiki page already exists for this target");
         const id = String(nextWikiId++);
         const now = new Date().toISOString();
-        WIKI_PAGES[key] = { id, content_md: b.content_md ?? "", contributor_name: b.contributor_name ?? "anonymous", updated_at: now };
+        WIKI_PAGES[key] = { id, title: b.title ?? "", content_md: b.content_md ?? "", contributor_name: b.contributor_name ?? "anonymous", updated_at: now };
         WIKI_REVISIONS[id] = [{ id: String(nextRevId++), wiki_page_id: id, content_md: b.content_md ?? "", contributor_name: b.contributor_name ?? "anonymous", edit_summary: b.edit_summary ?? "", created_at: now }];
         CITATIONS[id] = [];
         return ok({ id, title: b.title ?? "", content_md: b.content_md ?? "", contributor_name: b.contributor_name ?? "anonymous", updated_at: now, citation_count: 0, revision_count: 1 }, 201);
@@ -561,6 +573,17 @@ export function resetApiMock() {
   MEDIA_ITEMS.length = 0;
   PENDING_CONTRIBUTIONS.length = 0;
   DOWNLOADED_PACKS.length = 0;
+  // Re-seed the segment/feature/trail data so tests that mutate them
+  // (reorder, split, delete, etc.) don't leak into subsequent tests.
+  for (const key of Object.keys(SEGMENTS_BY_TRAIL)) {
+    SEGMENTS_BY_TRAIL[key] = (INITIAL_SEGMENTS_BY_TRAIL[key] ?? []).map((s) => ({ ...s }));
+  }
+  for (const id of Object.keys(FEATURES)) {
+    FEATURES[id] = { ...INITIAL_FEATURES[id] };
+  }
+  for (const trailId of Object.keys(FEATURES_BY_TRAIL)) {
+    FEATURES_BY_TRAIL[trailId] = (INITIAL_FEATURES_BY_TRAIL[trailId] ?? []).map((f) => ({ ...f }));
+  }
   nextWikiId = 100;
   nextRevId = 200;
   nextCitationId = 300;

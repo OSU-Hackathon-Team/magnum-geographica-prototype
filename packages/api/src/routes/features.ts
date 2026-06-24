@@ -139,7 +139,7 @@ featuresRoute.put("/:id", async (c) => {
 
   const rows = await db
     .update(features)
-    .set(updates as Parameters<typeof db.update>[1])
+    .set(updates as never)
     .where(eq(features.id, id))
     .returning();
 
