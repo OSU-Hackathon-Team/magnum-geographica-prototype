@@ -1,0 +1,1378 @@
+{
+  "id": "d38d151d-f255-4ad0-a136-b75b2172d8bd",
+  "prevId": "7f520cf4-1823-421a-bf53-1187b27f0401",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.citations": {
+      "name": "citations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "wiki_page_id": {
+          "name": "wiki_page_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image_data": {
+          "name": "image_data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_mime_type": {
+          "name": "image_mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "citations_wiki_page_id_wiki_pages_id_fk": {
+          "name": "citations_wiki_page_id_wiki_pages_id_fk",
+          "tableFrom": "citations",
+          "tableTo": "wiki_pages",
+          "columnsFrom": [
+            "wiki_page_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.features": {
+      "name": "features",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type_tag": {
+          "name": "type_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "point": {
+          "name": "point",
+          "type": "geometry(Point, 4326)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trail_id": {
+          "name": "trail_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "system_id": {
+          "name": "system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_features_point": {
+          "name": "idx_features_point",
+          "columns": [
+            {
+              "expression": "point",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        },
+        "idx_features_trail": {
+          "name": "idx_features_trail",
+          "columns": [
+            {
+              "expression": "trail_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_features_system": {
+          "name": "idx_features_system",
+          "columns": [
+            {
+              "expression": "system_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "features_trail_id_trails_id_fk": {
+          "name": "features_trail_id_trails_id_fk",
+          "tableFrom": "features",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "trail_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "features_system_id_systems_id_fk": {
+          "name": "features_system_id_systems_id_fk",
+          "tableFrom": "features",
+          "tableTo": "systems",
+          "columnsFrom": [
+            "system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.media": {
+      "name": "media",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trail_id": {
+          "name": "trail_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "system_id": {
+          "name": "system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caption": {
+          "name": "caption",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_media_feature": {
+          "name": "idx_media_feature",
+          "columns": [
+            {
+              "expression": "feature_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_media_trail": {
+          "name": "idx_media_trail",
+          "columns": [
+            {
+              "expression": "trail_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_media_system": {
+          "name": "idx_media_system",
+          "columns": [
+            {
+              "expression": "system_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "media_feature_id_features_id_fk": {
+          "name": "media_feature_id_features_id_fk",
+          "tableFrom": "media",
+          "tableTo": "features",
+          "columnsFrom": [
+            "feature_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "media_trail_id_trails_id_fk": {
+          "name": "media_trail_id_trails_id_fk",
+          "tableFrom": "media",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "trail_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "media_system_id_systems_id_fk": {
+          "name": "media_system_id_systems_id_fk",
+          "tableFrom": "media",
+          "tableTo": "systems",
+          "columnsFrom": [
+            "system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.offline_packs": {
+      "name": "offline_packs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "system_id": {
+          "name": "system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mbtiles_data": {
+          "name": "mbtiles_data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geojson_data": {
+          "name": "geojson_data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wiki_data": {
+          "name": "wiki_data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tile_size_bytes": {
+          "name": "tile_size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geojson_size_bytes": {
+          "name": "geojson_size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "offline_packs_system_id_systems_id_fk": {
+          "name": "offline_packs_system_id_systems_id_fk",
+          "tableFrom": "offline_packs",
+          "tableTo": "systems",
+          "columnsFrom": [
+            "system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.revisions": {
+      "name": "revisions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "wiki_page_id": {
+          "name": "wiki_page_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_md": {
+          "name": "content_md",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contributor_name": {
+          "name": "contributor_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'anonymous'"
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "edit_summary": {
+          "name": "edit_summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_revisions_page": {
+          "name": "idx_revisions_page",
+          "columns": [
+            {
+              "expression": "wiki_page_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "revisions_wiki_page_id_wiki_pages_id_fk": {
+          "name": "revisions_wiki_page_id_wiki_pages_id_fk",
+          "tableFrom": "revisions",
+          "tableTo": "wiki_pages",
+          "columnsFrom": [
+            "wiki_page_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sub_systems": {
+      "name": "sub_systems",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "system_id": {
+          "name": "system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "geometry(Geometry, 4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sub_systems_system_id_systems_id_fk": {
+          "name": "sub_systems_system_id_systems_id_fk",
+          "tableFrom": "sub_systems",
+          "tableTo": "systems",
+          "columnsFrom": [
+            "system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sub_systems_slug_unique": {
+          "name": "sub_systems_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.super_systems": {
+      "name": "super_systems",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "official": {
+          "name": "official",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "boundary": {
+          "name": "boundary",
+          "type": "geometry(MultiPolygon, 4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_url": {
+          "name": "external_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_super_systems_boundary": {
+          "name": "idx_super_systems_boundary",
+          "columns": [
+            {
+              "expression": "boundary",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "super_systems_slug_unique": {
+          "name": "super_systems_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.system_super_systems": {
+      "name": "system_super_systems",
+      "schema": "",
+      "columns": {
+        "system_id": {
+          "name": "system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "super_system_id": {
+          "name": "super_system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "system_super_systems_system_id_systems_id_fk": {
+          "name": "system_super_systems_system_id_systems_id_fk",
+          "tableFrom": "system_super_systems",
+          "tableTo": "systems",
+          "columnsFrom": [
+            "system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "system_super_systems_super_system_id_super_systems_id_fk": {
+          "name": "system_super_systems_super_system_id_super_systems_id_fk",
+          "tableFrom": "system_super_systems",
+          "tableTo": "super_systems",
+          "columnsFrom": [
+            "super_system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "system_super_systems_system_id_super_system_id_pk": {
+          "name": "system_super_systems_system_id_super_system_id_pk",
+          "columns": [
+            "system_id",
+            "super_system_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.systems": {
+      "name": "systems",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "boundary": {
+          "name": "boundary",
+          "type": "geometry(MultiPolygon, 4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#22c55e'"
+        },
+        "ownership_source": {
+          "name": "ownership_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_date": {
+          "name": "source_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_url": {
+          "name": "external_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_systems_boundary": {
+          "name": "idx_systems_boundary",
+          "columns": [
+            {
+              "expression": "boundary",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "systems_slug_unique": {
+          "name": "systems_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.trail_segments": {
+      "name": "trail_segments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "trail_id": {
+          "name": "trail_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "geometry(MultiLineString, 4326)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "surface_type": {
+          "name": "surface_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hazards": {
+          "name": "hazards",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "is_road_connector": {
+          "name": "is_road_connector",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "steep_grade": {
+          "name": "steep_grade",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "one_way": {
+          "name": "one_way",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_segments_geometry": {
+          "name": "idx_segments_geometry",
+          "columns": [
+            {
+              "expression": "geometry",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        },
+        "idx_segments_trail": {
+          "name": "idx_segments_trail",
+          "columns": [
+            {
+              "expression": "trail_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sort_order",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "trail_segments_trail_id_trails_id_fk": {
+          "name": "trail_segments_trail_id_trails_id_fk",
+          "tableFrom": "trail_segments",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "trail_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.trail_sub_systems": {
+      "name": "trail_sub_systems",
+      "schema": "",
+      "columns": {
+        "trail_id": {
+          "name": "trail_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sub_system_id": {
+          "name": "sub_system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "trail_sub_systems_trail_id_trails_id_fk": {
+          "name": "trail_sub_systems_trail_id_trails_id_fk",
+          "tableFrom": "trail_sub_systems",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "trail_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "trail_sub_systems_sub_system_id_sub_systems_id_fk": {
+          "name": "trail_sub_systems_sub_system_id_sub_systems_id_fk",
+          "tableFrom": "trail_sub_systems",
+          "tableTo": "sub_systems",
+          "columnsFrom": [
+            "sub_system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "trail_sub_systems_trail_id_sub_system_id_pk": {
+          "name": "trail_sub_systems_trail_id_sub_system_id_pk",
+          "columns": [
+            "trail_id",
+            "sub_system_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.trail_systems": {
+      "name": "trail_systems",
+      "schema": "",
+      "columns": {
+        "trail_id": {
+          "name": "trail_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "system_id": {
+          "name": "system_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "trail_systems_trail_id_trails_id_fk": {
+          "name": "trail_systems_trail_id_trails_id_fk",
+          "tableFrom": "trail_systems",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "trail_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "trail_systems_system_id_systems_id_fk": {
+          "name": "trail_systems_system_id_systems_id_fk",
+          "tableFrom": "trail_systems",
+          "tableTo": "systems",
+          "columnsFrom": [
+            "system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "trail_systems_trail_id_system_id_pk": {
+          "name": "trail_systems_trail_id_system_id_pk",
+          "columns": [
+            "trail_id",
+            "system_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.trails": {
+      "name": "trails",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "geometry": {
+          "name": "geometry",
+          "type": "geometry(MultiLineString, 4326)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "length_meters": {
+          "name": "length_meters",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "elevation_gain_meters": {
+          "name": "elevation_gain_meters",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verified": {
+          "name": "verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_trails_geometry": {
+          "name": "idx_trails_geometry",
+          "columns": [
+            {
+              "expression": "geometry",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gist",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "trails_slug_unique": {
+          "name": "trails_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.wiki_pages": {
+      "name": "wiki_pages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_md": {
+          "name": "content_md",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "rendered_html": {
+          "name": "rendered_html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_wiki_pages_target": {
+          "name": "idx_wiki_pages_target",
+          "columns": [
+            {
+              "expression": "target_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
