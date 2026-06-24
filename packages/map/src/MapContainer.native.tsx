@@ -445,10 +445,14 @@ function buildMapHtml(
         setOfflineBaseLayer:function(a){
           if(!map)return;
           var ext=a.kind==='raster'?'.jpg':'.pbf';
-          var prefix='file://'+a.tilesPath+'/';
+          // tilesPath already contains the file:// scheme from
+          // expo-file-system's documentDirectory — don't double-prefix.
+          var prefix=a.tilesPath.replace(/\/+$/,'')+'/';
+          var tileUrl=prefix+'{z}/{x}/{y}'+ext;
+          console.log('[map] setOfflineBaseLayer kind='+a.kind+' active='+a.active+' url='+tileUrl);
           var srcMaxZoom=a.maxZoom||14;
           if(a.kind==='raster'){
-            var src=new ol.source.XYZ({url:prefix+'{z}/{x}/{y}'+ext,maxZoom:srcMaxZoom});
+            var src=new ol.source.XYZ({url:tileUrl,maxZoom:srcMaxZoom});
             var layer=new ol.layer.Tile({source:src,minZoom:a.minZoom||2,maxZoom:a.maxZoom||18});
             layer.set('name','basemap-offline');
             var layers=map.getLayers().getArray();
@@ -459,7 +463,7 @@ function buildMapHtml(
             layer.setVisible(a.active);
             map.getLayers().insertAt(0,layer);
           }else{
-            var src2=new ol.source.VectorTile({format:new ol.format.MVT(),url:prefix+'{z}/{x}/{y}'+ext,tileGrid:ol.tilegrid.createXYZ({maxZoom:srcMaxZoom})});
+            var src2=new ol.source.VectorTile({format:new ol.format.MVT(),url:tileUrl,tileGrid:ol.tilegrid.createXYZ({maxZoom:srcMaxZoom})});
             var layer2=new ol.layer.VectorTile({source:src2,minZoom:a.minZoom||2,maxZoom:a.maxZoom||18,style:styleMvtFeature});
             layer2.set('name','basemap-offline');
             var layers2=map.getLayers().getArray();
