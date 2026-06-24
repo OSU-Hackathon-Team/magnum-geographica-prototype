@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MapContainer, resolveBaseLayers } from "@magnum/map";
 import {
@@ -76,6 +76,10 @@ export default function ExploreScreen() {
   } | null>(null);
   const [showDownloadSheet, setShowDownloadSheet] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Web is always online, so the offline-download FAB is irrelevant there.
+  // Hiding it also lets the add-feature FAB sit lower (closer to the tab bar).
+  const isWeb = Platform.OS === "web";
+  const showDownloadFab = isOnline && !isWeb;
   const lastRequestRef = useRef(0);
 
   const deepLink = useMemo(() => parseDeepLink(params), [params]);
@@ -447,15 +451,8 @@ export default function ExploreScreen() {
           </Pressable>
         </View>
       ) : (
-        <View style={styles.fabColumn}>
-          <Pressable
-            style={styles.addFeatureFab}
-            onPress={handleStartPlacing}
-            testID="explore-add-feature"
-          >
-            <Text style={styles.addFeatureFabText}>+</Text>
-          </Pressable>
-          {isOnline ? (
+        <View style={[styles.fabColumn, !showDownloadFab && styles.fabColumnAlone]}>
+          {showDownloadFab ? (
             <Pressable
               style={styles.downloadAreaFab}
               onPress={handleStartDraw}
@@ -464,6 +461,13 @@ export default function ExploreScreen() {
               <Text style={styles.downloadAreaFabText}>⬇</Text>
             </Pressable>
           ) : null}
+          <Pressable
+            style={styles.addFeatureFab}
+            onPress={handleStartPlacing}
+            testID="explore-add-feature"
+          >
+            <Text style={styles.addFeatureFabText}>+</Text>
+          </Pressable>
         </View>
       )}
 
@@ -631,6 +635,9 @@ const styles = StyleSheet.create({
     right: 20,
     gap: 12,
     alignItems: "center",
+  },
+  fabColumnAlone: {
+    bottom: 32,
   },
   downloadAreaFab: {
     width: 48,
