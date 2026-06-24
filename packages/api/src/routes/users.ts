@@ -9,6 +9,17 @@ type Variables = { user: AuthUser };
 
 export const usersRoute = new Hono<{ Variables: Variables }>();
 
+function serializeUser(user: Record<string, unknown>) {
+  const { passwordHash: _ph, createdAt, updatedAt, trustScore, displayName, ...rest } = user;
+  return userProfileSchema.parse({
+    ...rest,
+    trust_score: trustScore ?? 0,
+    display_name: displayName ?? null,
+    created_at: createdAt instanceof Date ? createdAt.toISOString() : createdAt,
+    updated_at: updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt,
+  });
+}
+
 async function getUserWithContributions(id: string) {
   const [userResult, contribCount] = await Promise.all([
     db.select().from(users).where(eq(users.id, id)).limit(1),
@@ -20,9 +31,8 @@ async function getUserWithContributions(id: string) {
 
   const user = userResult[0];
   if (!user) return null;
-  const { passwordHash: _ph, ...safeUser } = user;
   return {
-    ...userProfileSchema.parse({ ...safeUser, trust_score: user.trustScore ?? 0 }),
+    ...serializeUser(user as unknown as Record<string, unknown>),
     contribution_count: Number(contribCount[0]?.count ?? 0),
   };
 }
@@ -107,6 +117,5 @@ usersRoute.put("/:id", authRequired(), async (c) => {
   const updated = updatedRows[0];
   if (!updated) return c.json({ error: "not_found", message: "user not found" }, 404);
 
-  const { passwordHash: _ph, ...safeUser } = updated;
-  return c.json(userProfileSchema.parse({ ...safeUser, trust_score: updated.trustScore ?? 0 }));
+  return c.json(serializeUser(updated as unknown as Record<string, unknown>));
 });

@@ -1,11 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock } from "../helpers/api-mock.js";
+import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
 
 test.beforeEach(async ({ page }) => {
   await installApiMock(page);
 });
 
-test.describe("Auth flow", () => {
+test.afterEach(() => {
+  resetApiMock();
+});
+
+test.describe("Auth flow — navigation and UI", () => {
   test("profile shows login and register buttons when not authenticated", async ({ page }) => {
     await page.goto("/profile");
     await expect(page.getByTestId("profile-screen")).toBeVisible();
@@ -36,25 +40,46 @@ test.describe("Auth flow", () => {
     await expect(page.getByTestId("register-submit")).toBeVisible();
   });
 
-  test("login screen shows error with empty fields", async ({ page }) => {
+  test("login ↔ register links navigate both ways", async ({ page }) => {
+    await page.goto("/auth/login");
+    await page.getByTestId("login-to-register").click();
+    await expect(page).toHaveURL(/\/auth\/register$/);
+
+    await page.getByTestId("register-to-login").click();
+    await expect(page).toHaveURL(/\/auth\/login$/);
+  });
+});
+
+test.describe("Auth flow — login validation", () => {
+  test("shows error with empty fields", async ({ page }) => {
     await page.goto("/auth/login");
     await page.getByTestId("login-submit").click();
     await expect(page.getByText("Email and password are required")).toBeVisible();
   });
 
-  test("login screen shows navigation link to register", async ({ page }) => {
+  test("shows error with missing password", async ({ page }) => {
     await page.goto("/auth/login");
-    await page.getByTestId("login-to-register").click();
-    await expect(page).toHaveURL(/\/auth\/register$/);
+    await page.getByTestId("login-email").fill("test@example.com");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByText("Email and password are required")).toBeVisible();
   });
 
-  test("register screen shows navigation link to login", async ({ page }) => {
+  test("shows error with missing email", async ({ page }) => {
+    await page.goto("/auth/login");
+    await page.getByTestId("login-password").fill("password123");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByText("Email and password are required")).toBeVisible();
+  });
+});
+
+test.describe("Auth flow — register validation", () => {
+  test("shows error with empty fields", async ({ page }) => {
     await page.goto("/auth/register");
-    await page.getByTestId("register-to-login").click();
-    await expect(page).toHaveURL(/\/auth\/login$/);
+    await page.getByTestId("register-submit").click();
+    await expect(page.getByText("All fields are required")).toBeVisible();
   });
 
-  test("register screen validates password length", async ({ page }) => {
+  test("validates password minimum length", async ({ page }) => {
     await page.goto("/auth/register");
     await page.getByTestId("register-username").fill("testuser");
     await page.getByTestId("register-email").fill("test@example.com");
@@ -64,7 +89,7 @@ test.describe("Auth flow", () => {
     await expect(page.getByText("Password must be at least 8 characters")).toBeVisible();
   });
 
-  test("register screen validates password match", async ({ page }) => {
+  test("validates passwords must match", async ({ page }) => {
     await page.goto("/auth/register");
     await page.getByTestId("register-username").fill("testuser");
     await page.getByTestId("register-email").fill("test@example.com");
@@ -72,5 +97,116 @@ test.describe("Auth flow", () => {
     await page.getByTestId("register-confirm-password").fill("different");
     await page.getByTestId("register-submit").click();
     await expect(page.getByText("Passwords do not match")).toBeVisible();
+  });
+});
+
+test.describe("Auth flow — password manager form attributes", () => {
+  test("login form renders as HTML <form> element on web", async ({ page }) => {
+    await page.goto("/auth/login");
+    const form = page.locator("form");
+    await expect(form).toBeAttached();
+  });
+
+  test("register form renders as HTML <form> element on web", async ({ page }) => {
+    await page.goto("/auth/register");
+    const form = page.locator("form");
+    await expect(form).toBeAttached();
+  });
+
+  test("login email has correct autocomplete", async ({ page }) => {
+    await page.goto("/auth/login");
+    await expect(page.getByTestId("login-email")).toHaveAttribute("autocomplete", "email");
+  });
+
+  test("login password has correct autocomplete", async ({ page }) => {
+    await page.goto("/auth/login");
+    await expect(page.getByTestId("login-password")).toHaveAttribute(
+      "autocomplete",
+      "current-password",
+    );
+  });
+
+  test("register username has correct autocomplete", async ({ page }) => {
+    await page.goto("/auth/register");
+    await expect(page.getByTestId("register-username")).toHaveAttribute("autocomplete", "username");
+  });
+
+  test("register email has correct autocomplete", async ({ page }) => {
+    await page.goto("/auth/register");
+    await expect(page.getByTestId("register-email")).toHaveAttribute("autocomplete", "email");
+  });
+
+  test("register password fields have correct autocomplete", async ({ page }) => {
+    await page.goto("/auth/register");
+    await expect(page.getByTestId("register-password")).toHaveAttribute(
+      "autocomplete",
+      "new-password",
+    );
+    await expect(page.getByTestId("register-confirm-password")).toHaveAttribute(
+      "autocomplete",
+      "new-password",
+    );
+  });
+
+  test("password fields are type=password", async ({ page }) => {
+    await page.goto("/auth/login");
+    await expect(page.getByTestId("login-password")).toHaveAttribute("type", "password");
+
+    await page.goto("/auth/register");
+    await expect(page.getByTestId("register-password")).toHaveAttribute("type", "password");
+    await expect(page.getByTestId("register-confirm-password")).toHaveAttribute("type", "password");
+  });
+});
+
+test.describe("Auth flow — successful login", () => {
+  test("registers and logs in through the full flow", async ({ page }) => {
+    // Navigate to register
+    await page.goto("/auth/register");
+    await page.getByTestId("register-username").fill("trailhiker42");
+    await page.getByTestId("register-email").fill("trailhiker42@example.com");
+    await page.getByTestId("register-password").fill("securepass123");
+    await page.getByTestId("register-confirm-password").fill("securepass123");
+
+    // Submit registration
+    await page.getByTestId("register-submit").click();
+
+    // Should redirect to tabs after successful registration
+    await expect(page).toHaveURL(/\/explore$/);
+
+    // Profile should show authenticated user
+    await page.getByRole("tab", { name: "Profile" }).click();
+    await expect(page.getByTestId("profile-username")).toHaveText("trailhiker42");
+    await expect(page.getByTestId("profile-logout")).toBeVisible();
+    await expect(page.getByTestId("profile-login")).not.toBeAttached();
+  });
+
+  test("login form submits successfully with valid credentials", async ({ page }) => {
+    // First register via the form
+    await page.goto("/auth/register");
+    await page.getByTestId("register-username").fill("hiker99");
+    await page.getByTestId("register-email").fill("hiker99@example.com");
+    await page.getByTestId("register-password").fill("mypassword123");
+    await page.getByTestId("register-confirm-password").fill("mypassword123");
+    await page.getByTestId("register-submit").click();
+
+    // Then log out
+    await page.goto("/profile");
+    await page.getByTestId("profile-logout").click();
+
+    // Should be back to anonymous
+    await expect(page.getByTestId("profile-contributor")).toHaveText("anonymous");
+    await expect(page.getByTestId("profile-login")).toBeVisible();
+
+    // Log back in
+    await page.getByTestId("profile-login").click();
+    await expect(page).toHaveURL(/\/auth\/login$/);
+    await page.getByTestId("login-email").fill("hiker99@example.com");
+    await page.getByTestId("login-password").fill("mypassword123");
+    await page.getByTestId("login-submit").click();
+
+    // Should redirect to tabs
+    await expect(page).toHaveURL(/\/explore$/);
+    await page.getByRole("tab", { name: "Profile" }).click();
+    await expect(page.getByTestId("profile-username")).toHaveText("hiker99");
   });
 });

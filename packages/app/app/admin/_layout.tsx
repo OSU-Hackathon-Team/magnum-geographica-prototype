@@ -15,7 +15,7 @@ export default function AdminLayout() {
   }
 
   if (!isAdmin) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href="/(tabs)/explore" />;
   }
 
   return (

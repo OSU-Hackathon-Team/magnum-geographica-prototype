@@ -13,6 +13,17 @@ type Variables = { user: AuthUser };
 
 export const authRoute = new Hono<{ Variables: Variables }>();
 
+function serializeUser(user: Record<string, unknown>) {
+  const { passwordHash: _ph, createdAt, updatedAt, trustScore, displayName, ...rest } = user;
+  return userProfileSchema.parse({
+    ...rest,
+    trust_score: trustScore ?? 0,
+    display_name: displayName ?? null,
+    created_at: createdAt instanceof Date ? createdAt.toISOString() : createdAt,
+    updated_at: updatedAt instanceof Date ? updatedAt.toISOString() : updatedAt,
+  });
+}
+
 authRoute.post("/register", async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body) return c.json({ error: "invalid_input", message: "request body required" }, 400);
@@ -59,13 +70,12 @@ authRoute.post("/register", async (c) => {
   });
   const refreshToken = await signRefreshToken(user.id);
 
-  const { passwordHash: _ph, ...safeUser } = user;
   return c.json(
     {
       access_token: accessToken,
       refresh_token: refreshToken,
       expires_in: 900,
-      user: userProfileSchema.parse({ ...safeUser, trust_score: user.trustScore ?? 0 }),
+      user: serializeUser(user as unknown as Record<string, unknown>),
     },
     201,
   );
@@ -103,12 +113,11 @@ authRoute.post("/login", async (c) => {
   });
   const refreshToken = await signRefreshToken(user.id);
 
-  const { passwordHash: _ph, ...safeUser } = user;
   return c.json({
     access_token: accessToken,
     refresh_token: refreshToken,
     expires_in: 900,
-    user: userProfileSchema.parse({ ...safeUser, trust_score: user.trustScore ?? 0 }),
+    user: serializeUser(user as unknown as Record<string, unknown>),
   });
 });
 
@@ -158,6 +167,5 @@ authRoute.get("/me", authRequired(), async (c) => {
   if (!user) {
     return c.json({ error: "not_found", message: "user not found" }, 404);
   }
-  const { passwordHash: _ph, ...safeUser } = user;
-  return c.json(userProfileSchema.parse({ ...safeUser, trust_score: user.trustScore ?? 0 }));
+  return c.json(serializeUser(user as unknown as Record<string, unknown>));
 });

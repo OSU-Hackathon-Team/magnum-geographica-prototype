@@ -5,19 +5,25 @@ test.beforeEach(async ({ page }) => {
   await installApiMock(page);
 });
 
-test.describe("Admin flow", () => {
-  test("admin dashboard is not accessible to unauthenticated users", async ({ page }) => {
+test.describe("Admin panel — access control", () => {
+  test("dashboard redirects unauthenticated users to explore", async ({ page }) => {
     await page.goto("/admin/dashboard");
-    await expect(page).toHaveURL(/\/(explore|tabs)\//);
+    await expect(page).toHaveURL(/\/explore$/);
   });
 
-  test("admin revisions page is not accessible to unauthenticated users", async ({ page }) => {
+  test("revisions page redirects unauthenticated users", async ({ page }) => {
     await page.goto("/admin/revisions");
-    await expect(page).toHaveURL(/\/(explore|tabs)\//);
+    await expect(page).toHaveURL(/\/explore$/);
   });
 
-  test("admin users page is not accessible to unauthenticated users", async ({ page }) => {
+  test("users page redirects unauthenticated users", async ({ page }) => {
     await page.goto("/admin/users");
-    await expect(page).toHaveURL(/\/(explore|tabs)\//);
+    await expect(page).toHaveURL(/\/explore$/);
+  });
+
+  test("unauthenticated user does not see admin button on profile", async ({ page }) => {
+    await page.goto("/profile");
+    await expect(page.getByTestId("profile-admin")).not.toBeAttached();
+    await expect(page.getByTestId("profile-login")).toBeVisible();
   });
 });

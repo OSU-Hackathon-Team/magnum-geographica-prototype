@@ -10,6 +10,7 @@ import {
 import { router, Link } from "expo-router";
 import { Button } from "../../src/components/ui/Button";
 import { Card } from "../../src/components/ui/Card";
+import { Form } from "../../src/components/ui/Form";
 import { useAuthStore } from "../../src/stores/authStore";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 
@@ -43,7 +44,7 @@ export default function RegisterScreen() {
       const client = createMagnumClient(API_URL);
       const result = await client.register({ username: username.trim(), email: email.trim(), password });
       await setAuth(result.access_token, result.refresh_token, result.user);
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/explore");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Registration failed";
       setError(msg);
@@ -60,6 +61,7 @@ export default function RegisterScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Card>
+        <Form onSubmit={handleRegister}>
         <Text style={styles.heading}>Create Account</Text>
         {error && (
           <View style={styles.errorBox}>
@@ -72,8 +74,12 @@ export default function RegisterScreen() {
           value={username}
           onChangeText={setUsername}
           placeholder="trailhiker42"
+          textContentType="username"
+          autoComplete="username"
+          importantForAutofill="yes"
           autoCapitalize="none"
           autoCorrect={false}
+          spellCheck={false}
           testID="register-username"
           editable={!loading}
         />
@@ -84,8 +90,12 @@ export default function RegisterScreen() {
           onChangeText={setEmail}
           placeholder="you@example.com"
           keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+          importantForAutofill="yes"
           autoCapitalize="none"
           autoCorrect={false}
+          spellCheck={false}
           testID="register-email"
           editable={!loading}
         />
@@ -96,7 +106,12 @@ export default function RegisterScreen() {
           onChangeText={setPassword}
           placeholder="At least 8 characters"
           secureTextEntry
+          textContentType="newPassword"
+          autoComplete="new-password"
+          importantForAutofill="yes"
           autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
           testID="register-password"
           editable={!loading}
         />
@@ -107,7 +122,12 @@ export default function RegisterScreen() {
           onChangeText={setConfirmPassword}
           placeholder="Type it again"
           secureTextEntry
+          textContentType="newPassword"
+          autoComplete="new-password"
+          importantForAutofill="yes"
           autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
           testID="register-confirm-password"
           editable={!loading}
         />
@@ -121,6 +141,7 @@ export default function RegisterScreen() {
             {loading ? <ActivityIndicator color="#fff" size="small" /> : "Create Account"}
           </Button>
         </View>
+        </Form>
         <Link href="/auth/login" style={styles.link} testID="register-to-login">
           Already have an account? Log in
         </Link>

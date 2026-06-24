@@ -11,6 +11,7 @@ import {
 import { router, Link } from "expo-router";
 import { Button } from "../../src/components/ui/Button";
 import { Card } from "../../src/components/ui/Card";
+import { Form } from "../../src/components/ui/Form";
 import { useAuthStore } from "../../src/stores/authStore";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 
@@ -34,7 +35,7 @@ export default function LoginScreen() {
       const client = createMagnumClient(API_URL);
       const result = await client.login({ email: email.trim(), password });
       await setAuth(result.access_token, result.refresh_token, result.user);
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/explore");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Login failed";
       setError(msg);
@@ -51,6 +52,7 @@ export default function LoginScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Card>
+        <Form onSubmit={handleLogin}>
         <Text style={styles.heading}>Welcome Back</Text>
         {error && (
           <View style={styles.errorBox}>
@@ -64,8 +66,12 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           placeholder="you@example.com"
           keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+          importantForAutofill="yes"
           autoCapitalize="none"
           autoCorrect={false}
+          spellCheck={false}
           testID="login-email"
           editable={!loading}
         />
@@ -76,7 +82,12 @@ export default function LoginScreen() {
           onChangeText={setPassword}
           placeholder="Your password"
           secureTextEntry
+          textContentType="password"
+          autoComplete="current-password"
+          importantForAutofill="yes"
           autoCapitalize="none"
+          autoCorrect={false}
+          spellCheck={false}
           testID="login-password"
           editable={!loading}
         />
@@ -90,6 +101,7 @@ export default function LoginScreen() {
             {loading ? <ActivityIndicator color="#fff" size="small" /> : "Log In"}
           </Button>
         </View>
+        </Form>
         <Link href="/auth/register" style={styles.link} testID="login-to-register">
           Don&apos;t have an account? Create one
         </Link>

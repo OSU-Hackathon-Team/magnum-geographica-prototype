@@ -10,17 +10,24 @@ const ALLOWED_HEADERS = [
 ];
 
 export function corsMiddleware(opts?: { origins?: string[] | "*" }): MiddlewareHandler {
-  const allowed = opts?.origins ?? process.env.CORS_ORIGINS?.split(",") ?? ["*"];
+  const envOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
+  const configured = opts?.origins ?? envOrigins;
+  const allowed = configured?.length ? configured : "*";
 
   return async (c: Context, next) => {
     const requestOrigin = c.req.header("origin") ?? "";
 
-    const isAllowed =
-      allowed === "*" || (Array.isArray(allowed) && allowed.includes(requestOrigin));
+    const isWildcard = allowed === "*";
+    const isAllowed = isWildcard || (Array.isArray(allowed) && allowed.includes(requestOrigin));
 
     if (isAllowed) {
-      c.header("Access-Control-Allow-Origin", allowed === "*" ? "*" : requestOrigin);
-      c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      c.header("Access-Control-Allow-Origin", isWildcard ? "*" : requestOrigin);
+      if (!isWildcard) {
+        c.header("Access-Control-Allow-Credentials", "true");
+      }
+      c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
       c.header("Access-Control-Allow-Headers", ALLOWED_HEADERS.join(", "));
       c.header("Access-Control-Max-Age", "86400");
     }
