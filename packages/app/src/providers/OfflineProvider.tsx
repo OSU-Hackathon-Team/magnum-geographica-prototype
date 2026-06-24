@@ -26,6 +26,23 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   const setSyncState = useOfflineStore((s) => s.setSyncState);
   const contributorName = useAuthStore((s) => s.contributorName);
 
+  // Detox e2e tests cannot toggle airplane mode (it kills the adb reverse
+  // bridge that Metro depends on).  Instead they launch the app with
+  //   device.launchApp({ url: "magnum://offline" })
+  // which lands here and forces the store into offline mode so the app
+  // reads from the local SQLite database.
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      try {
+        const { useURL } = require("expo-linking");
+        const url = useURL();
+        if (url && url.includes("offline")) {
+          setOnline(false);
+        }
+      } catch { /* expo-linking not available — skip */ }
+    }
+  }, [setOnline]);
+
   useEffect(() => {
     let unsubNetInfo: (() => void) | null = null;
     let cancelled = false;

@@ -595,14 +595,17 @@ export default function MapContainer({
     // the page's globals (ol, map, the olBridge wrapper) are not defined, so
     // commands silently fail. window.postMessage lands in the page's main
     // context where the listener installed in buildMapHtml can dispatch them.
+    //
+    // We MUST NOT fall back to injectJavaScript — it runs in an isolated
+    // context that doesn't have 'ol' defined, which causes an uncaught
+    // ReferenceError that crashes the Chromium WebView process and kills the
+    // entire app. If postMessage fails, the command is simply dropped.
     if (!webViewRef.current) return;
     try {
       webViewRef.current.postMessage(JSON.stringify(command));
-    } catch (e) {
-      // Fall back to injectJavaScript for environments where postMessage is
-      // not yet wired up. The bridge listener is a defensive copy.
-      const script = commandToScript(command);
-      webViewRef.current.injectJavaScript(script);
+    } catch (_e) {
+      // postMessage may fail if the WebView hasn't finished loading.
+      // Retry on the next render — don't use injectJavaScript here.
     }
   }, []);
 
