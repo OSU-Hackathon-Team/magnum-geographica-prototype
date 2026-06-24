@@ -447,7 +447,9 @@ function buildMapHtml(
           var ext=a.kind==='raster'?'.jpg':'.pbf';
           // tilesPath already contains the file:// scheme from
           // expo-file-system's documentDirectory — don't double-prefix.
-          var prefix=a.tilesPath.replace(/\/+$/,'')+'/';
+          // Strip any trailing slashes so the join below is a clean
+          // {tilesPath}/{z}/{x}/{y}.{ext}.
+          var prefix=a.tilesPath.replace(/\\/+$/, '') + '/';
           var tileUrl=prefix+'{z}/{x}/{y}'+ext;
           console.log('[map] setOfflineBaseLayer kind='+a.kind+' active='+a.active+' url='+tileUrl);
           var srcMaxZoom=a.maxZoom||14;
