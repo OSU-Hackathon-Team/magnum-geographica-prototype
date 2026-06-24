@@ -49,7 +49,12 @@ export default function SystemsScreen() {
 
   return (
     <View style={styles.container} testID="systems-screen">
-      <SearchBar value={q} onChangeText={setQ} placeholder="Filter systems..." testID="systems-search" />
+      <SearchBar
+        value={q}
+        onChangeText={setQ}
+        placeholder="Filter systems..."
+        testID="systems-search"
+      />
       <FlatList
         data={items}
         keyExtractor={(s) => s.id}

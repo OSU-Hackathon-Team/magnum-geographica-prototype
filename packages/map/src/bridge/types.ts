@@ -40,7 +40,16 @@ export type BridgeCommand =
   | { method: "setOfflineMode"; args: { offline: boolean } }
   | { method: "setOfflineData"; args: { trails?: unknown; systems?: unknown; features?: unknown } }
   | { method: "setBaseLayer"; args: { id: string } }
-  | { method: "setOfflineBaseLayer"; args: { kind: "mvt" | "raster"; tilesPath: string; minZoom: number; maxZoom: number; active: boolean } }
+  | {
+      method: "setOfflineBaseLayer";
+      args: {
+        kind: "mvt" | "raster";
+        tilesPath: string;
+        minZoom: number;
+        maxZoom: number;
+        active: boolean;
+      };
+    }
   | { method: "enterDrawMode"; args: {} }
   | { method: "exitDrawMode"; args: {} };
 

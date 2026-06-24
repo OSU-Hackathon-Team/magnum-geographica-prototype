@@ -49,19 +49,26 @@ export default function ProfileScreen() {
     [refreshPending],
   );
 
-  const handleDeleteRegion = useCallback(
-    async (regionId: string) => {
-      await deleteRegion(regionId);
-    },
-    [],
-  );
+  const handleDeleteRegion = useCallback(async (regionId: string) => {
+    await deleteRegion(regionId);
+  }, []);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} testID="profile-screen">
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      testID="profile-screen"
+    >
       <Card>
         <Text style={styles.label}>Contributing as</Text>
-        <Text style={styles.value} testID="profile-contributor">{contributor}</Text>
-        <Text style={styles.hint} onPress={() => setContributor("anonymous")} testID="profile-reset">
+        <Text style={styles.value} testID="profile-contributor">
+          {contributor}
+        </Text>
+        <Text
+          style={styles.hint}
+          onPress={() => setContributor("anonymous")}
+          testID="profile-reset"
+        >
           Tap to reset
         </Text>
       </Card>
@@ -79,7 +86,12 @@ export default function ProfileScreen() {
       </Card>
 
       <View testID="profile-pending-section">
-        <PendingQueue items={items} onDelete={handleDeletePending} onSyncAll={handleSyncAll} syncing={syncing} />
+        <PendingQueue
+          items={items}
+          onDelete={handleDeletePending}
+          onSyncAll={handleSyncAll}
+          syncing={syncing}
+        />
       </View>
     </ScrollView>
   );

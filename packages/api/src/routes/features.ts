@@ -4,9 +4,7 @@ import { db } from "../db/index.js";
 import { features } from "../db/schema.js";
 import { createFeatureInputSchema } from "@magnum/shared";
 
-function toCoordinate(
-  x: number | string | null | undefined,
-): number | null {
+function toCoordinate(x: number | string | null | undefined): number | null {
   if (x === null || x === undefined) return null;
   const n = typeof x === "string" ? parseFloat(x) : x;
   return Number.isFinite(n) ? n : null;
@@ -34,8 +32,7 @@ featuresRoute.get("/:id", async (c) => {
     .limit(1);
   const feat = rows[0];
   if (!feat) return c.json({ error: "not_found" }, 404);
-  const center =
-    feat.lon != null && feat.lat != null ? { lat: feat.lat, lon: feat.lon } : null;
+  const center = feat.lon != null && feat.lat != null ? { lat: feat.lat, lon: feat.lon } : null;
   const { lon: _lon, lat: _lat, ...rest } = feat;
   return c.json({ ...rest, center });
 });
@@ -52,11 +49,20 @@ featuresRoute.post("/", async (c) => {
 
   const { name, type_tag, point, trail_id, system_id, description } = parsed.data;
 
-  const geojson = point as { type?: string; coordinates?: [number, number]; lat?: number; lon?: number };
+  const geojson = point as {
+    type?: string;
+    coordinates?: [number, number];
+    lat?: number;
+    lon?: number;
+  };
   let lon: number | null = null;
   let lat: number | null = null;
 
-  if (geojson?.type === "Point" && Array.isArray(geojson.coordinates) && geojson.coordinates.length >= 2) {
+  if (
+    geojson?.type === "Point" &&
+    Array.isArray(geojson.coordinates) &&
+    geojson.coordinates.length >= 2
+  ) {
     lon = toCoordinate(geojson.coordinates[0]);
     lat = toCoordinate(geojson.coordinates[1]);
   } else if (typeof geojson?.lon === "number" || typeof geojson?.lat === "number") {
@@ -68,7 +74,10 @@ featuresRoute.post("/", async (c) => {
   }
 
   if (lon === null || lat === null) {
-    return c.json({ error: "invalid_input", message: "could not extract coordinates from point" }, 400);
+    return c.json(
+      { error: "invalid_input", message: "could not extract coordinates from point" },
+      400,
+    );
   }
 
   const rows = await db
@@ -88,17 +97,20 @@ featuresRoute.post("/", async (c) => {
     return c.json({ error: "internal", message: "failed to create feature" }, 500);
   }
 
-  return c.json({
-    id: feat.id,
-    name: feat.name,
-    type_tag: feat.typeTag,
-    description: feat.description,
-    trail_id: feat.trailId,
-    system_id: feat.systemId,
-    created_at: feat.createdAt,
-    updated_at: feat.updatedAt,
-    center: { lat, lon },
-  }, 201);
+  return c.json(
+    {
+      id: feat.id,
+      name: feat.name,
+      type_tag: feat.typeTag,
+      description: feat.description,
+      trail_id: feat.trailId,
+      system_id: feat.systemId,
+      created_at: feat.createdAt,
+      updated_at: feat.updatedAt,
+      center: { lat, lon },
+    },
+    201,
+  );
 });
 
 featuresRoute.put("/:id", async (c) => {
@@ -116,11 +128,17 @@ featuresRoute.put("/:id", async (c) => {
   if (body.trail_id !== undefined) updates.trailId = body.trail_id || null;
   if (body.system_id !== undefined) updates.systemId = body.system_id || null;
 
-  const pointData = body.point as { type?: string; coordinates?: [number, number]; lat?: number; lon?: number } | undefined;
+  const pointData = body.point as
+    | { type?: string; coordinates?: [number, number]; lat?: number; lon?: number }
+    | undefined;
   if (pointData) {
     let lon: number | null = null;
     let lat: number | null = null;
-    if (pointData.type === "Point" && Array.isArray(pointData.coordinates) && pointData.coordinates.length >= 2) {
+    if (
+      pointData.type === "Point" &&
+      Array.isArray(pointData.coordinates) &&
+      pointData.coordinates.length >= 2
+    ) {
       lon = toCoordinate(pointData.coordinates[0]);
       lat = toCoordinate(pointData.coordinates[1]);
     } else if (typeof pointData.lon === "number" || typeof pointData.lat === "number") {
@@ -128,7 +146,8 @@ featuresRoute.put("/:id", async (c) => {
       lat = toCoordinate(pointData.lat);
     }
     if (lon !== null && lat !== null) {
-      (updates as Record<string, unknown>).point = sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)`;
+      (updates as Record<string, unknown>).point =
+        sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)`;
     }
   }
 

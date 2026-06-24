@@ -49,7 +49,9 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           console.warn("[OfflineProvider] expo-linking unavailable:", e);
         }
       })();
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }
   }, [setOnline]);
 
@@ -57,7 +59,11 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     let unsubNetInfo: (() => void) | null = null;
     let cancelled = false;
 
-    if (Platform.OS === "web" && typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    if (
+      Platform.OS === "web" &&
+      typeof window !== "undefined" &&
+      typeof window.addEventListener === "function"
+    ) {
       const handleOnline = () => setOnline(true);
       const handleOffline = () => setOnline(false);
       window.addEventListener("online", handleOnline);
@@ -111,7 +117,8 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       setSyncState("syncing");
       try {
         const { synced, conflicts } = await syncContributions(contributorName);
-        const sinceRaw = typeof window !== "undefined" ? window.localStorage?.getItem(lastSyncedKey) : null;
+        const sinceRaw =
+          typeof window !== "undefined" ? window.localStorage?.getItem(lastSyncedKey) : null;
         const since = sinceRaw ?? "1970-01-01T00:00:00.000Z";
         const updateCount = await fetchUpdates(since);
         if (typeof window !== "undefined" && window.localStorage) {

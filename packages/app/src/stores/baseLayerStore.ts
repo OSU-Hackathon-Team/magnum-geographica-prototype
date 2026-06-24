@@ -1,11 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  SIMPLIFIED_BASE_LAYER_ID,
-  type BaseLayerDef,
-  type BaseLayerKind,
-} from "@magnum/map";
+import { SIMPLIFIED_BASE_LAYER_ID, type BaseLayerDef, type BaseLayerKind } from "@magnum/map";
 
 export type { BaseLayerDef, BaseLayerKind };
 

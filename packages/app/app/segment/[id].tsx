@@ -1,12 +1,6 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { createMagnumClient, type TrailSegment } from "@magnum/shared";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
 import { Card } from "../../src/components/ui/Card";
@@ -33,9 +27,7 @@ export default function SegmentDetailScreen() {
       // Try local first
       try {
         const localSegs = await getTrailSegments("");
-        const match = localSegs.find(
-          (s: Record<string, unknown>) => String(s.id) === id,
-        );
+        const match = localSegs.find((s: Record<string, unknown>) => String(s.id) === id);
         if (match && !cancelled) {
           hasLocalRef.current = true;
           setSegment({
@@ -43,8 +35,7 @@ export default function SegmentDetailScreen() {
             trail_id: String(match.trail_id ?? ""),
             name: match.name ? String(match.name) : null,
             sort_order: Number(match.sort_order ?? 0),
-            surface_type:
-              (match.surface_type as TrailSegment["surface_type"]) ?? null,
+            surface_type: (match.surface_type as TrailSegment["surface_type"]) ?? null,
             hazards: Array.isArray(match.hazards)
               ? (match.hazards as string[])
               : typeof match.hazards === "string"
@@ -53,24 +44,21 @@ export default function SegmentDetailScreen() {
             is_road_connector: Boolean(match.is_road_connector),
             steep_grade: Boolean(match.steep_grade),
             one_way: Boolean(match.one_way),
-            description: match.description
-              ? String(match.description)
-              : null,
+            description: match.description ? String(match.description) : null,
             length_meters: Number(match.length_meters ?? 0),
             created_at: "",
             updated_at: "",
           } as TrailSegment);
         }
-      } catch { /* ignore local errors */ }
+      } catch {
+        /* ignore local errors */
+      }
 
       // If online, fetch fresh from API
       if (isOnline) {
         try {
           const client = createMagnumClient(API_URL);
-          const fresh = await client.raw.request<TrailSegment>(
-            "GET",
-            `/api/segments/${id}`,
-          );
+          const fresh = await client.raw.request<TrailSegment>("GET", `/api/segments/${id}`);
           if (!cancelled) setSegment(fresh);
         } catch (e: unknown) {
           if (
@@ -89,7 +77,9 @@ export default function SegmentDetailScreen() {
       if (!cancelled) setLoading(false);
     })();
 
-    return () => { cancelled = true };
+    return () => {
+      cancelled = true;
+    };
   }, [id, isOnline]);
 
   if (loading) {
@@ -103,9 +93,7 @@ export default function SegmentDetailScreen() {
   if (!segment) {
     return (
       <View style={styles.centered} testID="segment-detail-not-found">
-        <Text style={styles.errorText}>
-          {error ?? "Segment not found"}
-        </Text>
+        <Text style={styles.errorText}>{error ?? "Segment not found"}</Text>
       </View>
     );
   }
@@ -114,18 +102,14 @@ export default function SegmentDetailScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{ title: segment.name ?? `Segment ${segment.sort_order + 1}` }}
-      />
+      <Stack.Screen options={{ title: segment.name ?? `Segment ${segment.sort_order + 1}` }} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
         testID={`segment-detail-${segment.id}`}
       >
         <Card>
-          <Text style={styles.name}>
-            {segment.name ?? `Segment ${segment.sort_order + 1}`}
-          </Text>
+          <Text style={styles.name}>{segment.name ?? `Segment ${segment.sort_order + 1}`}</Text>
           {segment.surface_type ? (
             <View style={styles.badgeRow}>
               <SegmentTypeBadge surface={segment.surface_type} />
@@ -152,27 +136,19 @@ export default function SegmentDetailScreen() {
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Surface</Text>
-            <Text style={styles.detailValue}>
-              {segment.surface_type ?? "—"}
-            </Text>
+            <Text style={styles.detailValue}>{segment.surface_type ?? "—"}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Steep Grade</Text>
-            <Text style={styles.detailValue}>
-              {segment.steep_grade ? "Yes" : "No"}
-            </Text>
+            <Text style={styles.detailValue}>{segment.steep_grade ? "Yes" : "No"}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>One Way</Text>
-            <Text style={styles.detailValue}>
-              {segment.one_way ? "Yes" : "No"}
-            </Text>
+            <Text style={styles.detailValue}>{segment.one_way ? "Yes" : "No"}</Text>
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Road Connector</Text>
-            <Text style={styles.detailValue}>
-              {segment.is_road_connector ? "Yes" : "No"}
-            </Text>
+            <Text style={styles.detailValue}>{segment.is_road_connector ? "Yes" : "No"}</Text>
           </View>
         </Card>
 

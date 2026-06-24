@@ -28,9 +28,7 @@ revisionsRoute.get("/recent", adminOnly(), async (c) => {
       .orderBy(desc(revisions.createdAt))
       .limit(pageSize)
       .offset(offset),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(revisions),
+    db.select({ count: sql<number>`count(*)::int` }).from(revisions),
   ]);
 
   return c.json({ items, total: totalRow[0]?.count ?? 0, page, pageSize });

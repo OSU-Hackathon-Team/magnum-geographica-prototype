@@ -64,8 +64,7 @@ export async function initDatabase(): Promise<OfflineDatabase> {
   if (currentVersion < SCHEMA_VERSION) {
     await db.exec("BEGIN TRANSACTION");
     try {
-      const statements = OFFLINE_SCHEMA_SQL
-        .split(";")
+      const statements = OFFLINE_SCHEMA_SQL.split(";")
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       for (const stmt of statements) {
@@ -92,13 +91,15 @@ let initPromise: Promise<OfflineDatabase> | null = null;
 export async function getOfflineDb(): Promise<OfflineDatabase> {
   if (initPromise) return initPromise;
 
-  initPromise = initDatabase().then((db) => {
-    dbInstance = db;
-    return db;
-  }).catch((e) => {
-    initPromise = null;
-    throw e;
-  });
+  initPromise = initDatabase()
+    .then((db) => {
+      dbInstance = db;
+      return db;
+    })
+    .catch((e) => {
+      initPromise = null;
+      throw e;
+    });
 
   return initPromise;
 }

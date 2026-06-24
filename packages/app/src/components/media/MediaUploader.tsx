@@ -66,7 +66,14 @@ export function MediaUploader({ onSelect, uploading, testID }: MediaUploaderProp
           <Image source={{ uri: preview }} style={styles.thumbnail} />
           <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
           <Text style={styles.attached}>Attached</Text>
-          <Button variant="ghost" size="small" onPress={() => { setPreview(null); setBase64Input(""); }}>
+          <Button
+            variant="ghost"
+            size="small"
+            onPress={() => {
+              setPreview(null);
+              setBase64Input("");
+            }}
+          >
             <Ionicons name="close-outline" size={14} color="#888" />
           </Button>
         </View>

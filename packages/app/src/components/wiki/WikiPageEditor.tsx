@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { WikiPage } from "@magnum/shared";
 import { Button } from "../ui/Button";
@@ -100,8 +93,17 @@ export function WikiPageEditor({
           <View style={styles.section}>
             <View style={styles.toolbarRow}>
               <Text style={styles.label}>Content (Markdown)</Text>
-              <Button variant="ghost" size="small" onPress={() => setShowPreview(!showPreview)} testID="wiki-toggle-preview">
-                <Ionicons name={showPreview ? "create-outline" : "eye-outline"} size={14} color="#666" />
+              <Button
+                variant="ghost"
+                size="small"
+                onPress={() => setShowPreview(!showPreview)}
+                testID="wiki-toggle-preview"
+              >
+                <Ionicons
+                  name={showPreview ? "create-outline" : "eye-outline"}
+                  size={14}
+                  color="#666"
+                />
                 <Text style={styles.btnLabel}>{showPreview ? "Edit" : "Preview"}</Text>
               </Button>
             </View>
@@ -160,7 +162,9 @@ export function WikiPageEditor({
               testID={`wiki-tab-${t.key}`}
             >
               <Ionicons name={t.icon} size={14} color={tab === t.key ? "#fff" : "#666"} />
-              <Text style={[styles.btnLabel, tab === t.key ? styles.btnLabelActive : null]}>{t.label}</Text>
+              <Text style={[styles.btnLabel, tab === t.key ? styles.btnLabelActive : null]}>
+                {t.label}
+              </Text>
             </Button>
           ))}
         </View>

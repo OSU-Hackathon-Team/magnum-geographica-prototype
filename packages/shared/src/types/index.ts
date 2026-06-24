@@ -18,12 +18,7 @@ import {
 } from "../schemas/index.js";
 
 export type Difficulty = "easy" | "moderate" | "hard" | "expert";
-export type SurfaceType =
-  | "natural"
-  | "gravel"
-  | "paved"
-  | "boardwalk"
-  | "road_connector";
+export type SurfaceType = "natural" | "gravel" | "paved" | "boardwalk" | "road_connector";
 export type FeatureType =
   | "trailhead"
   | "shelter"
@@ -37,12 +32,7 @@ export type FeatureType =
   | "sign"
   | "intersection"
   | "other";
-export type WikiTargetType =
-  | "super_system"
-  | "system"
-  | "sub_system"
-  | "trail"
-  | "feature";
+export type WikiTargetType = "super_system" | "system" | "sub_system" | "trail" | "feature";
 export type SyncAction = "create" | "update" | "delete";
 export type SyncStatus = "pending" | "syncing" | "conflict" | "synced";
 

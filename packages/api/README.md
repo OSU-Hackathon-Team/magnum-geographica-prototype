@@ -4,17 +4,17 @@ Bun + Hono backend. PostgreSQL 16 + PostGIS 3 via Drizzle ORM. Single-port REST 
 
 ## Routes (Phase 0)
 
-| Method | Path | Notes |
-|---|---|---|
-| `GET` | `/api/health` | liveness + DB probe |
-| `GET` | `/api/systems` | list, paginated, `?q=`, `?page=`, `?pageSize=` |
-| `GET` | `/api/systems/:id` | detail |
-| `POST` | `/api/systems` | create |
-| `GET` | `/api/trails` | list, filterable by `?systemId=`, `?q=`, `?difficulty=` |
-| `GET` | `/api/trails/:id` | detail |
-| `POST` | `/api/trails` | create |
-| `GET` | `/api/search?q=&type=&limit=` | full-text over systems/trails/features |
-| `POST` | `/api/seed` | dev seed of Ohio test data |
+| Method | Path                          | Notes                                                   |
+| ------ | ----------------------------- | ------------------------------------------------------- |
+| `GET`  | `/api/health`                 | liveness + DB probe                                     |
+| `GET`  | `/api/systems`                | list, paginated, `?q=`, `?page=`, `?pageSize=`          |
+| `GET`  | `/api/systems/:id`            | detail                                                  |
+| `POST` | `/api/systems`                | create                                                  |
+| `GET`  | `/api/trails`                 | list, filterable by `?systemId=`, `?q=`, `?difficulty=` |
+| `GET`  | `/api/trails/:id`             | detail                                                  |
+| `POST` | `/api/trails`                 | create                                                  |
+| `GET`  | `/api/search?q=&type=&limit=` | full-text over systems/trails/features                  |
+| `POST` | `/api/seed`                   | dev seed of Ohio test data                              |
 
 ## Scripts
 
@@ -58,9 +58,9 @@ test/                 bun test files
 
 ## Env
 
-| Var | Default |
-|---|---|
+| Var            | Default                                          |
+| -------------- | ------------------------------------------------ |
 | `DATABASE_URL` | `postgres://magnum:magnum@localhost:5432/magnum` |
-| `API_PORT` | `3000` |
-| `ADMIN_SECRET` | `dev-secret-change-me` |
-| `CORS_ORIGINS` | comma-separated; `*` for dev |
+| `API_PORT`     | `3000`                                           |
+| `ADMIN_SECRET` | `dev-secret-change-me`                           |
+| `CORS_ORIGINS` | comma-separated; `*` for dev                     |

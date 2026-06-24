@@ -77,19 +77,17 @@ test("selecting 'Simplified' after 'Satellite' reverts the label", async ({ page
   await expect(switcher).toContainText("Simplified");
 });
 
-test("clicking the backdrop dismisses the menu without changing the selection", async ({ page }) => {
+test("clicking the backdrop dismisses the menu without changing the selection", async ({
+  page,
+}) => {
   await page.goto("/explore");
   const switcher = page.getByTestId("explore-base-layer-switcher-trigger");
   await switcher.click();
-  await expect(
-    page.getByTestId("explore-base-layer-switcher-option-satellite"),
-  ).toBeVisible();
+  await expect(page.getByTestId("explore-base-layer-switcher-option-satellite")).toBeVisible();
 
   await page.getByTestId("explore-base-layer-switcher-backdrop").click();
   // The menu option should no longer be visible (modal dismissed).
-  await expect(
-    page.getByTestId("explore-base-layer-switcher-option-satellite"),
-  ).toHaveCount(0);
+  await expect(page.getByTestId("explore-base-layer-switcher-option-satellite")).toHaveCount(0);
   // The original selection is unchanged.
   await expect(switcher).toContainText("Simplified");
 });
@@ -117,9 +115,7 @@ test("the map canvas is NOT recreated when switching basemaps", async ({ page })
   // between a VectorTileSource and an XYZ source can momentarily replace
   // the underlying canvas.
   await expect(mapDiv).toHaveCount(1);
-  const marker = await mapDiv.evaluate(
-    (el) => (el as HTMLElement).dataset.reproMarker ?? null,
-  );
+  const marker = await mapDiv.evaluate((el) => (el as HTMLElement).dataset.reproMarker ?? null);
   expect(marker).toBe("original");
   // And the canvas is still there.
   await expect(canvas).toHaveCount(1);

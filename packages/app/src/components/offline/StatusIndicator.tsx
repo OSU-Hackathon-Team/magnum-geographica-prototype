@@ -8,7 +8,8 @@ export function StatusIndicator() {
 
   const { color, label } = (() => {
     if (syncState === "syncing") return { color: "#a3a3a3", label: "Syncing..." };
-    if (!isOnline && pending > 0) return { color: "#eab308", label: `Offline (${pending} pending)` };
+    if (!isOnline && pending > 0)
+      return { color: "#eab308", label: `Offline (${pending} pending)` };
     if (!isOnline) return { color: "#ef4444", label: "Offline" };
     return { color: "#22c55e", label: "Online" };
   })();
@@ -16,7 +17,9 @@ export function StatusIndicator() {
   return (
     <View style={styles.row} testID="status-indicator">
       <View style={[styles.dot, { backgroundColor: color }]} testID="status-dot" />
-      <Text style={styles.text} testID="status-label">{label}</Text>
+      <Text style={styles.text} testID="status-label">
+        {label}
+      </Text>
     </View>
   );
 }

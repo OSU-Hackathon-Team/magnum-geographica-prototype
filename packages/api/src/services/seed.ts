@@ -38,7 +38,8 @@ const OHIO_SYSTEMS: ReadonlyArray<{
   {
     name: "Cuyahoga Valley National Park",
     slug: "cuyahoga-valley-national-park",
-    description: "A national park between Cleveland and Akron with the Ohio & Erie Canal Towpath Trail.",
+    description:
+      "A national park between Cleveland and Akron with the Ohio & Erie Canal Towpath Trail.",
     externalUrl: "https://www.nps.gov/cuva/",
     color: "#3b82f6",
     boundary:
@@ -134,14 +135,33 @@ const OHIO_FEATURES: ReadonlyArray<{
   lon: number;
   lat: number;
 }> = [
-  { name: "Old Man's Cave", typeTag: "scenic_point", systemIdx: 0, description: "Recessed gorge with waterfall.", lon: -82.5410, lat: 39.4400 },
-  { name: "Ash Cave Trailhead", typeTag: "trailhead", systemIdx: 0, lon: -82.5450, lat: 39.4480 },
-  { name: "Cedar Falls Overlook", typeTag: "scenic_point", systemIdx: 0, lon: -82.5350, lat: 39.4550 },
-  { name: "Ledges Overlook", typeTag: "scenic_point", systemIdx: 1, lon: -81.5600, lat: 41.2450 },
-  { name: "Boston Mill Visitor Center", typeTag: "trailhead", systemIdx: 1, lon: -81.5550, lat: 41.2500 },
-  { name: "Blue Hen Falls", typeTag: "water_source", systemIdx: 1, lon: -81.5400, lat: 41.2300 },
-  { name: "Pine Hollow Parking", typeTag: "parking", systemIdx: 2, lon: -82.4600, lat: 39.4450 },
-  { name: "Covered Bridge Trailhead", typeTag: "trailhead", systemIdx: 2, lon: -82.4400, lat: 39.4600 },
+  {
+    name: "Old Man's Cave",
+    typeTag: "scenic_point",
+    systemIdx: 0,
+    description: "Recessed gorge with waterfall.",
+    lon: -82.541,
+    lat: 39.44,
+  },
+  { name: "Ash Cave Trailhead", typeTag: "trailhead", systemIdx: 0, lon: -82.545, lat: 39.448 },
+  {
+    name: "Cedar Falls Overlook",
+    typeTag: "scenic_point",
+    systemIdx: 0,
+    lon: -82.535,
+    lat: 39.455,
+  },
+  { name: "Ledges Overlook", typeTag: "scenic_point", systemIdx: 1, lon: -81.56, lat: 41.245 },
+  {
+    name: "Boston Mill Visitor Center",
+    typeTag: "trailhead",
+    systemIdx: 1,
+    lon: -81.555,
+    lat: 41.25,
+  },
+  { name: "Blue Hen Falls", typeTag: "water_source", systemIdx: 1, lon: -81.54, lat: 41.23 },
+  { name: "Pine Hollow Parking", typeTag: "parking", systemIdx: 2, lon: -82.46, lat: 39.445 },
+  { name: "Covered Bridge Trailhead", typeTag: "trailhead", systemIdx: 2, lon: -82.44, lat: 39.46 },
 ];
 
 export interface SeedResult {
@@ -235,9 +255,12 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
   for (const trail of allTrails) {
     const t = OHIO_TRAILS.find((ot) => ot.slug === trail.slug);
     const geom = t ? t.geometry : "MULTILINESTRING((-82.5 39.45, -82.48 39.46))";
-    const surface = trail.slug === "little-miami-scenic-trail" ? "paved"
-      : trail.slug === "towpath-trail" ? "gravel"
-      : "natural";
+    const surface =
+      trail.slug === "little-miami-scenic-trail"
+        ? "paved"
+        : trail.slug === "towpath-trail"
+          ? "gravel"
+          : "natural";
     await database.execute(
       sql`INSERT INTO trail_segments (trail_id, name, sort_order, surface_type, geometry)
           VALUES (${trail.id}, 'Main segment', 0, ${surface},

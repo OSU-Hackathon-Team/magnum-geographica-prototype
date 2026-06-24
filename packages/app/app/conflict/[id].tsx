@@ -1,12 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../src/components/ui/Button";
 import { Card } from "../../src/components/ui/Card";
 import {
@@ -39,18 +33,16 @@ export default function ConflictScreen() {
     if (!item) return;
     const serverId = item.conflict_revision_id ?? item.server_id ?? "local";
     await markContributionSynced(item.id, serverId);
-    useOfflineStore.getState().setPendingCount(
-      useOfflineStore.getState().pendingCount - 1,
-    );
+    useOfflineStore.getState().setPendingCount(useOfflineStore.getState().pendingCount - 1);
     router.back();
   }
 
   async function handleDiscard() {
     if (!item) return;
     await deletePendingContribution(item.id);
-    useOfflineStore.getState().setPendingCount(
-      Math.max(0, useOfflineStore.getState().pendingCount - 1),
-    );
+    useOfflineStore
+      .getState()
+      .setPendingCount(Math.max(0, useOfflineStore.getState().pendingCount - 1));
     router.back();
   }
 
@@ -89,8 +81,8 @@ export default function ConflictScreen() {
         <Card>
           <Text style={styles.heading}>Edit Conflict</Text>
           <Text style={styles.description}>
-            Your offline edit conflicts with a newer version on the server. Choose
-            how to resolve it.
+            Your offline edit conflicts with a newer version on the server. Choose how to resolve
+            it.
           </Text>
         </Card>
 
@@ -118,21 +110,13 @@ export default function ConflictScreen() {
         {payload ? (
           <Card>
             <Text style={styles.label}>Your Changes</Text>
+            {payload.title ? <Text style={styles.fieldLabel}>Title</Text> : null}
             {payload.title ? (
-              <Text style={styles.fieldLabel}>Title</Text>
+              <Text style={styles.fieldValue}>{String(payload.title).slice(0, 200)}</Text>
             ) : null}
-            {payload.title ? (
-              <Text style={styles.fieldValue}>
-                {String(payload.title).slice(0, 200)}
-              </Text>
-            ) : null}
+            {payload.content_md ? <Text style={styles.fieldLabel}>Content</Text> : null}
             {payload.content_md ? (
-              <Text style={styles.fieldLabel}>Content</Text>
-            ) : null}
-            {payload.content_md ? (
-              <Text style={styles.fieldValue}>
-                {String(payload.content_md).slice(0, 500)}
-              </Text>
+              <Text style={styles.fieldValue}>{String(payload.content_md).slice(0, 500)}</Text>
             ) : null}
           </Card>
         ) : null}
@@ -146,12 +130,7 @@ export default function ConflictScreen() {
           >
             Keep My Version
           </Button>
-          <Button
-            variant="ghost"
-            size="medium"
-            onPress={handleDiscard}
-            testID="conflict-discard"
-          >
+          <Button variant="ghost" size="medium" onPress={handleDiscard} testID="conflict-discard">
             Discard My Changes
           </Button>
         </View>

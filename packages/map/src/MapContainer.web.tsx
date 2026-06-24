@@ -3,11 +3,7 @@ import { Map, View } from "ol";
 import type { Layer } from "ol/layer.js";
 import "ol/ol.css";
 import { fromLonLat, toLonLat } from "ol/proj.js";
-import {
-  defaultMapConfig,
-  resolveBaseLayers,
-  resolveDefaultBaseLayerId,
-} from "./shared/config.js";
+import { defaultMapConfig, resolveBaseLayers, resolveDefaultBaseLayerId } from "./shared/config.js";
 import { createTrailsLayer } from "./layers/TrailsLayer.js";
 import { createSystemsLayer } from "./layers/SystemsLayer.js";
 import { createFeaturesLayer } from "./layers/FeaturesLayer.js";
@@ -57,10 +53,7 @@ export default function MapContainer({
   onMoveEndRef.current = onMoveEnd;
 
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
-  const baseLayerDefs = useMemo(
-    () => resolveBaseLayers(merged),
-    [merged],
-  );
+  const baseLayerDefs = useMemo(() => resolveBaseLayers(merged), [merged]);
   const defaultBaseLayerId = useMemo(
     () => resolveDefaultBaseLayerId(merged, baseLayerDefs),
     [merged, baseLayerDefs],
@@ -182,12 +175,7 @@ export default function MapContainer({
   useEffect(() => {
     if (!mapRef.current || !flyTo) return;
     const last = lastFlyToRef.current;
-    if (
-      last &&
-      last.lon === flyTo.lon &&
-      last.lat === flyTo.lat &&
-      last.zoom === flyTo.zoom
-    )
+    if (last && last.lon === flyTo.lon && last.lat === flyTo.lat && last.zoom === flyTo.zoom)
       return;
     lastFlyToRef.current = flyTo;
     const view = mapRef.current.getView();

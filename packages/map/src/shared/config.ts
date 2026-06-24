@@ -41,9 +41,7 @@ export function defaultBaseLayers(martinTilesUrl: string | undefined): BaseLayer
     id: SIMPLIFIED_BASE_LAYER_ID,
     label: "Simplified",
     kind: "mvt",
-    url: martinTilesUrl
-      ? `${martinTilesUrl}/basemap/{z}/{x}/{y}`
-      : "/basemap/{z}/{x}/{y}",
+    url: martinTilesUrl ? `${martinTilesUrl}/basemap/{z}/{x}/{y}` : "/basemap/{z}/{x}/{y}",
     minZoom: 2,
     maxZoom: 18,
     attribution: "© OpenStreetMap contributors",

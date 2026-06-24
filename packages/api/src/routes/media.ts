@@ -23,7 +23,10 @@ mediaRoute.post("/", async (c) => {
 
   if ([feature_id, trail_id, system_id].filter((v) => v != null).length !== 1) {
     return c.json(
-      { error: "invalid_input", message: "exactly one of feature_id, trail_id, system_id required" },
+      {
+        error: "invalid_input",
+        message: "exactly one of feature_id, trail_id, system_id required",
+      },
       400,
     );
   }

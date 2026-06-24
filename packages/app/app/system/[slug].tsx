@@ -1,6 +1,14 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
 import { createMagnumClient, type System, type Trail, type WikiPage } from "@magnum/shared";
@@ -47,28 +55,30 @@ export default function SystemDetail() {
 
       if (!isOnline) {
         // Check if system data is available offline (from a downloaded region)
-        getAllDownloadedSystems().then((localSystems) => {
-          const found = localSystems.find(
-            (s: Record<string, unknown>) => String(s.slug) === slug,
-          );
-          if (found) {
-            setSystem({
-              id: String(found.id),
-              name: String(found.name),
-              slug: String(found.slug),
-              description: null,
-              boundary: null,
-              ownership_source: null,
-              source_date: null,
-              external_url: null,
-              created_at: "",
-              updated_at: "",
-            } as System);
-            setIsOfflineAvailable(true);
-          } else {
-            setError("Offline and not downloaded");
-          }
-        }).catch(() => setError("Offline and not downloaded"));
+        getAllDownloadedSystems()
+          .then((localSystems) => {
+            const found = localSystems.find(
+              (s: Record<string, unknown>) => String(s.slug) === slug,
+            );
+            if (found) {
+              setSystem({
+                id: String(found.id),
+                name: String(found.name),
+                slug: String(found.slug),
+                description: null,
+                boundary: null,
+                ownership_source: null,
+                source_date: null,
+                external_url: null,
+                created_at: "",
+                updated_at: "",
+              } as System);
+              setIsOfflineAvailable(true);
+            } else {
+              setError("Offline and not downloaded");
+            }
+          })
+          .catch(() => setError("Offline and not downloaded"));
         return;
       }
 
@@ -84,12 +94,14 @@ export default function SystemDetail() {
           if (w) setWikiPage(w as WikiPage);
 
           // Check if available offline
-          getAllDownloadedSystems().then((localSystems) => {
-            const found = localSystems.some(
-              (ls: Record<string, unknown>) => String(ls.id) === s.id,
-            );
-            setIsOfflineAvailable(found);
-          }).catch(() => {});
+          getAllDownloadedSystems()
+            .then((localSystems) => {
+              const found = localSystems.some(
+                (ls: Record<string, unknown>) => String(ls.id) === s.id,
+              );
+              setIsOfflineAvailable(found);
+            })
+            .catch(() => {});
         })
         .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
     }, [slug, isOnline]),
@@ -98,12 +110,12 @@ export default function SystemDetail() {
   useEffect(() => {
     if (!system) return;
     // Check if this system ID is in any downloaded region
-    getAllDownloadedSystems().then((localSystems) => {
-      const found = localSystems.some(
-        (s: Record<string, unknown>) => String(s.id) === system.id,
-      );
-      setIsOfflineAvailable(found);
-    }).catch(() => {});
+    getAllDownloadedSystems()
+      .then((localSystems) => {
+        const found = localSystems.some((s: Record<string, unknown>) => String(s.id) === system.id);
+        setIsOfflineAvailable(found);
+      })
+      .catch(() => {});
   }, [offlineRegions, system]);
 
   if (error) {
@@ -128,7 +140,9 @@ export default function SystemDetail() {
         <SystemMapPreview />
 
         <View style={styles.section} testID="system-meta">
-          <Text style={styles.title} testID="system-name">{system.name}</Text>
+          <Text style={styles.title} testID="system-name">
+            {system.name}
+          </Text>
           {system.description ? <Text style={styles.body}>{system.description}</Text> : null}
           {system.ownership_source ? (
             <Text style={styles.meta}>Owner: {system.ownership_source}</Text>
@@ -145,14 +159,18 @@ export default function SystemDetail() {
           ) : null}
           <ViewOnMapButton center={system.center ?? null} zoom={9} testID="system-view-on-map" />
           {isOfflineAvailable ? (
-            <Text style={styles.meta} testID="system-offline-ready">Available offline</Text>
+            <Text style={styles.meta} testID="system-offline-ready">
+              Available offline
+            </Text>
           ) : null}
         </View>
 
         <View style={styles.section} testID="system-trails">
           <Text style={styles.h2}>Trails ({trails.length})</Text>
           {trails.length === 0 ? (
-            <Text style={styles.body} testID="system-trails-empty">No trails yet for this system.</Text>
+            <Text style={styles.body} testID="system-trails-empty">
+              No trails yet for this system.
+            </Text>
           ) : (
             trails.map((t) => (
               <Pressable

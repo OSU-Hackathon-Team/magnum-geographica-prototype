@@ -1,12 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import {
-  createMagnumClient,
-  type WikiPage,
-  type Revision,
-  type Citation,
-} from "@magnum/shared";
+import { createMagnumClient, type WikiPage, type Revision, type Citation } from "@magnum/shared";
 import { WikiPageEditor } from "../../../../src/components/wiki/WikiPageEditor";
 import { useOfflineStore } from "../../../../src/stores/offlineStore";
 import { useAuthStore } from "../../../../src/stores/authStore";
@@ -42,7 +37,8 @@ export default function WikiEditScreen() {
   }, [storedContributor]);
 
   const load = useCallback(async () => {
-    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string") return;
+    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string")
+      return;
     setLoading(true);
     setError(null);
     try {
@@ -90,21 +86,31 @@ export default function WikiEditScreen() {
       .then(async (page) => {
         setWikiPage(page);
         const [revsRes, citesRes] = await Promise.all([
-          client.listWikiPageRevisions(page.id).catch(() => ({ items: [] as Revision[], total: 0, page: 1, pageSize: 20 })),
-          client.listWikiPageCitations(page.id).catch(() => ({ items: [] as Citation[], total: 0 })),
+          client
+            .listWikiPageRevisions(page.id)
+            .catch(() => ({ items: [] as Revision[], total: 0, page: 1, pageSize: 20 })),
+          client
+            .listWikiPageCitations(page.id)
+            .catch(() => ({ items: [] as Citation[], total: 0 })),
         ]);
         setRevisions(revsRes.items);
         setCitations(citesRes.items);
       })
       .catch((e: unknown) => {
-        if (!e || typeof e !== "object" || !("status" in e) || (e as { status: number }).status !== 404) {
+        if (
+          !e ||
+          typeof e !== "object" ||
+          !("status" in e) ||
+          (e as { status: number }).status !== 404
+        ) {
           // Don't overwrite the local page with a 404 if we already loaded it
         }
       });
   }, [isOnline, targetType, targetId]);
 
   async function handleSave(data: { title: string; content_md: string; edit_summary: string }) {
-    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string") return;
+    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string")
+      return;
     setSaving(true);
     setError(null);
     const finalContributor = contributorName || "anonymous";

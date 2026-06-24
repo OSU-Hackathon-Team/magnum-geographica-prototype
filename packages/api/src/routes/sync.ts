@@ -13,7 +13,12 @@ syncRoute.post("/contributions", async (c) => {
     return c.json({ results: [] });
   }
 
-  const results: Array<{ local_id: number; status: string; server_id?: string; conflict_revision_id?: string }> = [];
+  const results: Array<{
+    local_id: number;
+    status: string;
+    server_id?: string;
+    conflict_revision_id?: string;
+  }> = [];
 
   for (let i = 0; i < contributions.length; i++) {
     const contrib = contributions[i] as Record<string, unknown>;
@@ -22,7 +27,12 @@ syncRoute.post("/contributions", async (c) => {
     try {
       if (contrib.entity_type === "wiki_page") {
         if (contrib.action === "create") {
-          const data = contrib.payload as { target_type: string; target_id: string; title: string; content_md: string };
+          const data = contrib.payload as {
+            target_type: string;
+            target_id: string;
+            title: string;
+            content_md: string;
+          };
           const rows = await db
             .insert(wikiPages)
             .values({
@@ -57,7 +67,11 @@ syncRoute.post("/contributions", async (c) => {
             .limit(1);
 
           const headRev = currentHead[0];
-          if (contrib.base_revision_id && headRev && headRev.id !== (contrib.base_revision_id as string)) {
+          if (
+            contrib.base_revision_id &&
+            headRev &&
+            headRev.id !== (contrib.base_revision_id as string)
+          ) {
             results.push({
               local_id: localId,
               status: "conflict",
@@ -86,11 +100,22 @@ syncRoute.post("/contributions", async (c) => {
             results.push({ local_id: localId, status: "synced", server_id: entityId });
           }
         } else {
-          results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
+          results.push({
+            local_id: localId,
+            status: "synced",
+            server_id: contrib.entity_id as string,
+          });
         }
       } else if (contrib.entity_type === "feature") {
         if (contrib.action === "create") {
-          const data = contrib.payload as { name: string; type_tag: string; description?: string; point: { coordinates: [number, number] }; system_id?: string; trail_id?: string };
+          const data = contrib.payload as {
+            name: string;
+            type_tag: string;
+            description?: string;
+            point: { coordinates: [number, number] };
+            system_id?: string;
+            trail_id?: string;
+          };
           const [lon, lat] = data.point?.coordinates ?? [null, null];
           if (!lon || !lat) {
             results.push({ local_id: localId, status: "error" });
@@ -114,18 +139,27 @@ syncRoute.post("/contributions", async (c) => {
           }
         } else if (contrib.action === "update" && contrib.entity_id) {
           const entityId = contrib.entity_id as string;
-          const data = contrib.payload as { name?: string; type_tag?: string; description?: string };
+          const data = contrib.payload as {
+            name?: string;
+            type_tag?: string;
+            description?: string;
+          };
           const updates: Record<string, unknown> = { updatedAt: sql`now()` };
           if (data.name) (updates as Record<string, string | null>).name = data.name;
           if (data.type_tag) (updates as Record<string, string | null>).typeTag = data.type_tag;
-          if (data.description !== undefined) (updates as Record<string, string | null>).description = data.description || null;
+          if (data.description !== undefined)
+            (updates as Record<string, string | null>).description = data.description || null;
           await db
             .update(features)
             .set(updates as never)
             .where(eq(features.id, entityId));
           results.push({ local_id: localId, status: "synced", server_id: entityId });
         } else {
-          results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
+          results.push({
+            local_id: localId,
+            status: "synced",
+            server_id: contrib.entity_id as string,
+          });
         }
       } else if (contrib.entity_type === "trail_segment") {
         if (contrib.action === "update" && contrib.entity_id) {
@@ -160,7 +194,11 @@ syncRoute.post("/contributions", async (c) => {
           results.push({ local_id: localId, status: "synced", server_id: data.id });
         } else if (contrib.action === "delete" && contrib.entity_id) {
           await db.delete(trailSegments).where(eq(trailSegments.id, contrib.entity_id as string));
-          results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
+          results.push({
+            local_id: localId,
+            status: "synced",
+            server_id: contrib.entity_id as string,
+          });
         } else if (contrib.action === "reorder" && contrib.payload) {
           const data = contrib.payload as { ordered_ids: string[] };
           for (let k = 0; k < data.ordered_ids.length; k++) {
@@ -195,12 +233,16 @@ syncRoute.post("/contributions", async (c) => {
             continue;
           }
           const wktA = await db
-            .select({ wkt: sql<string>`ST_AsText(ST_LineSubstring(${trailSegments.geometry}, 0, ${data.split_at}))` })
+            .select({
+              wkt: sql<string>`ST_AsText(ST_LineSubstring(${trailSegments.geometry}, 0, ${data.split_at}))`,
+            })
             .from(trailSegments)
             .where(eq(trailSegments.id, data.id))
             .limit(1);
           const wktB = await db
-            .select({ wkt: sql<string>`ST_AsText(ST_LineSubstring(${trailSegments.geometry}, ${data.split_at}, 1))` })
+            .select({
+              wkt: sql<string>`ST_AsText(ST_LineSubstring(${trailSegments.geometry}, ${data.split_at}, 1))`,
+            })
             .from(trailSegments)
             .where(eq(trailSegments.id, data.id))
             .limit(1);
@@ -220,7 +262,14 @@ syncRoute.post("/contributions", async (c) => {
             })
             .where(eq(trailSegments.id, data.id));
           await db.insert(trailSegments).values({
-            trailId: (await db.select({ trailId: trailSegments.trailId }).from(trailSegments).where(eq(trailSegments.id, data.id)).limit(1))[0]?.trailId ?? "",
+            trailId:
+              (
+                await db
+                  .select({ trailId: trailSegments.trailId })
+                  .from(trailSegments)
+                  .where(eq(trailSegments.id, data.id))
+                  .limit(1)
+              )[0]?.trailId ?? "",
             geometry: sql`ST_Multi(ST_GeomFromText(${textB}, 4326))`,
             name: data.name_b ?? null,
             sortOrder: seg.sortOrder + 1,
@@ -286,7 +335,11 @@ syncRoute.post("/contributions", async (c) => {
             .where(sql`${trailSegments.sortOrder} > ${lo.sortOrder}`);
           results.push({ local_id: localId, status: "synced", server_id: lo.id });
         } else {
-          results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
+          results.push({
+            local_id: localId,
+            status: "synced",
+            server_id: contrib.entity_id as string,
+          });
         }
       } else if (contrib.entity_type === "media") {
         if (contrib.action === "create" && contrib.payload) {
@@ -316,10 +369,18 @@ syncRoute.post("/contributions", async (c) => {
             results.push({ local_id: localId, status: "error" });
           }
         } else {
-          results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
+          results.push({
+            local_id: localId,
+            status: "synced",
+            server_id: contrib.entity_id as string,
+          });
         }
       } else {
-        results.push({ local_id: localId, status: "synced", server_id: contrib.entity_id as string });
+        results.push({
+          local_id: localId,
+          status: "synced",
+          server_id: contrib.entity_id as string,
+        });
       }
     } catch (e) {
       results.push({ local_id: localId, status: "error" });

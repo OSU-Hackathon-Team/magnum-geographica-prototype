@@ -29,9 +29,11 @@ test("user can create a wiki page and view its content", async ({ page }) => {
   // 2. Fill in the editor and save.
   await page.getByTestId("wiki-editor-contributor").fill("test-user");
   await page.getByTestId("wiki-editor-title").fill("Buckeye Trail reference");
-  await page.getByTestId("wiki-editor-content").fill(
-    "## Conditions\n\nMostly dirt. Watch for muddy sections in spring.\n\n## Access\n\nFree. Open daily.",
-  );
+  await page
+    .getByTestId("wiki-editor-content")
+    .fill(
+      "## Conditions\n\nMostly dirt. Watch for muddy sections in spring.\n\n## Access\n\nFree. Open daily.",
+    );
   await page.getByTestId("wiki-editor-summary").fill("initial creation");
   await page.getByTestId("wiki-editor-save").click();
 
@@ -67,9 +69,9 @@ test("wiki revision history grows each time the page is saved", async ({ page })
   // Second save: opens the editor, modifies content, saves.
   await page.getByTestId("wiki-edit-button").click();
   await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
-  await page.getByTestId("wiki-editor-content").fill(
-    "Flat towpath along the canal. Family-friendly.",
-  );
+  await page
+    .getByTestId("wiki-editor-content")
+    .fill("Flat towpath along the canal. Family-friendly.");
   await page.getByTestId("wiki-editor-summary").fill("v2: add family note");
   await page.getByTestId("wiki-editor-save").click();
 

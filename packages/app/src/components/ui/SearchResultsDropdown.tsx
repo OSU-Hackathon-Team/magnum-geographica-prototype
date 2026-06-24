@@ -36,9 +36,13 @@ export function SearchResultsDropdown({
   return (
     <View style={styles.container} testID="search-results">
       {loading ? (
-        <Text style={styles.muted} testID="search-loading">Searching…</Text>
+        <Text style={styles.muted} testID="search-loading">
+          Searching…
+        </Text>
       ) : total === 0 ? (
-        <Text style={styles.muted} testID="search-empty">No results for &ldquo;{query}&rdquo;.</Text>
+        <Text style={styles.muted} testID="search-empty">
+          No results for &ldquo;{query}&rdquo;.
+        </Text>
       ) : null}
 
       {systems.length > 0 ? (
@@ -152,6 +156,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 14, fontWeight: "600", color: "#111" },
   subtitle: { fontSize: 12, color: "#666", marginTop: 2 },
   muted: { color: "#888", fontSize: 13, padding: 10 },
-  dismiss: { paddingVertical: 8, alignItems: "center", borderTopWidth: 1, borderColor: "#eee", marginTop: 6 },
+  dismiss: {
+    paddingVertical: 8,
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderColor: "#eee",
+    marginTop: 6,
+  },
   dismissText: { color: "#22c55e", fontWeight: "600" },
 });

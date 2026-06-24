@@ -26,7 +26,11 @@ describe("GET /api/search", () => {
   test("returns grouped results for a valid query", async () => {
     const res = await buildApp().request("/api/search?q=hocking&limit=10");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { systems: unknown[]; trails: unknown[]; features: unknown[] };
+    const body = (await res.json()) as {
+      systems: unknown[];
+      trails: unknown[];
+      features: unknown[];
+    };
     expect(Array.isArray(body.systems)).toBe(true);
     expect(Array.isArray(body.trails)).toBe(true);
     expect(Array.isArray(body.features)).toBe(true);

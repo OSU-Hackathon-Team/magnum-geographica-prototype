@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import {
   SURFACE_TYPES,
   type SurfaceType,
@@ -54,9 +46,7 @@ export function SegmentEditor({
   );
   const [hazards, setHazards] = useState<string[]>(segment.hazards ?? []);
   const [steepGrade, setSteepGrade] = useState(Boolean(segment.steep_grade));
-  const [isRoadConnector, setIsRoadConnector] = useState(
-    Boolean(segment.is_road_connector),
-  );
+  const [isRoadConnector, setIsRoadConnector] = useState(Boolean(segment.is_road_connector));
   const [oneWay, setOneWay] = useState(Boolean(segment.one_way));
   const [description, setDescription] = useState(segment.description ?? "");
   const [showSplit, setShowSplit] = useState(false);
@@ -65,9 +55,7 @@ export function SegmentEditor({
   const [nameB, setNameB] = useState("");
 
   const toggleHazard = (h: string) => {
-    setHazards((prev) =>
-      prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h],
-    );
+    setHazards((prev) => (prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]));
   };
 
   const canSave = !saving && !deleting;
@@ -121,10 +109,7 @@ export function SegmentEditor({
               <Pressable
                 key={s}
                 onPress={() => setSurfaceType(surfaceType === s ? null : s)}
-                style={[
-                  styles.surfaceOption,
-                  surfaceType === s && styles.surfaceOptionActive,
-                ]}
+                style={[styles.surfaceOption, surfaceType === s && styles.surfaceOptionActive]}
                 testID={`segment-editor-surface-${s}-${segment.id}`}
                 disabled={!canSave}
               >
@@ -150,19 +135,11 @@ export function SegmentEditor({
                 <Pressable
                   key={h}
                   onPress={() => toggleHazard(h)}
-                  style={[
-                    styles.hazardChip,
-                    active && styles.hazardChipActive,
-                  ]}
+                  style={[styles.hazardChip, active && styles.hazardChipActive]}
                   testID={`segment-editor-hazard-${h}-${segment.id}`}
                   disabled={!canSave}
                 >
-                  <Text
-                    style={[
-                      styles.hazardChipText,
-                      active && styles.hazardChipTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.hazardChipText, active && styles.hazardChipTextActive]}>
                     {h.replace("_", " ")}
                   </Text>
                 </Pressable>
@@ -250,17 +227,11 @@ export function SegmentEditor({
                 <Pressable
                   key={v}
                   onPress={() => setSplitAt(v)}
-                  style={[
-                    styles.splitPreset,
-                    splitAt === v && styles.splitPresetActive,
-                  ]}
+                  style={[styles.splitPreset, splitAt === v && styles.splitPresetActive]}
                   testID={`segment-editor-split-preset-${v}-${segment.id}`}
                 >
                   <Text
-                    style={[
-                      styles.splitPresetText,
-                      splitAt === v && styles.splitPresetTextActive,
-                    ]}
+                    style={[styles.splitPresetText, splitAt === v && styles.splitPresetTextActive]}
                   >
                     {v}
                   </Text>
@@ -381,12 +352,7 @@ export function SegmentEditList({
     <ScrollView testID={testID ?? "segment-edit-list"}>
       <View style={styles.listHeader}>
         <Text style={styles.listTitle}>Edit Segments</Text>
-        <Button
-          variant="ghost"
-          size="small"
-          onPress={onExit}
-          testID="segment-edit-exit"
-        >
+        <Button variant="ghost" size="small" onPress={onExit} testID="segment-edit-exit">
           Done
         </Button>
       </View>
@@ -411,10 +377,7 @@ export function SegmentEditList({
           <View style={styles.itemHeader}>
             <Pressable
               onPress={() => toggleMergeSelect(s.id)}
-              style={[
-                styles.mergeToggle,
-                selectedForMerge.has(s.id) && styles.mergeToggleActive,
-              ]}
+              style={[styles.mergeToggle, selectedForMerge.has(s.id) && styles.mergeToggleActive]}
               testID={`segment-merge-toggle-${s.id}`}
             >
               <Text style={styles.mergeToggleText}>
@@ -449,12 +412,8 @@ export function SegmentEditList({
             deleting={deletingId === s.id}
             testID={`segment-editor-${s.id}`}
           />
-          {pendingId === s.id ? (
-            <Text style={styles.pendingHint}>Pending sync…</Text>
-          ) : null}
-          {splittingId === s.id ? (
-            <Text style={styles.pendingHint}>Splitting…</Text>
-          ) : null}
+          {pendingId === s.id ? <Text style={styles.pendingHint}>Pending sync…</Text> : null}
+          {splittingId === s.id ? <Text style={styles.pendingHint}>Splitting…</Text> : null}
         </View>
       ))}
 

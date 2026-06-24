@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   QUALITY_LEVELS,
   QUALITY_LEVEL_ORDER,
@@ -69,10 +63,16 @@ export function DownloadAreaSheet({
 
   const currentQualityIndex = QUALITY_LEVEL_ORDER.indexOf(quality);
 
-  const handleQualityChange = useCallback((delta: number) => {
-    const newIndex = Math.max(0, Math.min(QUALITY_LEVEL_ORDER.length - 1, currentQualityIndex + delta));
-    setQuality(QUALITY_LEVEL_ORDER[newIndex]!);
-  }, [currentQualityIndex]);
+  const handleQualityChange = useCallback(
+    (delta: number) => {
+      const newIndex = Math.max(
+        0,
+        Math.min(QUALITY_LEVEL_ORDER.length - 1, currentQualityIndex + delta),
+      );
+      setQuality(QUALITY_LEVEL_ORDER[newIndex]!);
+    },
+    [currentQualityIndex],
+  );
 
   const handleDownload = useCallback(async () => {
     setDownloading(true);
@@ -129,7 +129,10 @@ export function DownloadAreaSheet({
           </View>
           <Pressable
             onPress={() => handleQualityChange(1)}
-            style={[styles.qualityBtn, currentQualityIndex >= QUALITY_LEVEL_ORDER.length - 1 && styles.qualityBtnDisabled]}
+            style={[
+              styles.qualityBtn,
+              currentQualityIndex >= QUALITY_LEVEL_ORDER.length - 1 && styles.qualityBtnDisabled,
+            ]}
             disabled={currentQualityIndex >= QUALITY_LEVEL_ORDER.length - 1}
             testID="download-quality-more"
           >
@@ -162,11 +165,7 @@ export function DownloadAreaSheet({
             <Text style={styles.downloadedText}>Downloaded successfully</Text>
           </View>
         ) : (
-          <Pressable
-            style={styles.downloadBtn}
-            onPress={handleDownload}
-            testID="download-start"
-          >
+          <Pressable style={styles.downloadBtn} onPress={handleDownload} testID="download-start">
             <Text style={styles.downloadBtnText}>Download</Text>
           </Pressable>
         )}

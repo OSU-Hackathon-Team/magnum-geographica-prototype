@@ -28,14 +28,17 @@ interface CachedPack {
 const packs = new Map<string, CachedPack>();
 const PACK_EXPIRY_MS = 30 * 60 * 1000;
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, pack] of packs) {
-    if (now - pack.createdAt > PACK_EXPIRY_MS) {
-      packs.delete(id);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [id, pack] of packs) {
+      if (now - pack.createdAt > PACK_EXPIRY_MS) {
+        packs.delete(id);
+      }
     }
-  }
-}, 5 * 60 * 1000).unref();
+  },
+  5 * 60 * 1000,
+).unref();
 
 offlineRoute.post("/info", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -49,8 +52,7 @@ offlineRoute.post("/info", async (c) => {
 
   const bbox = parsed.data as BboxRequest;
   const tileCount = estimateTileCount(bbox);
-  const avgBytes =
-    bbox.baseLayerId === "satellite" ? AVG_TILE_BYTES_SATELLITE : AVG_TILE_BYTES_MVT;
+  const avgBytes = bbox.baseLayerId === "satellite" ? AVG_TILE_BYTES_SATELLITE : AVG_TILE_BYTES_MVT;
   const estimatedTileBytes = tileCount * avgBytes;
 
   return c.json({
@@ -95,8 +97,7 @@ offlineRoute.post("/generate", async (c) => {
       tileSizeBytes: result.tileSizeBytes,
       geojsonSizeBytes: result.geojsonSizeBytes,
       wikiSizeBytes: result.wikiSizeBytes,
-      totalSizeBytes:
-        result.tileSizeBytes + result.geojsonSizeBytes + result.wikiSizeBytes,
+      totalSizeBytes: result.tileSizeBytes + result.geojsonSizeBytes + result.wikiSizeBytes,
       entityCounts: result.entityCounts,
     });
   } catch (e) {

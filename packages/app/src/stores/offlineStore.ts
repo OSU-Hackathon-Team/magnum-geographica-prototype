@@ -46,10 +46,7 @@ export const useOfflineStore = create<OfflineState>((set) => ({
   setOfflineRegions: (regions) => set({ offlineRegions: regions }),
   addOfflineRegion: (region) =>
     set((s) => ({
-      offlineRegions: [
-        ...s.offlineRegions.filter((r) => r.id !== region.id),
-        region,
-      ],
+      offlineRegions: [...s.offlineRegions.filter((r) => r.id !== region.id), region],
     })),
   removeOfflineRegion: (id) =>
     set((s) => ({

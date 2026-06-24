@@ -10,7 +10,9 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
-export async function syncContributions(contributorName: string): Promise<{ synced: number; conflicts: number }> {
+export async function syncContributions(
+  contributorName: string,
+): Promise<{ synced: number; conflicts: number }> {
   const client = createMagnumClient(API_URL, { getContributorName: () => contributorName });
   const pending = await getPendingContributions();
 
@@ -30,7 +32,12 @@ export async function syncContributions(contributorName: string): Promise<{ sync
 
   try {
     const response = await client.raw.request<{
-      results: Array<{ local_id: number; status: string; server_id?: string; conflict_revision_id?: string }>;
+      results: Array<{
+        local_id: number;
+        status: string;
+        server_id?: string;
+        conflict_revision_id?: string;
+      }>;
     }>("POST", "/api/sync/contributions", { body: { contributions: payload } });
 
     for (const result of response.results) {
@@ -59,11 +66,9 @@ export async function fetchUpdates(since: string): Promise<number> {
   const client = createMagnumClient(API_URL);
 
   try {
-    const response = await client.raw.request<{ updates: unknown[] }>(
-      "GET",
-      "/api/sync/updates",
-      { query: { since } },
-    );
+    const response = await client.raw.request<{ updates: unknown[] }>("GET", "/api/sync/updates", {
+      query: { since },
+    });
     return (response.updates ?? []).length;
   } catch (e) {
     console.error("Failed to fetch updates:", e);

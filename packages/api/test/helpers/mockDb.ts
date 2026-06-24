@@ -151,7 +151,10 @@ export function createMockDb(): { db: Database; state: MockState } {
     chain.orderBy = () => chain;
 
     const origThen = chain.then;
-    chain.then = (onfulfilled?: (value: unknown) => unknown, onrejected?: (reason: unknown) => unknown) => {
+    chain.then = (
+      onfulfilled?: (value: unknown) => unknown,
+      onrejected?: (reason: unknown) => unknown,
+    ) => {
       let result = rows;
       if (whereFilter) result = applyWhere(result, whereFilter);
       result = applyOrderBy(result);
@@ -187,7 +190,9 @@ export function createMockDb(): { db: Database; state: MockState } {
       };
       chain.returning = () => {
         const call = state.insertCalls[state.insertCalls.length - 1];
-        return Promise.resolve([{ id: "00000000-0000-0000-0000-000000000001", ...(call?.values as object ?? {}) }]);
+        return Promise.resolve([
+          { id: "00000000-0000-0000-0000-000000000001", ...((call?.values as object) ?? {}) },
+        ]);
       };
       chain.onConflictDoNothing = () => chain;
       return chain;
@@ -203,8 +208,7 @@ export function createMockDb(): { db: Database; state: MockState } {
         state.updateCalls.push({ table: tableName, values: {}, where });
         return chain;
       };
-      chain.returning = () =>
-        Promise.resolve([{ id: "00000000-0000-0000-0000-000000000001" }]);
+      chain.returning = () => Promise.resolve([{ id: "00000000-0000-0000-0000-000000000001" }]);
       return chain;
     },
     delete: (table: unknown) => {

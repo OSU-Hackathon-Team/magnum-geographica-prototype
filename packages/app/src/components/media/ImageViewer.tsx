@@ -24,12 +24,16 @@ export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps
             testID="image-viewer-image"
           />
         ) : (
-          <Text style={styles.noImage} testID="image-viewer-no-image">No image</Text>
+          <Text style={styles.noImage} testID="image-viewer-no-image">
+            No image
+          </Text>
         )}
 
         {caption ? (
           <View style={styles.captionBar} testID="image-viewer-caption-bar">
-            <Text style={styles.caption} testID="image-viewer-caption">{caption}</Text>
+            <Text style={styles.caption} testID="image-viewer-caption">
+              {caption}
+            </Text>
           </View>
         ) : null}
       </View>

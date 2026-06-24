@@ -2,11 +2,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { SURFACE_COLORS, type SurfaceType } from "@magnum/shared";
 
 export function SegmentTypeBadge({ surface }: { surface: SurfaceType | string }) {
-  const color =
-    (SURFACE_COLORS as Record<string, string>)[surface] ?? SURFACE_COLORS.natural;
+  const color = (SURFACE_COLORS as Record<string, string>)[surface] ?? SURFACE_COLORS.natural;
   return (
     <View style={[styles.badge, { borderColor: color }]} testID={`segment-type-badge-${surface}`}>
-      <Text style={[styles.text, { color }]} testID="segment-type-label">{String(surface).replace("_", " ").toUpperCase()}</Text>
+      <Text style={[styles.text, { color }]} testID="segment-type-label">
+        {String(surface).replace("_", " ").toUpperCase()}
+      </Text>
     </View>
   );
 }

@@ -59,13 +59,17 @@ export function DownloadButton({
         testID={`download-button-${systemId}`}
       >
         <Ionicons name="download-outline" size={14} color="#fff" />
-        <Text style={styles.btnText}>{downloading ? "Downloading..." : "Download for Offline"}</Text>
+        <Text style={styles.btnText}>
+          {downloading ? "Downloading..." : "Download for Offline"}
+        </Text>
       </Button>
       {downloadSizeBytes !== undefined ? (
         <Text style={styles.size}>~{formatSize(downloadSizeBytes)}</Text>
       ) : null}
       {error ? (
-        <Text style={styles.error} testID={`download-error-${systemId}`}>{error}</Text>
+        <Text style={styles.error} testID={`download-error-${systemId}`}>
+          {error}
+        </Text>
       ) : null}
     </View>
   );

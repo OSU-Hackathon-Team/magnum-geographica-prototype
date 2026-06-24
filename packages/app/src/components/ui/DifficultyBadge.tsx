@@ -2,11 +2,15 @@ import { StyleSheet, Text, View } from "react-native";
 import { DIFFICULTY_COLORS, type Difficulty } from "@magnum/shared";
 
 export function DifficultyBadge({ difficulty }: { difficulty: Difficulty | string }) {
-  const color =
-    (DIFFICULTY_COLORS as Record<string, string>)[difficulty] ?? DIFFICULTY_COLORS.easy;
+  const color = (DIFFICULTY_COLORS as Record<string, string>)[difficulty] ?? DIFFICULTY_COLORS.easy;
   return (
-    <View style={[styles.badge, { backgroundColor: color }]} testID={`difficulty-badge-${difficulty}`}>
-      <Text style={styles.text} testID="difficulty-label">{String(difficulty).toUpperCase()}</Text>
+    <View
+      style={[styles.badge, { backgroundColor: color }]}
+      testID={`difficulty-badge-${difficulty}`}
+    >
+      <Text style={styles.text} testID="difficulty-label">
+        {String(difficulty).toUpperCase()}
+      </Text>
     </View>
   );
 }

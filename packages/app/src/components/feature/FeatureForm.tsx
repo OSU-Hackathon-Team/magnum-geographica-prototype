@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { FEATURE_TYPES, createMagnumClient, type System, type Trail } from "@magnum/shared";
 import { Button } from "../ui/Button";
 import { FeatureTypeIcon } from "./FeatureTypeIcon";
@@ -146,13 +139,20 @@ export function FeatureForm({
         ) : systems.length === 0 ? (
           <Text style={styles.hint}>No systems available</Text>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.hierarchyScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.hierarchyScroll}
+          >
             <View style={styles.hierarchyRow}>
               <Button
                 key="none"
                 variant={systemId === null ? "primary" : "secondary"}
                 size="small"
-                onPress={() => { setSystemId(null); setTrailId(null); }}
+                onPress={() => {
+                  setSystemId(null);
+                  setTrailId(null);
+                }}
                 testID="feature-system-none"
               >
                 None
@@ -162,7 +162,10 @@ export function FeatureForm({
                   key={s.id}
                   variant={systemId === s.id ? "primary" : "secondary"}
                   size="small"
-                  onPress={() => { setSystemId(s.id); setTrailId(null); }}
+                  onPress={() => {
+                    setSystemId(s.id);
+                    setTrailId(null);
+                  }}
                   testID={`feature-system-${s.slug}`}
                 >
                   {s.name}
@@ -181,7 +184,11 @@ export function FeatureForm({
           ) : trails.length === 0 ? (
             <Text style={styles.hint}>No trails in this system</Text>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.hierarchyScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.hierarchyScroll}
+            >
               <View style={styles.hierarchyRow}>
                 <Button
                   key="none"

@@ -539,10 +539,7 @@ export default function MapContainer({
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
-  const baseLayerDefs = useMemo(
-    () => resolveBaseLayers(merged),
-    [merged],
-  );
+  const baseLayerDefs = useMemo(() => resolveBaseLayers(merged), [merged]);
   const defaultBaseLayerId = useMemo(
     () => resolveDefaultBaseLayerId(merged, baseLayerDefs),
     [merged, baseLayerDefs],
@@ -613,7 +610,9 @@ export default function MapContainer({
         console.warn("Failed to write map files, falling back to inline HTML", e);
       }
     })();
-    return () => { cancelled = true };
+    return () => {
+      cancelled = true;
+    };
   }, [merged.martinTilesUrl, baseLayerDefs, defaultBaseLayerId, initialCenter, initialZoom]);
 
   const htmlFallback = useMemo(
@@ -655,16 +654,20 @@ export default function MapContainer({
     // ReferenceError that crashes the Chromium WebView process and kills the
     // entire app. If postMessage fails, the command is simply dropped.
     if (!webViewRef.current) {
-      console.log('[MapContainer] send DROPPED (no ref):', command.method, JSON.stringify(command.args));
+      console.log(
+        "[MapContainer] send DROPPED (no ref):",
+        command.method,
+        JSON.stringify(command.args),
+      );
       return;
     }
     try {
-      console.log('[MapContainer] send OK:', command.method, JSON.stringify(command.args));
+      console.log("[MapContainer] send OK:", command.method, JSON.stringify(command.args));
       webViewRef.current.postMessage(JSON.stringify(command));
     } catch (_e) {
       // postMessage may fail if the WebView hasn't finished loading.
       // Retry on the next render — don't use injectJavaScript here.
-      console.log('[MapContainer] send THREW:', command.method);
+      console.log("[MapContainer] send THREW:", command.method);
     }
   }, []);
 
@@ -672,7 +675,7 @@ export default function MapContainer({
     // The WebView auto-initializes the map and posts `{type:'ready'}` to the
     // host as soon as OL finishes loading. The original `injectJavaScript`
     // init call was a no-op on the JS side and is no longer needed.
-    console.log('[MapContainer] onLoadEnd, replaying drawMode=', drawModeRef.current);
+    console.log("[MapContainer] onLoadEnd, replaying drawMode=", drawModeRef.current);
     initSentRef.current = true;
     // Replay any state changes that happened before the WebView finished
     // loading. The per-state useEffects gate on `initSentRef.current`, so
@@ -756,12 +759,7 @@ export default function MapContainer({
   useEffect(() => {
     if (!flyTo || !initSentRef.current) return;
     const last = lastFlyToRef.current;
-    if (
-      last &&
-      last.lon === flyTo.lon &&
-      last.lat === flyTo.lat &&
-      last.zoom === flyTo.zoom
-    )
+    if (last && last.lon === flyTo.lon && last.lat === flyTo.lat && last.zoom === flyTo.zoom)
       return;
     lastFlyToRef.current = flyTo;
     send({ method: "flyTo", args: { lon: flyTo.lon, lat: flyTo.lat, zoom: flyTo.zoom } });

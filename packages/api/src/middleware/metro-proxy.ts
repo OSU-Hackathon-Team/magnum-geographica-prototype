@@ -31,7 +31,10 @@ export function metroProxy(): MiddlewareHandler {
         headers: upstream.headers,
       });
     } catch {
-      return c.json({ error: "metro_unreachable", message: `could not reach Metro at ${METRO_URL}` }, 502);
+      return c.json(
+        { error: "metro_unreachable", message: `could not reach Metro at ${METRO_URL}` },
+        502,
+      );
     }
   };
 }

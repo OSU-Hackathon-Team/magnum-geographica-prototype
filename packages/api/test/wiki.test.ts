@@ -121,18 +121,15 @@ describe("POST /api/wiki-pages", () => {
 describe("PUT /api/wiki-pages/:id", () => {
   test("returns 404 for non-existent wiki page", async () => {
     state.wikiPages.length = 0;
-    const res = await buildApp().request(
-      `/api/wiki-pages/${WIKI_UUID}`,
-      {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title: "Updated",
-          content_md: "new content",
-          contributor_name: "editor",
-        }),
-      },
-    );
+    const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Updated",
+        content_md: "new content",
+        contributor_name: "editor",
+      }),
+    });
     expect(res.status).toBe(404);
   });
 
@@ -151,19 +148,16 @@ describe("PUT /api/wiki-pages/:id", () => {
     state.insertCalls.length = 0;
     state.updateCalls.length = 0;
 
-    const res = await buildApp().request(
-      `/api/wiki-pages/${WIKI_UUID}`,
-      {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title: "Updated Title",
-          content_md: "updated content",
-          contributor_name: "editor",
-          edit_summary: "Made edits",
-        }),
-      },
-    );
+    const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Updated Title",
+        content_md: "updated content",
+        contributor_name: "editor",
+        edit_summary: "Made edits",
+      }),
+    });
     expect(res.status).toBe(200);
     expect(state.updateCalls.length).toBeGreaterThanOrEqual(1);
   });
@@ -223,9 +217,7 @@ describe("GET /api/wiki-pages/:id/revisions", () => {
 describe("GET /api/wiki-pages/:id/revisions/:revId", () => {
   test("returns 404 for non-existent revision", async () => {
     state.revisions.length = 0;
-    const res = await buildApp().request(
-      `/api/wiki-pages/${WIKI_UUID}/revisions/${REV_UUID}`,
-    );
+    const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}/revisions/${REV_UUID}`);
     expect(res.status).toBe(404);
   });
 
@@ -240,9 +232,7 @@ describe("GET /api/wiki-pages/:id/revisions/:revId", () => {
       edit_summary: null,
       created_at: "2026-01-01T00:00:00.000Z",
     });
-    const res = await buildApp().request(
-      `/api/wiki-pages/${WIKI_UUID}/revisions/${REV_UUID}`,
-    );
+    const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}/revisions/${REV_UUID}`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { content_md: string };
     expect(body.content_md).toBe("old content");

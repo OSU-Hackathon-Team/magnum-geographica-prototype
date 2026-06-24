@@ -41,9 +41,7 @@ function toMultiLineStringWkt(geometry: unknown): string | null {
   }
 
   if (g.type === "LineString" && Array.isArray(g.coordinates)) {
-    const pts = (g.coordinates as number[][])
-      .map((p) => `${p[0]} ${p[1]}`)
-      .join(", ");
+    const pts = (g.coordinates as number[][]).map((p) => `${p[0]} ${p[1]}`).join(", ");
     if (!pts) return null;
     return `MULTILINESTRING((${pts}))`;
   }
@@ -51,11 +49,11 @@ function toMultiLineStringWkt(geometry: unknown): string | null {
   if (Array.isArray(g.coordinates) && g.coordinates.length > 0) {
     const first = (g.coordinates as unknown[])[0];
     if (Array.isArray(first) && Array.isArray((first as unknown[])[0])) {
-      const lines = ((g.coordinates as number[][][])
+      const lines = (g.coordinates as number[][][])
         .map((line) =>
           line.length >= 2 ? `(${line.map((p) => `${p[0]} ${p[1]}`).join(", ")})` : null,
         )
-        .filter((s): s is string => s !== null));
+        .filter((s): s is string => s !== null);
       if (lines.length === 0) return null;
       return `MULTILINESTRING(${lines.join(", ")})`;
     }
@@ -95,7 +93,8 @@ segmentDetailRoute.put("/:id", async (c) => {
   if (parsed.data.sort_order !== undefined) updates.sortOrder = parsed.data.sort_order;
   if (parsed.data.surface_type !== undefined) updates.surfaceType = parsed.data.surface_type;
   if (parsed.data.hazards !== undefined) updates.hazards = parsed.data.hazards;
-  if (parsed.data.is_road_connector !== undefined) updates.isRoadConnector = parsed.data.is_road_connector;
+  if (parsed.data.is_road_connector !== undefined)
+    updates.isRoadConnector = parsed.data.is_road_connector;
   if (parsed.data.steep_grade !== undefined) updates.steepGrade = parsed.data.steep_grade;
   if (parsed.data.one_way !== undefined) updates.oneWay = parsed.data.one_way;
   if (parsed.data.description !== undefined) updates.description = parsed.data.description;
@@ -177,7 +176,8 @@ trailSegmentsRoute.post("/:id/segments", async (c) => {
   if (parsed.data.sort_order !== undefined) insertValues.sortOrder = parsed.data.sort_order;
   if (parsed.data.surface_type !== undefined) insertValues.surfaceType = parsed.data.surface_type;
   if (parsed.data.hazards !== undefined) insertValues.hazards = parsed.data.hazards;
-  if (parsed.data.is_road_connector !== undefined) insertValues.isRoadConnector = parsed.data.is_road_connector;
+  if (parsed.data.is_road_connector !== undefined)
+    insertValues.isRoadConnector = parsed.data.is_road_connector;
   if (parsed.data.steep_grade !== undefined) insertValues.steepGrade = parsed.data.steep_grade;
   if (parsed.data.one_way !== undefined) insertValues.oneWay = parsed.data.one_way;
   if (parsed.data.description !== undefined) insertValues.description = parsed.data.description;
@@ -216,10 +216,7 @@ trailSegmentsRoute.post("/:id/segments/reorder", async (c) => {
     .where(eq(trailSegments.trailId, trailId));
   const existingIds = new Set(existing.map((r) => r.id));
 
-  if (
-    ordered_ids.length !== existingIds.size ||
-    !ordered_ids.every((id) => existingIds.has(id))
-  ) {
+  if (ordered_ids.length !== existingIds.size || !ordered_ids.every((id) => existingIds.has(id))) {
     return c.json(
       {
         error: "invalid_input",
@@ -388,10 +385,7 @@ trailSegmentsRoute.post("/:id/segments/merge", async (c) => {
   }
 
   if (a.isRoadConnector || b.isRoadConnector) {
-    return c.json(
-      { error: "invalid_input", message: "cannot merge road connectors" },
-      400,
-    );
+    return c.json({ error: "invalid_input", message: "cannot merge road connectors" }, 400);
   }
 
   const [lo, hi] = a.sortOrder < b.sortOrder ? [a, b] : [b, a];

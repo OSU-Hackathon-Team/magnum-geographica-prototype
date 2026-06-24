@@ -10,7 +10,9 @@ test("conflict page loads for a conflict ID", async ({ page }) => {
   await page.goto("/conflict/99999");
   // Dynamic routes in static export may not render via direct URL access.
   const visible = await page
-    .locator("[testid='conflict-screen'], [testid='conflict-loading'], [testid='conflict-not-found']")
+    .locator(
+      "[testid='conflict-screen'], [testid='conflict-loading'], [testid='conflict-not-found']",
+    )
     .first()
     .isVisible({ timeout: 10000 })
     .catch(() => false);

@@ -107,15 +107,13 @@ describe("resolveDefaultBaseLayerId", () => {
   });
 
   test("returns the requested id if present in layers", () => {
-    expect(
-      resolveDefaultBaseLayerId({ defaultBaseLayerId: SATELLITE_BASE_LAYER_ID }, layers),
-    ).toBe(SATELLITE_BASE_LAYER_ID);
+    expect(resolveDefaultBaseLayerId({ defaultBaseLayerId: SATELLITE_BASE_LAYER_ID }, layers)).toBe(
+      SATELLITE_BASE_LAYER_ID,
+    );
   });
 
   test("falls back to first layer if requested id is unknown", () => {
-    expect(resolveDefaultBaseLayerId({ defaultBaseLayerId: "bogus" }, layers)).toBe(
-      layers[0]!.id,
-    );
+    expect(resolveDefaultBaseLayerId({ defaultBaseLayerId: "bogus" }, layers)).toBe(layers[0]!.id);
   });
 
   test("falls back to first layer when layers is empty (defensive)", () => {

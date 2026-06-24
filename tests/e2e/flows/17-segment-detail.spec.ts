@@ -18,7 +18,9 @@ test("segment detail page loads by direct URL", async ({ page }) => {
   // Dynamic routes in static export may not render via direct URL access.
   // The test passes if the component mounts or gracefully doesn't.
   const visible = await page
-    .locator("[testid='segment-detail-seg-1'], [testid='segment-detail-loading'], [testid='segment-detail-not-found']")
+    .locator(
+      "[testid='segment-detail-seg-1'], [testid='segment-detail-loading'], [testid='segment-detail-not-found']",
+    )
     .first()
     .isVisible({ timeout: 10000 })
     .catch(() => false);

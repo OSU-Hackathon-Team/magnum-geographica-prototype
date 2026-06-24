@@ -21,7 +21,9 @@ test("unknown feature id shows the error state", async ({ page }) => {
   await expect(page.getByTestId("feature-detail-error")).toBeVisible();
 });
 
-test("tapping a feature card on a trail detail page navigates to feature detail", async ({ page }) => {
+test("tapping a feature card on a trail detail page navigates to feature detail", async ({
+  page,
+}) => {
   await page.goto("/trail/buckeye-trail");
 
   await page.getByTestId("trail-feature-f-1").click();

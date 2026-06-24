@@ -32,7 +32,9 @@ test("trail detail 'View on map' opens the explore map with deep-link coords", a
   await expect(page.getByTestId("explore-coords")).toBeVisible();
 });
 
-test("system detail 'View on map' opens the explore map with deep-link coords", async ({ page }) => {
+test("system detail 'View on map' opens the explore map with deep-link coords", async ({
+  page,
+}) => {
   await page.goto("/system/cuyahoga-valley-national-park");
 
   await expect(page.getByTestId("system-view-on-map")).toBeVisible();
@@ -43,7 +45,9 @@ test("system detail 'View on map' opens the explore map with deep-link coords", 
   await expect(page.getByTestId("explore-coords")).toBeVisible();
 });
 
-test("feature detail 'View on map' opens the explore map with deep-link coords", async ({ page }) => {
+test("feature detail 'View on map' opens the explore map with deep-link coords", async ({
+  page,
+}) => {
   await page.goto("/feature/f-1");
 
   await expect(page.getByTestId("feature-view-on-map")).toBeVisible();

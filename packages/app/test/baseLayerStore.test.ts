@@ -25,7 +25,7 @@ mock.module("@react-native-async-storage/async-storage", () => ({
 mock.module("react-native", () => ({
   Platform: { OS: "ios" },
   View: () => null,
-  StyleSheet: { create: <T,>(s: T): T => s },
+  StyleSheet: { create: <T>(s: T): T => s },
   Modal: () => null,
   Pressable: () => null,
   Text: () => null,
@@ -46,9 +46,8 @@ mock.module("@magnum/map", () => ({
 // Pull constants directly from the map package's shared/config subpath to
 // avoid loading the full @magnum/map index (which transitively imports RN
 // components). Same path is exported in packages/map/package.json#exports.
-const { SIMPLIFIED_BASE_LAYER_ID, SATELLITE_BASE_LAYER_ID } = await import(
-  "@magnum/map/shared/config"
-);
+const { SIMPLIFIED_BASE_LAYER_ID, SATELLITE_BASE_LAYER_ID } =
+  await import("@magnum/map/shared/config");
 const { useBaseLayerStore } = await import("../src/stores/baseLayerStore");
 
 const STORAGE_KEY = "magnum.baseLayer.v1";

@@ -50,7 +50,11 @@ wikiRoute.get("/", async (c) => {
   });
   if (!parsed.success) {
     return c.json(
-      { error: "invalid_input", message: "target_type and target_id required", details: parsed.error.flatten() },
+      {
+        error: "invalid_input",
+        message: "target_type and target_id required",
+        details: parsed.error.flatten(),
+      },
       400,
     );
   }
@@ -64,7 +68,10 @@ wikiRoute.get("/", async (c) => {
 
   const page = rows[0];
   if (!page) {
-    return c.json({ error: "not_found", message: `wiki page for ${target_type} ${target_id} not found` }, 404);
+    return c.json(
+      { error: "not_found", message: `wiki page for ${target_type} ${target_id} not found` },
+      404,
+    );
   }
   return c.json(page);
 });
@@ -153,7 +160,11 @@ wikiRoute.put("/:id", async (c) => {
       .limit(1);
     if (currentHead.length > 0 && currentHead[0] && currentHead[0].id !== base_revision_id) {
       return c.json(
-        { error: "conflict", message: "wiki page has been edited since", current_revision_id: currentHead[0].id },
+        {
+          error: "conflict",
+          message: "wiki page has been edited since",
+          current_revision_id: currentHead[0].id,
+        },
         409,
       );
     }

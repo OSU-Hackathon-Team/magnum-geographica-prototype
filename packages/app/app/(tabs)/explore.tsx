@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MapContainer, resolveBaseLayers } from "@magnum/map";
-import { createMagnumClient, type Feature as ApiFeature, type System, type Trail } from "@magnum/shared";
+import {
+  createMagnumClient,
+  type Feature as ApiFeature,
+  type System,
+  type Trail,
+} from "@magnum/shared";
 import { SearchBar } from "../../src/components/ui/SearchBar";
 import {
   SearchResultsDropdown,
@@ -13,10 +18,7 @@ import { DownloadAreaSheet } from "../../src/components/offline/DownloadAreaShee
 import { useMapStore } from "../../src/stores/mapStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useBaseLayerStore } from "../../src/stores/baseLayerStore";
-import {
-  loadOfflineMapData,
-  getDownloadedRegionIds,
-} from "../../src/services/offlineDataService";
+import { loadOfflineMapData, getDownloadedRegionIds } from "../../src/services/offlineDataService";
 import type { OfflineMapData } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -29,7 +31,9 @@ function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
 }
 
-function parseDeepLink(params: Partial<Record<"lat" | "lon" | "zoom", string | string[] | undefined>>): {
+function parseDeepLink(
+  params: Partial<Record<"lat" | "lon" | "zoom", string | string[] | undefined>>,
+): {
   lat: number;
   lon: number;
   zoom: number;
@@ -52,10 +56,7 @@ export default function ExploreScreen() {
   const isOnline = useOfflineStore((s) => s.isOnline);
   const offlineRegions = useOfflineStore((s) => s.offlineRegions);
   const baseLayerId = useBaseLayerStore((s) => s.baseLayerId);
-  const baseLayerDefs = useMemo(
-    () => resolveBaseLayers({ martinTilesUrl: MARTIN_URL }),
-    [],
-  );
+  const baseLayerDefs = useMemo(() => resolveBaseLayers({ martinTilesUrl: MARTIN_URL }), []);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -67,7 +68,12 @@ export default function ExploreScreen() {
   const [selectedSystem, setSelectedSystem] = useState<System | null>(null);
   const [systemLoading, setSystemLoading] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [drawBbox, setDrawBbox] = useState<{ minLon: number; minLat: number; maxLon: number; maxLat: number } | null>(null);
+  const [drawBbox, setDrawBbox] = useState<{
+    minLon: number;
+    minLat: number;
+    maxLon: number;
+    maxLat: number;
+  } | null>(null);
   const [showDownloadSheet, setShowDownloadSheet] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestRef = useRef(0);
@@ -112,10 +118,18 @@ export default function ExploreScreen() {
     const client = createMagnumClient(API_URL);
     client.raw
       .request<System>("GET", `/api/systems/by-slug/${selectedSystemSlug}`)
-      .then((s) => { if (!cancelled) setSelectedSystem(s); })
-      .catch(() => { if (!cancelled) setSelectedSystem(null); })
-      .finally(() => { if (!cancelled) setSystemLoading(false); });
-    return () => { cancelled = true };
+      .then((s) => {
+        if (!cancelled) setSelectedSystem(s);
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedSystem(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSystemLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSystemSlug]);
 
   // Load offline map data when offline with downloaded regions
@@ -131,7 +145,9 @@ export default function ExploreScreen() {
       const data = await loadOfflineMapData();
       if (!cancelled) setOfflineData(data);
     })();
-    return () => { cancelled = true };
+    return () => {
+      cancelled = true;
+    };
   }, [isOnline, offlineRegions]);
 
   // Search offline when disconnected
@@ -216,7 +232,11 @@ export default function ExploreScreen() {
   );
 
   const handleFeatureSelect = useCallback(
-    (selection: { id: string; layer: "trails" | "segments" | "systems" | "features" | "superSystems"; slug?: string | null }) => {
+    (selection: {
+      id: string;
+      layer: "trails" | "segments" | "systems" | "features" | "superSystems";
+      slug?: string | null;
+    }) => {
       if (selection.layer === "trails" && selection.slug) {
         router.push(`/trail/${selection.slug}` as never);
         return;
@@ -267,7 +287,7 @@ export default function ExploreScreen() {
     const region = offlineRegions[0];
     if (!region?.tilesPath) return null;
     return {
-      kind: region.baseLayerId === "satellite" ? "raster" as const : "mvt" as const,
+      kind: region.baseLayerId === "satellite" ? ("raster" as const) : ("mvt" as const),
       tilesPath: region.tilesPath,
       minZoom: region.minZoom,
       maxZoom: region.maxZoom,
@@ -345,10 +365,7 @@ export default function ExploreScreen() {
           drawMode={isDrawing}
           onDrawEnd={handleDrawEnd}
         />
-        <BaseLayerSwitcher
-          layers={baseLayerDefs}
-          testID="explore-base-layer-switcher"
-        />
+        <BaseLayerSwitcher layers={baseLayerDefs} testID="explore-base-layer-switcher" />
       </View>
 
       {deepLink ? (
@@ -365,7 +382,9 @@ export default function ExploreScreen() {
             <View style={styles.systemPopupHeader}>
               <View style={styles.systemPopupTitleRow}>
                 {selectedSystem?.color ? (
-                  <View style={[styles.systemColorDot, { backgroundColor: selectedSystem.color }]} />
+                  <View
+                    style={[styles.systemColorDot, { backgroundColor: selectedSystem.color }]}
+                  />
                 ) : null}
                 {systemLoading ? (
                   <ActivityIndicator size="small" />
@@ -407,9 +426,7 @@ export default function ExploreScreen() {
 
       {isPlacing ? (
         <View style={styles.placingBanner} testID="explore-placing-banner">
-          <Text style={styles.placingText}>
-            Tap on the map to place your feature
-          </Text>
+          <Text style={styles.placingText}>Tap on the map to place your feature</Text>
           <Pressable
             onPress={handleCancelPlacing}
             style={styles.placingCancel}
@@ -420,9 +437,7 @@ export default function ExploreScreen() {
         </View>
       ) : isDrawing ? (
         <View style={styles.placingBanner} testID="explore-draw-banner">
-          <Text style={styles.placingText}>
-            Drag to select download area
-          </Text>
+          <Text style={styles.placingText}>Drag to select download area</Text>
           <Pressable
             onPress={handleCancelDraw}
             style={styles.placingCancel}

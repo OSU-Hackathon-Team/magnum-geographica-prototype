@@ -53,7 +53,9 @@ export function MediaGallery({
                 </View>
               )}
               {item.caption ? (
-                <Text style={styles.caption} numberOfLines={1}>{item.caption}</Text>
+                <Text style={styles.caption} numberOfLines={1}>
+                  {item.caption}
+                </Text>
               ) : null}
             </Pressable>
           );

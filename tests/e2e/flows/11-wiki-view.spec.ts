@@ -12,7 +12,9 @@ test("wiki view page shows not-found when no wiki exists", async ({ page }) => {
   // The SPA fallback loads; if the component mounts, one of these states will be visible.
   // If none appears, the route's dynamic content requires client-side routing from the app shell.
   const visible = await page
-    .locator("[testid='wiki-page-not-found'], [testid='wiki-page-error'], [testid='wiki-page-loading'], [testid='wiki-page-screen']")
+    .locator(
+      "[testid='wiki-page-not-found'], [testid='wiki-page-error'], [testid='wiki-page-loading'], [testid='wiki-page-screen']",
+    )
     .first()
     .isVisible({ timeout: 15000 })
     .catch(() => false);

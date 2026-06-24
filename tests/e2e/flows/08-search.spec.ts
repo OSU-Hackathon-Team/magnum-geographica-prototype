@@ -47,7 +47,9 @@ test("the clear button dismisses results and resets the query", async ({ page })
   await page.goto("/explore");
 
   await page.getByTestId("explore-search").fill("cuyahoga");
-  await expect(page.getByTestId("search-result-system-cuyahoga-valley-national-park")).toBeVisible();
+  await expect(
+    page.getByTestId("search-result-system-cuyahoga-valley-national-park"),
+  ).toBeVisible();
 
   await page.getByTestId("explore-search-clear").click();
   await expect(page.getByTestId("search-results")).toHaveCount(0);

@@ -54,11 +54,7 @@ export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
       </Pressable>
 
       {open ? (
-        <Modal
-          transparent
-          animationType="fade"
-          onRequestClose={() => setOpen(false)}
-        >
+        <Modal transparent animationType="fade" onRequestClose={() => setOpen(false)}>
           <Pressable
             style={styles.backdrop}
             onPress={() => setOpen(false)}

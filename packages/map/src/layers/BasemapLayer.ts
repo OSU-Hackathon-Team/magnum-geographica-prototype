@@ -32,12 +32,7 @@ function styleWater(): Style {
 function styleRoad(highway: string | null | undefined): Style {
   const key = (highway ?? "").toLowerCase();
   const color = ROAD_COLORS[key] ?? "#c2bcae";
-  const width =
-    key === "motorway" || key === "trunk"
-      ? 1.6
-      : key === "primary"
-        ? 1.3
-        : 1.0;
+  const width = key === "motorway" || key === "trunk" ? 1.6 : key === "primary" ? 1.3 : 1.0;
   return new Style({ stroke: new Stroke({ color, width }) });
 }
 
@@ -69,7 +64,10 @@ const SIMPLIFIED_SOURCE_MAXZOOM = 14;
 
 export function createBaseLayer(def: BaseLayerDef): BaseLayer {
   if (def.kind === "raster") {
-    const sourceMaxZoom = Math.min(def.maxZoom ?? SATELLITE_SOURCE_MAXZOOM, SATELLITE_SOURCE_MAXZOOM);
+    const sourceMaxZoom = Math.min(
+      def.maxZoom ?? SATELLITE_SOURCE_MAXZOOM,
+      SATELLITE_SOURCE_MAXZOOM,
+    );
     const layer = new TileLayer({
       source: new XYZ({ url: def.url, crossOrigin: "anonymous", maxZoom: sourceMaxZoom }),
       minZoom: def.minZoom,
@@ -80,7 +78,10 @@ export function createBaseLayer(def: BaseLayerDef): BaseLayer {
     }
     return layer;
   }
-  const sourceMaxZoom = Math.min(def.maxZoom ?? SIMPLIFIED_SOURCE_MAXZOOM, SIMPLIFIED_SOURCE_MAXZOOM);
+  const sourceMaxZoom = Math.min(
+    def.maxZoom ?? SIMPLIFIED_SOURCE_MAXZOOM,
+    SIMPLIFIED_SOURCE_MAXZOOM,
+  );
   const layer = new VectorTileLayer({
     source: new VectorTileSource({
       format: new MVT(),

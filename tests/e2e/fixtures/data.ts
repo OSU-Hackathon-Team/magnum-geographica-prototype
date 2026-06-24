@@ -17,7 +17,8 @@ export const SYSTEMS = [
     id: "sys-2",
     name: "Cuyahoga Valley National Park",
     slug: "cuyahoga-valley-national-park",
-    description: "A national park between Cleveland and Akron with the Ohio & Erie Canal Towpath Trail.",
+    description:
+      "A national park between Cleveland and Akron with the Ohio & Erie Canal Towpath Trail.",
     external_url: "https://www.nps.gov/cuva/",
     ownership_source: "NPS",
     source_date: "2024-01-01",
@@ -211,7 +212,7 @@ export const FEATURES: Record<string, unknown> = {
   },
 };
 
-export const TRAILS_BY_SYSTEM: Record<string, typeof TRAILS[number][]> = {
+export const TRAILS_BY_SYSTEM: Record<string, (typeof TRAILS)[number][]> = {
   "sys-1": [TRAILS[0], TRAILS[2]],
   "sys-2": [TRAILS[1]],
   "sys-3": [],

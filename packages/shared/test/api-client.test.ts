@@ -81,11 +81,12 @@ describe("ApiClient", () => {
   test("throws ApiClientError with parsed body on non-2xx", async () => {
     const client = new ApiClient({
       baseUrl: "http://api.test",
-      fetch: makeFetch(() =>
-        new Response(JSON.stringify({ error: "bad", message: "nope" }), {
-          status: 400,
-          headers: { "content-type": "application/json" },
-        }),
+      fetch: makeFetch(
+        () =>
+          new Response(JSON.stringify({ error: "bad", message: "nope" }), {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          }),
       ),
     });
 

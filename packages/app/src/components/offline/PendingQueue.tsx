@@ -45,7 +45,13 @@ export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQue
     <View style={styles.container} testID="pending-queue">
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Pending Changes ({items.length})</Text>
-        <Button variant="primary" size="small" onPress={onSyncAll} disabled={syncing} testID="pending-sync-all">
+        <Button
+          variant="primary"
+          size="small"
+          onPress={onSyncAll}
+          disabled={syncing}
+          testID="pending-sync-all"
+        >
           {syncing ? "Syncing..." : "Sync All"}
         </Button>
       </View>
@@ -54,7 +60,16 @@ export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQue
         <View key={item.id} style={styles.itemRow} testID={`pending-item-${item.id}`}>
           <View style={styles.itemInfo}>
             <View style={styles.badgeRow}>
-              <View style={[styles.actionBadge, item.action === "create" ? styles.createBadge : item.action === "update" ? styles.updateBadge : styles.deleteBadge]}>
+              <View
+                style={[
+                  styles.actionBadge,
+                  item.action === "create"
+                    ? styles.createBadge
+                    : item.action === "update"
+                      ? styles.updateBadge
+                      : styles.deleteBadge,
+                ]}
+              >
                 <Text style={styles.actionText}>{item.action}</Text>
               </View>
               <Text style={styles.entityType}>{item.entity_type}</Text>
@@ -68,9 +83,7 @@ export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQue
                 <Button
                   variant="primary"
                   size="small"
-                  onPress={() =>
-                    router.push(`/conflict/${item.id}` as never)
-                  }
+                  onPress={() => router.push(`/conflict/${item.id}` as never)}
                   testID={`pending-resolve-${item.id}`}
                 >
                   Resolve
@@ -78,7 +91,12 @@ export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQue
               </View>
             ) : null}
           </View>
-          <Button variant="ghost" size="small" onPress={() => onDelete(item.id)} testID={`pending-delete-${item.id}`}>
+          <Button
+            variant="ghost"
+            size="small"
+            onPress={() => onDelete(item.id)}
+            testID={`pending-delete-${item.id}`}
+          >
             <Ionicons name="close-outline" size={14} color="#888" />
           </Button>
         </View>
@@ -114,5 +132,10 @@ const styles = StyleSheet.create({
   entityType: { fontSize: 12, color: "#666" },
   meta: { fontSize: 11, color: "#999" },
   conflict: { fontSize: 11, color: "#ef4444" },
-  conflictRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  conflictRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
 });

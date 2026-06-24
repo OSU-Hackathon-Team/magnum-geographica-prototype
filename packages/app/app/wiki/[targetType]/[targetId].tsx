@@ -4,7 +4,10 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-nat
 import { createMagnumClient, type WikiPage, type Revision, type Citation } from "@magnum/shared";
 import { WikiPageView } from "../../../src/components/wiki/WikiPageView";
 import { useOfflineStore } from "../../../src/stores/offlineStore";
-import { getWikiPage as getLocalWikiPage, getWikiRevisions } from "../../../src/services/offlineDataService";
+import {
+  getWikiPage as getLocalWikiPage,
+  getWikiRevisions,
+} from "../../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -21,7 +24,8 @@ export default function WikiPageScreen() {
   const isOnline = useOfflineStore((s) => s.isOnline);
 
   const loadLocal = useCallback(async () => {
-    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string") return;
+    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string")
+      return;
     try {
       const local = await getLocalWikiPage(targetType, targetId);
       if (local) {
@@ -66,7 +70,8 @@ export default function WikiPageScreen() {
 
   useEffect(() => {
     if (!isOnline) return;
-    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string") return;
+    if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string")
+      return;
     const client = createMagnumClient(API_URL);
     client
       .getWikiPage(targetType, targetId)
@@ -74,15 +79,24 @@ export default function WikiPageScreen() {
         setNotFound(false);
         setWikiPage(page);
         const [revsRes, citesRes] = await Promise.all([
-          client.listWikiPageRevisions(page.id).catch(() => ({ items: [] as Revision[], total: 0, page: 1, pageSize: 20 })),
-          client.listWikiPageCitations(page.id).catch(() => ({ items: [] as Citation[], total: 0 })),
+          client
+            .listWikiPageRevisions(page.id)
+            .catch(() => ({ items: [] as Revision[], total: 0, page: 1, pageSize: 20 })),
+          client
+            .listWikiPageCitations(page.id)
+            .catch(() => ({ items: [] as Citation[], total: 0 })),
         ]);
         setRevisionCount(revsRes.total);
         setCitationCount(citesRes.total);
         setLastRevision(revsRes.items[0] ?? null);
       })
       .catch((e: unknown) => {
-        if (e && typeof e === "object" && "status" in e && (e as { status: number }).status === 404) {
+        if (
+          e &&
+          typeof e === "object" &&
+          "status" in e &&
+          (e as { status: number }).status === 404
+        ) {
           if (!wikiPage) setNotFound(true);
         } else {
           if (!wikiPage) setError(e instanceof Error ? e.message : "Failed to load");

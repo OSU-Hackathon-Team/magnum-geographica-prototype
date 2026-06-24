@@ -2,10 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { createMagnumClient } from "@magnum/shared";
-import {
-  FeatureForm,
-  type FeatureFormData,
-} from "../../src/components/feature/FeatureForm";
+import { FeatureForm, type FeatureFormData } from "../../src/components/feature/FeatureForm";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useAuthStore } from "../../src/stores/authStore";
 import { addPendingContribution, getPendingCount } from "../../src/services/offlineDataService";
@@ -44,12 +41,7 @@ export default function CreateFeatureScreen() {
 
     if (!isOnline) {
       try {
-        await addPendingContribution(
-          "feature",
-          "create",
-          payload,
-          contributorName || "anonymous",
-        );
+        await addPendingContribution("feature", "create", payload, contributorName || "anonymous");
         const newCount = await getPendingCount();
         setPendingCount(newCount);
         router.back();
@@ -69,7 +61,12 @@ export default function CreateFeatureScreen() {
       const msg = e instanceof Error ? e.message : "Failed to create feature";
       if (/network|fetch|timeout/i.test(msg)) {
         try {
-          await addPendingContribution("feature", "create", payload, contributorName || "anonymous");
+          await addPendingContribution(
+            "feature",
+            "create",
+            payload,
+            contributorName || "anonymous",
+          );
           const newCount = await getPendingCount();
           setPendingCount(newCount);
           router.back();

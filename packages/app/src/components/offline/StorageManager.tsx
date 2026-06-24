@@ -65,7 +65,8 @@ export function StorageManager({ onDeleteRegion }: StorageManagerProps) {
             <View style={styles.regionInfo}>
               <Text style={styles.regionName}>{region.name}</Text>
               <Text style={styles.regionDetail}>
-                {region.baseLayerId} · z{region.minZoom}–{region.maxZoom} · {region.totalTiles} tiles
+                {region.baseLayerId} · z{region.minZoom}–{region.maxZoom} · {region.totalTiles}{" "}
+                tiles
               </Text>
               <Text style={styles.regionSize}>
                 {formatSize(region.tileSizeBytes + region.geojsonSizeBytes + region.wikiSizeBytes)}

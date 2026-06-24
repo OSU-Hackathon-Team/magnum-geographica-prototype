@@ -37,13 +37,17 @@ export function Button({
       testID={testID}
     >
       {typeof children === "string" ? (
-        <Text style={[styles.text, styles[`${variant}Text` as const], styles[`${size}Text` as const]]}>
+        <Text
+          style={[styles.text, styles[`${variant}Text` as const], styles[`${size}Text` as const]]}
+        >
           {children}
         </Text>
       ) : children !== undefined ? (
         children
       ) : (
-        <Text style={[styles.text, styles[`${variant}Text` as const], styles[`${size}Text` as const]]}>
+        <Text
+          style={[styles.text, styles[`${variant}Text` as const], styles[`${size}Text` as const]]}
+        >
           {title}
         </Text>
       )}

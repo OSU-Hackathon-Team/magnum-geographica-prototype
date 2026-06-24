@@ -15,12 +15,10 @@ const originalFetch = globalThis.fetch;
 mock.module("globalThis.fetch", () => ({
   default: async () => new Response(new Uint8Array([0]), { status: 200 }),
 }));
-globalThis.fetch = (async () =>
-  new Response(new Uint8Array([0]), { status: 200 })) as typeof fetch;
+globalThis.fetch = (async () => new Response(new Uint8Array([0]), { status: 200 })) as typeof fetch;
 
-const { generateBboxPack, uuidInClause, buildTar } = await import(
-  "../src/services/offline-pack.js"
-);
+const { generateBboxPack, uuidInClause, buildTar } =
+  await import("../src/services/offline-pack.js");
 const { sql } = await import("drizzle-orm");
 
 /**
@@ -258,9 +256,9 @@ describe("generateBboxPack — wiki query robustness", () => {
       wikiPages: 0,
     });
     // No wiki_pages query should have been issued at all.
-    expect(
-      state.executeCalls.some((c) => c.sql.toLowerCase().includes("from wiki_pages")),
-    ).toBe(false);
+    expect(state.executeCalls.some((c) => c.sql.toLowerCase().includes("from wiki_pages"))).toBe(
+      false,
+    );
   });
 
   test("issues wiki_pages query with parameterized UUIDs when all entity lists are populated", async () => {

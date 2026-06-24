@@ -48,7 +48,10 @@ systemsRoute.get("/", async (c) => {
 
   const [items, totalRow] = await Promise.all([
     db.select(baseSystemSelect).from(systems).where(where).limit(pageSize).offset(offset),
-    db.select({ count: sql<number>`count(*)::int` }).from(systems).where(where),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(systems)
+      .where(where),
   ]);
 
   return c.json({ items, total: totalRow[0]?.count ?? 0, page, pageSize });

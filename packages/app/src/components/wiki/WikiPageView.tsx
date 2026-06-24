@@ -3,9 +3,15 @@ import { Ionicons } from "@expo/vector-icons";
 import type { WikiPage, Revision } from "@magnum/shared";
 import { Button } from "../ui/Button";
 
-function renderMarkdown(md: string): Array<{ type: "h1" | "h2" | "h3" | "p" | "li" | "hr"; text: string; url?: string }> {
+function renderMarkdown(
+  md: string,
+): Array<{ type: "h1" | "h2" | "h3" | "p" | "li" | "hr"; text: string; url?: string }> {
   const lines = md.split("\n");
-  const blocks: Array<{ type: "h1" | "h2" | "h3" | "p" | "li" | "hr"; text: string; url?: string }> = [];
+  const blocks: Array<{
+    type: "h1" | "h2" | "h3" | "p" | "li" | "hr";
+    text: string;
+    url?: string;
+  }> = [];
   let buf = "";
 
   function flush() {
@@ -44,8 +50,14 @@ function renderMarkdown(md: string): Array<{ type: "h1" | "h2" | "h3" | "p" | "l
   return blocks;
 }
 
-function renderInline(text: string): Array<{ type: "text" | "bold" | "italic" | "code" | "link"; text: string; url?: string }> {
-  const parts: Array<{ type: "text" | "bold" | "italic" | "code" | "link"; text: string; url?: string }> = [];
+function renderInline(
+  text: string,
+): Array<{ type: "text" | "bold" | "italic" | "code" | "link"; text: string; url?: string }> {
+  const parts: Array<{
+    type: "text" | "bold" | "italic" | "code" | "link";
+    text: string;
+    url?: string;
+  }> = [];
   let i = 0;
   let current = "";
 
@@ -103,7 +115,11 @@ function renderInline(text: string): Array<{ type: "text" | "bold" | "italic" | 
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    return new Date(iso).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   } catch {
     return iso;
   }
@@ -134,26 +150,37 @@ export function WikiPageView({
     <View style={styles.container}>
       {compact ? null : (
         <View style={styles.header}>
-          <Text style={styles.title} testID="wiki-page-title">{wikiPage.title}</Text>
+          <Text style={styles.title} testID="wiki-page-title">
+            {wikiPage.title}
+          </Text>
           <View style={styles.metaRow}>
             <Text style={styles.meta} testID="wiki-page-meta">
               Updated {formatDate(wikiPage.updated_at)}
             </Text>
             {lastRevision ? (
               <Text style={styles.meta} testID="wiki-page-contributor">
-                {" "}· by {lastRevision.contributor_name}
+                {" "}
+                · by {lastRevision.contributor_name}
               </Text>
             ) : null}
           </View>
           <View style={styles.actionRow}>
             {revisionCount > 0 ? (
-              <Pressable onPress={onViewHistory} testID="wiki-view-history" style={styles.actionBtn}>
+              <Pressable
+                onPress={onViewHistory}
+                testID="wiki-view-history"
+                style={styles.actionBtn}
+              >
                 <Ionicons name="time-outline" size={12} color="#666" />
-                <Text style={styles.actionText}>{revisionCount} revision{revisionCount !== 1 ? "s" : ""}</Text>
+                <Text style={styles.actionText}>
+                  {revisionCount} revision{revisionCount !== 1 ? "s" : ""}
+                </Text>
               </Pressable>
             ) : null}
             {citationCount > 0 ? (
-              <Text style={styles.actionText} testID="wiki-citation-count">{citationCount} citation{citationCount !== 1 ? "s" : ""}</Text>
+              <Text style={styles.actionText} testID="wiki-citation-count">
+                {citationCount} citation{citationCount !== 1 ? "s" : ""}
+              </Text>
             ) : null}
             {onEdit ? (
               <Button variant="primary" size="small" onPress={onEdit} testID="wiki-edit-button">
@@ -166,22 +193,25 @@ export function WikiPageView({
 
       <View style={styles.content} testID="wiki-page-content">
         {blocks.length === 0 ? (
-          <Text style={styles.empty} testID="wiki-page-empty">No content yet. Tap Edit to add information.</Text>
+          <Text style={styles.empty} testID="wiki-page-empty">
+            No content yet. Tap Edit to add information.
+          </Text>
         ) : (
           blocks.map((block, idx) => {
             if (block.type === "hr") {
               return <View key={idx} style={styles.hr} />;
             }
             const inline = renderInline(block.text);
-            const baseStyle = block.type === "h1"
-              ? styles.h1
-              : block.type === "h2"
-                ? styles.h2
-                : block.type === "h3"
-                  ? styles.h3
-                  : block.type === "li"
-                    ? styles.li
-                    : styles.p;
+            const baseStyle =
+              block.type === "h1"
+                ? styles.h1
+                : block.type === "h2"
+                  ? styles.h2
+                  : block.type === "h3"
+                    ? styles.h3
+                    : block.type === "li"
+                      ? styles.li
+                      : styles.p;
             return (
               <Text key={idx} style={baseStyle}>
                 {block.type === "li" ? "· " : null}
@@ -197,9 +227,24 @@ export function WikiPageView({
                       </Text>
                     );
                   }
-                  if (p.type === "bold") return <Text key={i} style={{ fontWeight: "700" }}>{p.text}</Text>;
-                  if (p.type === "italic") return <Text key={i} style={{ fontStyle: "italic" }}>{p.text}</Text>;
-                  if (p.type === "code") return <Text key={i} style={{ fontFamily: "monospace", backgroundColor: "#f1f1f1" }}>{p.text}</Text>;
+                  if (p.type === "bold")
+                    return (
+                      <Text key={i} style={{ fontWeight: "700" }}>
+                        {p.text}
+                      </Text>
+                    );
+                  if (p.type === "italic")
+                    return (
+                      <Text key={i} style={{ fontStyle: "italic" }}>
+                        {p.text}
+                      </Text>
+                    );
+                  if (p.type === "code")
+                    return (
+                      <Text key={i} style={{ fontFamily: "monospace", backgroundColor: "#f1f1f1" }}>
+                        {p.text}
+                      </Text>
+                    );
                   return <Text key={i}>{p.text}</Text>;
                 })}
               </Text>

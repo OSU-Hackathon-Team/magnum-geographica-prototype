@@ -42,7 +42,10 @@ app.all("*", metroProxy());
 
 app.onError((err, c) => {
   console.error("api error:", err);
-  return c.json({ error: "internal", message: err instanceof Error ? err.message : String(err) }, 500);
+  return c.json(
+    { error: "internal", message: err instanceof Error ? err.message : String(err) },
+    500,
+  );
 });
 
 const port = Number(process.env.API_PORT ?? 3000);

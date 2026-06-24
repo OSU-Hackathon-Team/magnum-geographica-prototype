@@ -16,7 +16,9 @@ tilesRoute.get("/system/:systemId/trails.geojson", async (c) => {
       name: trails.name,
       slug: trails.slug,
       difficulty: trails.difficulty,
-      surface_type: sql<string | null>`(SELECT ts.surface_type FROM trail_segments ts WHERE ts.trail_id = ${trails.id} ORDER BY ts.sort_order LIMIT 1)`,
+      surface_type: sql<
+        string | null
+      >`(SELECT ts.surface_type FROM trail_segments ts WHERE ts.trail_id = ${trails.id} ORDER BY ts.sort_order LIMIT 1)`,
       length_meters: trails.lengthMeters,
       geometry: sql<string>`ST_AsGeoJSON(COALESCE(${trails.geometry}, ST_GeomFromText('POINT EMPTY', 4326)))`,
     })
@@ -75,4 +77,3 @@ function toFeatureCollection(rows: Array<{ id: string; geometry: string; [k: str
     }),
   };
 }
-

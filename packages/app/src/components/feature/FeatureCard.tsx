@@ -32,7 +32,9 @@ export function FeatureCard({
               <Text style={styles.name}>{name}</Text>
             </View>
             {description ? (
-              <Text style={styles.desc} numberOfLines={2}>{description}</Text>
+              <Text style={styles.desc} numberOfLines={2}>
+                {description}
+              </Text>
             ) : null}
           </View>
           {rightElement}

@@ -20,10 +20,7 @@ export const superSystemSchema = z.object({
   updated_at: isoDateSchema,
 });
 
-export const centerSchema = z
-  .object({ lat: z.number(), lon: z.number() })
-  .nullable()
-  .optional();
+export const centerSchema = z.object({ lat: z.number(), lon: z.number() }).nullable().optional();
 
 export const systemSchema = z.object({
   id: uuidSchema,
@@ -163,12 +160,31 @@ export const pendingContributionSchema = z.object({
 });
 
 export const createSystemInputSchema = systemSchema
-  .pick({ name: true, slug: true, description: true, external_url: true, ownership_source: true, source_date: true })
+  .pick({
+    name: true,
+    slug: true,
+    description: true,
+    external_url: true,
+    ownership_source: true,
+    source_date: true,
+  })
   .partial({ description: true, external_url: true, ownership_source: true, source_date: true });
 
 export const createTrailInputSchema = trailSchema
-  .pick({ name: true, slug: true, description: true, difficulty: true, length_meters: true, elevation_gain_meters: true })
-  .partial({ description: true, difficulty: true, length_meters: true, elevation_gain_meters: true });
+  .pick({
+    name: true,
+    slug: true,
+    description: true,
+    difficulty: true,
+    length_meters: true,
+    elevation_gain_meters: true,
+  })
+  .partial({
+    description: true,
+    difficulty: true,
+    length_meters: true,
+    elevation_gain_meters: true,
+  });
 
 export const createFeatureInputSchema = featureSchema.pick({
   name: true,
@@ -291,17 +307,19 @@ export const mediaListResponseSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
-export const bboxDownloadRequestSchema = z.object({
-  minLon: z.number().min(-180).max(180),
-  minLat: z.number().min(-90).max(90),
-  maxLon: z.number().min(-180).max(180),
-  maxLat: z.number().min(-90).max(90),
-  baseLayerId: z.string().min(1).max(60),
-  minZoom: z.number().int().min(0).max(18),
-  maxZoom: z.number().int().min(0).max(18),
-}).refine((d) => d.minLon < d.maxLon && d.minLat < d.maxLat && d.minZoom <= d.maxZoom, {
-  message: "min must be less than max for lon, lat, and zoom",
-});
+export const bboxDownloadRequestSchema = z
+  .object({
+    minLon: z.number().min(-180).max(180),
+    minLat: z.number().min(-90).max(90),
+    maxLon: z.number().min(-180).max(180),
+    maxLat: z.number().min(-90).max(90),
+    baseLayerId: z.string().min(1).max(60),
+    minZoom: z.number().int().min(0).max(18),
+    maxZoom: z.number().int().min(0).max(18),
+  })
+  .refine((d) => d.minLon < d.maxLon && d.minLat < d.maxLat && d.minZoom <= d.maxZoom, {
+    message: "min must be less than max for lon, lat, and zoom",
+  });
 
 export const bboxInfoResponseSchema = z.object({
   tileCount: z.number().int().nonnegative(),

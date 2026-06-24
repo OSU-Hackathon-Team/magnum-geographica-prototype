@@ -5,7 +5,9 @@ test.beforeEach(async ({ page }) => {
   await installApiMock(page);
 });
 
-test("map canvas is NOT recreated when returning to explore via 'View on map'", async ({ page }) => {
+test("map canvas is NOT recreated when returning to explore via 'View on map'", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page.getByTestId("explore-screen")).toBeVisible();
   const canvas = page.locator('[data-testid="explore-map"] canvas');
@@ -23,7 +25,9 @@ test("map canvas is NOT recreated when returning to explore via 'View on map'", 
   await page.waitForTimeout(600);
 
   await expect(canvas).toHaveCount(1);
-  const marker = await canvas.first().evaluate((el) => (el as HTMLElement).dataset.reproMarker ?? null);
+  const marker = await canvas
+    .first()
+    .evaluate((el) => (el as HTMLElement).dataset.reproMarker ?? null);
   expect(marker).toBe("original");
 });
 
@@ -57,11 +61,15 @@ test("map canvas is NOT recreated by plain re-renders (typing in search)", async
   await page.waitForTimeout(200);
 
   await expect(canvas).toHaveCount(1);
-  const marker = await canvas.first().evaluate((el) => (el as HTMLElement).dataset.reproMarker ?? null);
+  const marker = await canvas
+    .first()
+    .evaluate((el) => (el as HTMLElement).dataset.reproMarker ?? null);
   expect(marker).toBe("orig2");
 });
 
-test("zooming after a deep link does NOT snap the camera back to the deep-link position", async ({ page }) => {
+test("zooming after a deep link does NOT snap the camera back to the deep-link position", async ({
+  page,
+}) => {
   // Arrive via a deep link (sets flyTo target).
   await page.goto("/explore?lat=39.4301&lon=-82.5404&zoom=10");
   await expect(page.getByTestId("explore-screen")).toBeVisible();
@@ -73,8 +81,8 @@ test("zooming after a deep link does NOT snap the camera back to the deep-link p
   // controls); use .first() to get the map canvas container.
   const container = page.locator('[data-testid="explore-map"] > div').first();
   await expect(container).toHaveAttribute("data-map-zoom", /.+/, { timeout: 10_000 });
-  const zoomBefore = parseFloat(await container.getAttribute("data-map-zoom") ?? "0");
-  const centerBefore = await container.getAttribute("data-map-center") ?? "";
+  const zoomBefore = parseFloat((await container.getAttribute("data-map-zoom")) ?? "0");
+  const centerBefore = (await container.getAttribute("data-map-center")) ?? "";
 
   // Zoom in via mouse wheel over the map center.
   const box = await canvas.boundingBox();
@@ -86,8 +94,8 @@ test("zooming after a deep link does NOT snap the camera back to the deep-link p
   // The zoom should have increased, and the center should NOT have snapped
   // back to the deep-link coords (39.4301, -82.5404).
   await expect(container).toHaveAttribute("data-map-zoom", /.+/);
-  const zoomAfter = parseFloat(await container.getAttribute("data-map-zoom") ?? "0");
-  const centerAfter = await container.getAttribute("data-map-center") ?? "";
+  const zoomAfter = parseFloat((await container.getAttribute("data-map-zoom")) ?? "0");
+  const centerAfter = (await container.getAttribute("data-map-center")) ?? "";
 
   expect(zoomAfter).toBeGreaterThan(zoomBefore);
   // Center may shift slightly during zoom-to-cursor, but it must NOT snap back

@@ -13,7 +13,9 @@ export interface StoredTrail {
 
 export async function getDownloadedSystems() {
   const db = await getOfflineDb();
-  return db.exec("SELECT system_id, system_name, tile_size_bytes, geojson_size_bytes, wiki_size_bytes, generated_at, last_synced FROM downloaded_packs");
+  return db.exec(
+    "SELECT system_id, system_name, tile_size_bytes, geojson_size_bytes, wiki_size_bytes, generated_at, last_synced FROM downloaded_packs",
+  );
 }
 
 export async function isSystemDownloaded(systemId: string): Promise<boolean> {
@@ -68,16 +70,19 @@ export async function getTrailSegments(trailId: string) {
   return db.exec("SELECT * FROM trail_segments WHERE trail_id = ? ORDER BY sort_order", [trailId]);
 }
 
-export async function updateLocalSegment(segmentId: string, fields: {
-  name?: string | null;
-  surface_type?: string | null;
-  hazards?: string[];
-  is_road_connector?: boolean;
-  steep_grade?: boolean;
-  one_way?: boolean;
-  description?: string | null;
-  sort_order?: number;
-}) {
+export async function updateLocalSegment(
+  segmentId: string,
+  fields: {
+    name?: string | null;
+    surface_type?: string | null;
+    hazards?: string[];
+    is_road_connector?: boolean;
+    steep_grade?: boolean;
+    one_way?: boolean;
+    description?: string | null;
+    sort_order?: number;
+  },
+) {
   const db = await getOfflineDb();
   const sets: string[] = [];
   const params: (string | number)[] = [];
@@ -170,19 +175,18 @@ export async function getSystemFeatures(systemId: string) {
 
 export async function getWikiPage(targetType: string, targetId: string) {
   const db = await getOfflineDb();
-  const rows = await db.exec(
-    "SELECT * FROM wiki_pages WHERE target_type = ? AND target_id = ?",
-    [targetType, targetId],
-  );
+  const rows = await db.exec("SELECT * FROM wiki_pages WHERE target_type = ? AND target_id = ?", [
+    targetType,
+    targetId,
+  ]);
   return rows[0] ?? null;
 }
 
 export async function getWikiRevisions(wikiPageId: string) {
   const db = await getOfflineDb();
-  return db.exec(
-    "SELECT * FROM revisions WHERE wiki_page_id = ? ORDER BY created_at DESC",
-    [wikiPageId],
-  );
+  return db.exec("SELECT * FROM revisions WHERE wiki_page_id = ? ORDER BY created_at DESC", [
+    wikiPageId,
+  ]);
 }
 
 export async function searchOffline(query: string) {
@@ -206,17 +210,26 @@ export async function searchOffline(query: string) {
 export async function removeDownloadedPack(systemId: string) {
   const db = await getOfflineDb();
   await db.execRaw("DELETE FROM trail_systems WHERE system_id = ?", [systemId]);
-  await db.execRaw("DELETE FROM trail_segments WHERE trail_id IN (SELECT id FROM trails WHERE id IN (SELECT trail_id FROM trail_systems))");
-  await db.execRaw("DELETE FROM trails WHERE id IN (SELECT trail_id FROM trail_systems WHERE system_id = ?)", [systemId]);
+  await db.execRaw(
+    "DELETE FROM trail_segments WHERE trail_id IN (SELECT id FROM trails WHERE id IN (SELECT trail_id FROM trail_systems))",
+  );
+  await db.execRaw(
+    "DELETE FROM trails WHERE id IN (SELECT trail_id FROM trail_systems WHERE system_id = ?)",
+    [systemId],
+  );
   await db.execRaw("DELETE FROM features WHERE system_id = ?", [systemId]);
-  await db.execRaw("DELETE FROM wiki_pages WHERE target_type = 'system' AND target_id = ?", [systemId]);
+  await db.execRaw("DELETE FROM wiki_pages WHERE target_type = 'system' AND target_id = ?", [
+    systemId,
+  ]);
   await db.execRaw("DELETE FROM systems WHERE id = ?", [systemId]);
   await db.execRaw("DELETE FROM downloaded_packs WHERE system_id = ?", [systemId]);
 }
 
 export async function getTotalDownloadedSize(): Promise<number> {
   const db = await getOfflineDb();
-  const rows = await db.exec("SELECT COALESCE(SUM(tile_size_bytes + geojson_size_bytes + wiki_size_bytes), 0) as total FROM downloaded_packs");
+  const rows = await db.exec(
+    "SELECT COALESCE(SUM(tile_size_bytes + geojson_size_bytes + wiki_size_bytes), 0) as total FROM downloaded_packs",
+  );
   return Number(rows[0]?.total ?? 0);
 }
 
@@ -231,7 +244,14 @@ export async function addPendingContribution(
   await db.execRaw(
     `INSERT INTO pending_contributions (entity_type, entity_id, action, payload, contributor_name, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [entityType, entityId ?? null, action, JSON.stringify(payload), contributorName, new Date().toISOString()],
+    [
+      entityType,
+      entityId ?? null,
+      action,
+      JSON.stringify(payload),
+      contributorName,
+      new Date().toISOString(),
+    ],
   );
 }
 
@@ -253,16 +273,18 @@ export async function getPendingContributions(): Promise<PendingContributionRow[
   const rows = await db.exec(
     "SELECT * FROM pending_contributions WHERE sync_status = 'pending' ORDER BY created_at",
   );
-  return rows.map((r): PendingContributionRow => ({
-    id: Number(r.id),
-    entity_type: String(r.entity_type ?? ""),
-    entity_id: r.entity_id ? String(r.entity_id) : null,
-    action: String(r.action ?? ""),
-    payload: JSON.parse(String(r.payload)),
-    contributor_name: String(r.contributor_name ?? "anonymous"),
-    created_at: String(r.created_at ?? ""),
-    sync_status: String(r.sync_status ?? "pending"),
-  }));
+  return rows.map(
+    (r): PendingContributionRow => ({
+      id: Number(r.id),
+      entity_type: String(r.entity_type ?? ""),
+      entity_id: r.entity_id ? String(r.entity_id) : null,
+      action: String(r.action ?? ""),
+      payload: JSON.parse(String(r.payload)),
+      contributor_name: String(r.contributor_name ?? "anonymous"),
+      created_at: String(r.created_at ?? ""),
+      sync_status: String(r.sync_status ?? "pending"),
+    }),
+  );
 }
 
 export async function markContributionSynced(localId: number, serverId: string) {
@@ -288,7 +310,9 @@ export async function deletePendingContribution(localId: number) {
 
 export async function getPendingCount(): Promise<number> {
   const db = await getOfflineDb();
-  const rows = await db.exec("SELECT COUNT(*) as cnt FROM pending_contributions WHERE sync_status = 'pending'");
+  const rows = await db.exec(
+    "SELECT COUNT(*) as cnt FROM pending_contributions WHERE sync_status = 'pending'",
+  );
   return Number(rows[0]?.cnt ?? 0);
 }
 
@@ -300,9 +324,15 @@ export interface OfflineMapData {
 
 export async function loadOfflineMapData(_systemId?: string): Promise<OfflineMapData | null> {
   const db = await getOfflineDb();
-  const trails = await db.exec("SELECT id, name, slug, description, difficulty, length_meters, elevation_gain_meters, verified FROM trails");
-  const features = await db.exec("SELECT id, name, type_tag, description, trail_id, system_id, lon, lat FROM features");
-  const systems = await db.exec("SELECT id, name, slug, description, min_lon, max_lon, min_lat, max_lat FROM systems");
+  const trails = await db.exec(
+    "SELECT id, name, slug, description, difficulty, length_meters, elevation_gain_meters, verified FROM trails",
+  );
+  const features = await db.exec(
+    "SELECT id, name, type_tag, description, trail_id, system_id, lon, lat FROM features",
+  );
+  const systems = await db.exec(
+    "SELECT id, name, slug, description, min_lon, max_lon, min_lat, max_lat FROM systems",
+  );
 
   if (trails.length === 0 && features.length === 0 && systems.length === 0) return null;
 
@@ -380,16 +410,15 @@ export async function deleteAllOfflineRegions() {
   await db.execRaw("DELETE FROM trail_systems");
   await db.execRaw("DELETE FROM trail_segments");
   await db.execRaw("DELETE FROM features");
-  await db.execRaw("DELETE FROM wiki_pages WHERE target_type != 'trail' AND target_type != 'system' AND target_type != 'feature'");
+  await db.execRaw(
+    "DELETE FROM wiki_pages WHERE target_type != 'trail' AND target_type != 'system' AND target_type != 'feature'",
+  );
 }
 
 export async function deleteOfflineRegion(regionId: string) {
   const db = await getOfflineDb();
   await db.exec("DELETE FROM offline_regions WHERE id = ?", [regionId]);
-  const usages = await db.exec(
-    "SELECT id FROM offline_regions WHERE id = ?",
-    [regionId],
-  );
+  const usages = await db.exec("SELECT id FROM offline_regions WHERE id = ?", [regionId]);
   if (usages.length > 0) return;
   await db.execRaw("DELETE FROM systems");
   await db.execRaw("DELETE FROM trails");

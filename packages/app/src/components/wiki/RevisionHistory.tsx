@@ -6,7 +6,11 @@ import { Button } from "../ui/Button";
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    return new Date(iso).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   } catch {
     return iso;
   }
@@ -29,7 +33,7 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
   const [pendingRevertId, setPendingRevertId] = useState<string | null>(null);
 
   const pending = pendingRevertId
-    ? revisions.find((r) => r.id === pendingRevertId) ?? null
+    ? (revisions.find((r) => r.id === pendingRevertId) ?? null)
     : null;
 
   function confirmRevert() {
@@ -40,7 +44,9 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
 
   if (revisions.length === 0) {
     return (
-      <Text style={styles.empty} testID="revisions-empty">No revisions yet.</Text>
+      <Text style={styles.empty} testID="revisions-empty">
+        No revisions yet.
+      </Text>
     );
   }
 
@@ -59,7 +65,9 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
               {formatDate(rev.created_at)} at {formatTime(rev.created_at)}
             </Text>
             {rev.edit_summary ? (
-              <Text style={styles.revSummary} testID={`revision-summary-${rev.id}`}>{rev.edit_summary}</Text>
+              <Text style={styles.revSummary} testID={`revision-summary-${rev.id}`}>
+                {rev.edit_summary}
+              </Text>
             ) : null}
           </View>
           {onRevert ? (
@@ -86,8 +94,9 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
             <Text style={styles.title}>Revert to this revision?</Text>
             {pending ? (
               <Text style={styles.body}>
-                By {pending.contributor_name} on {formatDate(pending.created_at)} at {formatTime(pending.created_at)}.
-                {"\n\n"}This will create a new revision with the old content. The current content is not lost.
+                By {pending.contributor_name} on {formatDate(pending.created_at)} at{" "}
+                {formatTime(pending.created_at)}.{"\n\n"}This will create a new revision with the
+                old content. The current content is not lost.
               </Text>
             ) : null}
             <View style={styles.actions}>

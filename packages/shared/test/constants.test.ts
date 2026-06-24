@@ -42,7 +42,14 @@ describe("enum coverage", () => {
   });
 
   test("all enum tuples are non-empty arrays of strings", () => {
-    for (const e of [FEATURE_TYPES, DIFFICULTIES, SURFACE_TYPES, WIKI_TARGET_TYPES, SYNC_ACTIONS, SYNC_STATUSES]) {
+    for (const e of [
+      FEATURE_TYPES,
+      DIFFICULTIES,
+      SURFACE_TYPES,
+      WIKI_TARGET_TYPES,
+      SYNC_ACTIONS,
+      SYNC_STATUSES,
+    ]) {
       expect(e.length).toBeGreaterThan(0);
       for (const v of e) {
         expect(typeof v).toBe("string");

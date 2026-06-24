@@ -58,13 +58,10 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
 export function isBridgeEvent(value: unknown): value is BridgeEvent {
   if (!value || typeof value !== "object") return false;
   const t = (value as { type?: unknown }).type;
-  return typeof t === "string" && [
-    "ready",
-    "mapClick",
-    "mapLongPress",
-    "moveEnd",
-    "featureSelect",
-    "error",
-    "drawEnd",
-  ].includes(t);
+  return (
+    typeof t === "string" &&
+    ["ready", "mapClick", "mapLongPress", "moveEnd", "featureSelect", "error", "drawEnd"].includes(
+      t,
+    )
+  );
 }

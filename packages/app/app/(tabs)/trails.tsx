@@ -50,7 +50,12 @@ export default function TrailsScreen() {
 
   return (
     <View style={styles.container} testID="trails-screen">
-      <SearchBar value={q} onChangeText={setQ} placeholder="Filter trails..." testID="trails-search" />
+      <SearchBar
+        value={q}
+        onChangeText={setQ}
+        placeholder="Filter trails..."
+        testID="trails-search"
+      />
       <FlatList
         data={items}
         keyExtractor={(t) => t.id}

@@ -45,15 +45,31 @@ export interface ApiRoutes {
   };
   listSystems: {
     request: { page?: number; pageSize?: number; q?: string };
-    response: { items: import("../types/index.js").System[]; total: number; page: number; pageSize: number };
+    response: {
+      items: import("../types/index.js").System[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
   };
   getSystem: {
     request: { id: string };
     response: import("../types/index.js").System;
   };
   listTrails: {
-    request: { page?: number; pageSize?: number; systemId?: string; q?: string; difficulty?: string };
-    response: { items: import("../types/index.js").Trail[]; total: number; page: number; pageSize: number };
+    request: {
+      page?: number;
+      pageSize?: number;
+      systemId?: string;
+      q?: string;
+      difficulty?: string;
+    };
+    response: {
+      items: import("../types/index.js").Trail[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
   };
   getTrail: {
     request: { id: string };
@@ -81,7 +97,12 @@ export interface ApiRoutes {
   };
   listRevisions: {
     request: { id: string; page?: number; pageSize?: number };
-    response: { items: import("../types/index.js").Revision[]; total: number; page: number; pageSize: number };
+    response: {
+      items: import("../types/index.js").Revision[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
   };
   getRevision: {
     request: { wikiId: string; revId: string };
@@ -93,7 +114,12 @@ export interface ApiRoutes {
   };
   recentRevisions: {
     request: { page?: number; pageSize?: number };
-    response: { items: import("../types/index.js").Revision[]; total: number; page: number; pageSize: number };
+    response: {
+      items: import("../types/index.js").Revision[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
   };
   listCitations: {
     request: { wikiPageId: string };

@@ -69,45 +69,48 @@ export default function TrailDetail() {
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
 
-  const refreshSegments = useCallback(async (trailId: string) => {
-    if (isOnline) {
-      const client = createMagnumClient(API_URL);
-      try {
-        const segs = await client.listTrailSegments(trailId);
-        setSegments(segs.items);
-        return;
-      } catch {
-        // fall through to local
+  const refreshSegments = useCallback(
+    async (trailId: string) => {
+      if (isOnline) {
+        const client = createMagnumClient(API_URL);
+        try {
+          const segs = await client.listTrailSegments(trailId);
+          setSegments(segs.items);
+          return;
+        } catch {
+          // fall through to local
+        }
       }
-    }
-    const localSegs = await getTrailSegments(trailId);
-    setSegments(
-      localSegs.map((s) => ({
-        id: String(s.id),
-        trail_id: trailId,
-        name: s.name ? String(s.name) : null,
-        geometry: null,
-        sort_order: Number(s.sort_order ?? 0),
-        surface_type: s.surface_type
-          ? String(s.surface_type) as TrailSegment["surface_type"]
-          : null,
-        hazards: (() => {
-          try {
-            return JSON.parse(String(s.hazards ?? "[]"));
-          } catch {
-            return [];
-          }
-        })(),
-        is_road_connector: Boolean(s.is_road_connector),
-        steep_grade: Boolean(s.steep_grade),
-        one_way: Boolean(s.one_way),
-        description: s.description ? String(s.description) : null,
-        length_meters: s.length_meters ? Number(s.length_meters) : null,
-        created_at: "",
-        updated_at: "",
-      })),
-    );
-  }, [isOnline]);
+      const localSegs = await getTrailSegments(trailId);
+      setSegments(
+        localSegs.map((s) => ({
+          id: String(s.id),
+          trail_id: trailId,
+          name: s.name ? String(s.name) : null,
+          geometry: null,
+          sort_order: Number(s.sort_order ?? 0),
+          surface_type: s.surface_type
+            ? (String(s.surface_type) as TrailSegment["surface_type"])
+            : null,
+          hazards: (() => {
+            try {
+              return JSON.parse(String(s.hazards ?? "[]"));
+            } catch {
+              return [];
+            }
+          })(),
+          is_road_connector: Boolean(s.is_road_connector),
+          steep_grade: Boolean(s.steep_grade),
+          one_way: Boolean(s.one_way),
+          description: s.description ? String(s.description) : null,
+          length_meters: s.length_meters ? Number(s.length_meters) : null,
+          created_at: "",
+          updated_at: "",
+        })),
+      );
+    },
+    [isOnline],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -149,7 +152,7 @@ export default function TrailDetail() {
               geometry: null,
               sort_order: Number(s.sort_order ?? 0),
               surface_type: s.surface_type
-                ? String(s.surface_type) as TrailSegment["surface_type"]
+                ? (String(s.surface_type) as TrailSegment["surface_type"])
                 : null,
               hazards: (() => {
                 try {
@@ -172,9 +175,10 @@ export default function TrailDetail() {
               id: String(f.id),
               name: String(f.name),
               type_tag: String(f.type_tag) as Feature["type_tag"],
-              point: f.lon != null && f.lat != null
-                ? { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] }
-                : null,
+              point:
+                f.lon != null && f.lat != null
+                  ? { type: "Point", coordinates: [Number(f.lon), Number(f.lat)] }
+                  : null,
               description: f.description ? String(f.description) : null,
               trail_id: f.trail_id ? String(f.trail_id) : null,
               system_id: f.system_id ? String(f.system_id) : null,
@@ -493,7 +497,9 @@ export default function TrailDetail() {
 
         <View style={styles.section} testID="trail-meta">
           <View style={styles.row}>
-            <Text style={styles.title} testID="trail-name">{trail.name}</Text>
+            <Text style={styles.title} testID="trail-name">
+              {trail.name}
+            </Text>
             {trail.difficulty ? <DifficultyBadge difficulty={trail.difficulty} /> : null}
           </View>
           <View style={styles.statsRow} testID="trail-stats">
@@ -530,14 +536,14 @@ export default function TrailDetail() {
             </Button>
           </View>
           {segments.length === 0 ? (
-            <Text style={styles.body} testID="trail-segments-empty">No segments yet.</Text>
+            <Text style={styles.body} testID="trail-segments-empty">
+              No segments yet.
+            </Text>
           ) : (
             segments.map((s) => (
               <Card key={s.id} testID={`trail-segment-${s.id}`}>
                 <View style={styles.row}>
-                  <Text style={styles.cardTitle}>
-                    {s.name ?? `Segment ${s.sort_order + 1}`}
-                  </Text>
+                  <Text style={styles.cardTitle}>{s.name ?? `Segment ${s.sort_order + 1}`}</Text>
                   {s.surface_type ? <SegmentTypeBadge surface={s.surface_type} /> : null}
                 </View>
                 {s.hazards.length > 0 ? (
@@ -563,7 +569,9 @@ export default function TrailDetail() {
         <View style={styles.section} testID="trail-features">
           <Text style={styles.h2}>Features ({features.length})</Text>
           {features.length === 0 ? (
-            <Text style={styles.body} testID="trail-features-empty">No features yet.</Text>
+            <Text style={styles.body} testID="trail-features-empty">
+              No features yet.
+            </Text>
           ) : (
             features.map((f) => (
               <Pressable

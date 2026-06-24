@@ -31,7 +31,9 @@ export function CitationForm({ citations, onAdd, onDelete }: CitationFormProps) 
       <Text style={styles.heading}>Citations</Text>
 
       {citations.length === 0 ? (
-        <Text style={styles.empty} testID="citations-empty">No citations yet.</Text>
+        <Text style={styles.empty} testID="citations-empty">
+          No citations yet.
+        </Text>
       ) : (
         citations.map((c) => (
           <View key={c.id} style={styles.citationRow} testID={`citation-${c.id}`}>
@@ -43,7 +45,12 @@ export function CitationForm({ citations, onAdd, onDelete }: CitationFormProps) 
                 </Pressable>
               ) : null}
             </View>
-            <Button variant="ghost" size="small" onPress={() => onDelete(c.id)} testID={`citation-delete-${c.id}`}>
+            <Button
+              variant="ghost"
+              size="small"
+              onPress={() => onDelete(c.id)}
+              testID={`citation-delete-${c.id}`}
+            >
               <Ionicons name="trash-outline" size={14} color="#ef4444" />
             </Button>
           </View>

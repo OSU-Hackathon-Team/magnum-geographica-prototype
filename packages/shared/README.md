@@ -3,6 +3,7 @@
 Types, Zod schemas, API client, and constants shared across the Magnum stack.
 
 Consumed by:
+
 - `@magnum/api` — uses types for route validation
 - `@magnum/app` — uses the typed API client and constants
 - `@magnum/map` — uses color/icon constants for layer styling

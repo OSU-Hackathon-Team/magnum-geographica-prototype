@@ -15,13 +15,7 @@ export const FEATURE_TYPES = [
 
 export const DIFFICULTIES = ["easy", "moderate", "hard", "expert"] as const;
 
-export const SURFACE_TYPES = [
-  "natural",
-  "gravel",
-  "paved",
-  "boardwalk",
-  "road_connector",
-] as const;
+export const SURFACE_TYPES = ["natural", "gravel", "paved", "boardwalk", "road_connector"] as const;
 
 export const WIKI_TARGET_TYPES = [
   "super_system",

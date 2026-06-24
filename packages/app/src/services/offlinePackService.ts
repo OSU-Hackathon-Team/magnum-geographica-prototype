@@ -53,8 +53,7 @@ function byteLength(str: string): number {
 // `Buffer.from(...).toString("base64")` was being used to binary-encode a
 // tar entry for `writeAsStringAsync`. We use a tiny base64 encoder that works
 // in both web and React Native.
-const BASE64_CHARS =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let out = "";
   for (let i = 0; i < bytes.length; i += 3) {
@@ -145,10 +144,15 @@ export async function estimateRegionSize(
   maxZoom: number,
 ): Promise<BboxInfoResponse> {
   const client = createMagnumClient(API_URL);
-  return client.raw.post<BboxInfoResponse>(
-    "/api/offline-bbox/info",
-    { minLon, minLat, maxLon, maxLat, baseLayerId, minZoom, maxZoom },
-  );
+  return client.raw.post<BboxInfoResponse>("/api/offline-bbox/info", {
+    minLon,
+    minLat,
+    maxLon,
+    maxLat,
+    baseLayerId,
+    minZoom,
+    maxZoom,
+  });
 }
 
 export async function downloadRegion(
@@ -167,16 +171,19 @@ export async function downloadRegion(
 
   onProgress?.("Generating pack on server...", 5);
 
-  const generateResult = await client.raw.post<GenerateResponse>(
-    "/api/offline-bbox/generate",
-    { minLon, minLat, maxLon, maxLat, baseLayerId, minZoom, maxZoom },
-  );
+  const generateResult = await client.raw.post<GenerateResponse>("/api/offline-bbox/generate", {
+    minLon,
+    minLat,
+    maxLon,
+    maxLat,
+    baseLayerId,
+    minZoom,
+    maxZoom,
+  });
 
   onProgress?.("Downloading tiles...", 15);
 
-  const tarResponse = await fetch(
-    `${API_URL}/api/offline-bbox/${generateResult.packId}/download`,
-  );
+  const tarResponse = await fetch(`${API_URL}/api/offline-bbox/${generateResult.packId}/download`);
   if (!tarResponse.ok) {
     throw new Error(`Failed to download tiles: ${tarResponse.status}`);
   }
@@ -194,9 +201,7 @@ export async function downloadRegion(
 
   onProgress?.("Downloading data...", 85);
 
-  const dataResponse = await fetch(
-    `${API_URL}/api/offline-bbox/${generateResult.packId}/data`,
-  );
+  const dataResponse = await fetch(`${API_URL}/api/offline-bbox/${generateResult.packId}/data`);
   const packData: PackData = await dataResponse.json();
 
   const geojsonStr = JSON.stringify({
@@ -226,7 +231,9 @@ export async function downloadRegion(
 
   for (const t of packData.trails) {
     const geometryStr =
-      typeof t.geometry_geojson === "string" ? t.geometry_geojson : JSON.stringify(t.geometry_geojson);
+      typeof t.geometry_geojson === "string"
+        ? t.geometry_geojson
+        : JSON.stringify(t.geometry_geojson);
     const bounds = computeBounds(geometryStr);
     await db.execRaw(
       `INSERT INTO trails (id, name, slug, description, difficulty, length_meters, elevation_gain_meters, geometry_wkb, min_lon, max_lon, min_lat, max_lat, verified, updated_at)
@@ -239,11 +246,20 @@ export async function downloadRegion(
          min_lat=excluded.min_lat, max_lat=excluded.max_lat,
          verified=excluded.verified, updated_at=excluded.updated_at`,
       [
-        t.id, t.name, t.slug, t.description, t.difficulty, t.length_meters,
-        t.elevation_gain_meters, null,
-        bounds?.minLon ?? minLon, bounds?.maxLon ?? maxLon,
-        bounds?.minLat ?? minLat, bounds?.maxLat ?? maxLat,
-        t.verified ? 1 : 0, now,
+        t.id,
+        t.name,
+        t.slug,
+        t.description,
+        t.difficulty,
+        t.length_meters,
+        t.elevation_gain_meters,
+        null,
+        bounds?.minLon ?? minLon,
+        bounds?.maxLon ?? maxLon,
+        bounds?.minLat ?? minLat,
+        bounds?.maxLat ?? maxLat,
+        t.verified ? 1 : 0,
+        now,
       ],
     );
   }
@@ -259,7 +275,9 @@ export async function downloadRegion(
         lon = p.coordinates[0];
         lat = p.coordinates[1];
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     await db.execRaw(
       `INSERT INTO features (id, name, type_tag, description, trail_id, system_id, lon, lat, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -296,12 +314,23 @@ export async function downloadRegion(
        tiles_path=excluded.tiles_path, generated_at=excluded.generated_at,
        last_synced=excluded.last_synced, created_at=excluded.created_at`,
     [
-      regionId, regionName, baseLayerId,
-      minLon, minLat, maxLon, maxLat,
-      minZoom, maxZoom,
-      generateResult.tileCount, generateResult.tileSizeBytes,
-      byteLength(geojsonStr), byteLength(wikiStr),
-      tilesPath, now, now, now,
+      regionId,
+      regionName,
+      baseLayerId,
+      minLon,
+      minLat,
+      maxLon,
+      maxLat,
+      minZoom,
+      maxZoom,
+      generateResult.tileCount,
+      generateResult.tileSizeBytes,
+      byteLength(geojsonStr),
+      byteLength(wikiStr),
+      tilesPath,
+      now,
+      now,
+      now,
     ],
   );
 
@@ -309,8 +338,12 @@ export async function downloadRegion(
     id: regionId,
     name: regionName,
     baseLayerId,
-    minLon, minLat, maxLon, maxLat,
-    minZoom, maxZoom,
+    minLon,
+    minLat,
+    maxLon,
+    maxLat,
+    minZoom,
+    maxZoom,
     totalTiles: generateResult.tileCount,
     tileSizeBytes: generateResult.tileSizeBytes,
     geojsonSizeBytes: byteLength(geojsonStr),
@@ -364,7 +397,9 @@ export async function deleteOfflineRegion(regionId: string) {
       await FS.deleteAsync(tilesPath, { idempotent: true });
       const parentDir = tilesPath.substring(0, tilesPath.lastIndexOf("/"));
       await FS.deleteAsync(parentDir, { idempotent: true });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   await db.execRaw("DELETE FROM offline_regions WHERE id = ?", [regionId]);
@@ -381,8 +416,7 @@ function computeBounds(geometryJson: string | object | null): {
   try {
     const g = typeof geometryJson === "string" ? JSON.parse(geometryJson) : geometryJson;
     if (g.type === "MultiLineString" || g.type === "LineString") {
-      const coords =
-        g.type === "MultiLineString" ? g.coordinates.flat(1) : g.coordinates;
+      const coords = g.type === "MultiLineString" ? g.coordinates.flat(1) : g.coordinates;
       let minLon = Infinity,
         maxLon = -Infinity,
         minLat = Infinity,

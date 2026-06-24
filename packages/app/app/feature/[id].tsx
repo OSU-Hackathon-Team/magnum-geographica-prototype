@@ -50,7 +50,10 @@ export default function FeatureDetail() {
             id: String(local.id),
             name: String(local.name),
             type_tag: String(local.type_tag) as Feature["type_tag"],
-            point: local.lon != null && local.lat != null ? { type: "Point", coordinates: [Number(local.lon), Number(local.lat)] } : null,
+            point:
+              local.lon != null && local.lat != null
+                ? { type: "Point", coordinates: [Number(local.lon), Number(local.lat)] }
+                : null,
             description: local.description ? String(local.description) : null,
             trail_id: local.trail_id ? String(local.trail_id) : null,
             system_id: local.system_id ? String(local.system_id) : null,
@@ -82,7 +85,9 @@ export default function FeatureDetail() {
           setFeature(f);
           const [w, mediaRes] = await Promise.all([
             client.getWikiPage("feature", f.id).catch(() => null),
-            client.raw.request<{ items: MediaItem[] }>("GET", `/api/media?feature_id=${f.id}`).catch(() => ({ items: [] as MediaItem[] })),
+            client.raw
+              .request<{ items: MediaItem[] }>("GET", `/api/media?feature_id=${f.id}`)
+              .catch(() => ({ items: [] as MediaItem[] })),
           ]);
           if (w) setWikiPage(w as WikiPage);
           setMediaItems(mediaRes.items);
@@ -148,9 +153,7 @@ export default function FeatureDetail() {
           setShowUploader(false);
           return;
         } catch (queueErr) {
-          setUploadError(
-            queueErr instanceof Error ? queueErr.message : "Failed to queue photo",
-          );
+          setUploadError(queueErr instanceof Error ? queueErr.message : "Failed to queue photo");
           return;
         }
       }
@@ -198,7 +201,9 @@ export default function FeatureDetail() {
         <View style={styles.section} testID="feature-meta">
           <View style={styles.nameRow}>
             <FeatureTypeIcon type={feature.type_tag} size={20} />
-            <Text style={styles.title} testID="feature-name">{feature.name}</Text>
+            <Text style={styles.title} testID="feature-name">
+              {feature.name}
+            </Text>
           </View>
           <Text style={styles.typeTag}>{feature.type_tag.replace(/_/g, " ")}</Text>
           {feature.description ? <Text style={styles.body}>{feature.description}</Text> : null}

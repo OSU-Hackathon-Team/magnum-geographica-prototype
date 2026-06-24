@@ -16,6 +16,7 @@ A community-edited atlas of trails. Every trail has a wiki page covering conditi
 ## 2. Scope
 
 ### 2.1 Included
+
 - Natural-surface trails, paved paths, trail connectors along roads (marked explicitly)
 - Landmarks / Features: trailheads, shelters, water sources, scenic points, signage
 - Systems: parks, forests, preserves, city trail networks (with boundary polygons)
@@ -24,6 +25,7 @@ A community-edited atlas of trails. Every trail has a wiki page covering conditi
 - Offline mode: pre-download regions, work offline, sync contributions later
 
 ### 2.2 Excluded
+
 - General streets / urban navigation
 - Private residences or personal markers
 - Long-form history or general encyclopedic content (link to Wikipedia instead)
@@ -48,6 +50,7 @@ Feature (3)       ← point of interest (trailhead, shelter, etc.)
 ```
 
 ### Rules
+
 - A child can belong to multiple parents (e.g., Trail in multiple Systems)
 - Don't skip tiers (no Trail directly under Super-System)
 - Sub-Systems are optional — omit if no clear local grouping exists
@@ -60,9 +63,11 @@ Feature (3)       ← point of interest (trailhead, shelter, etc.)
 ## 4. Content Guidelines — Wiki Pages
 
 ### Purpose
+
 Provide practical, trail-specific information. Focus on what it's like to **experience and maintain** the trail.
 
 ### Include
+
 - Trail conditions, common hazards, access rules
 - Seasonal notes, closures, restrictions
 - Parking, entry fees, permit requirements
@@ -70,12 +75,14 @@ Provide practical, trail-specific information. Focus on what it's like to **expe
 - Water availability, shade coverage, difficulty notes
 
 ### Avoid
+
 - Long-form history or regional info (belongs on Wikipedia)
 - Copying content from Wikipedia or external sources
 - Personal trip reports or opinions
 - Redundant restatements of what Wikipedia already covers
 
 ### Citations
+
 - Official website is preferred
 - Images of signs or rule boards are acceptable
 - Link to detailed Wikipedia article rather than restating it
@@ -104,24 +111,25 @@ magnum/
 
 ### 5.2 Tech Stack
 
-| Layer | Choice | Rationale |
-|---|---|---|
-| Mobile | Expo SDK 52+, React Native 0.76+ | Managed workflow, OTA updates |
-| Web | React Native Web (via Expo) | Single codebase, feature parity |
-| State | Zustand | Minimal, works on RN + web identically |
-| Nav | expo-router (file-based) | Shared navigation between web + mobile |
-| Maps | OpenLayers 10 | FOSS, mature, vector tile support |
-| Tiles | OpenMapTiles schema, Martin tile server | FOSS, PostGIS-backed, MBTiles export |
-| Offline DB | op-sqlite (Android), expo-sqlite (web fallback) | Fast SQLite bindings |
-| Backend | Bun + Hono 4 | Fast, TypeScript-native, easy Docker |
-| ORM | Drizzle ORM | Type-safe, good PostGIS support |
-| DB | PostgreSQL 16 + PostGIS 3 | Spatial queries, proven |
-| Media | BYTEA in PG (MVP) → MinIO (later) | Simple first, scalable later |
-| Auth | None for MVP; JWT later | Anonymous contributor_name string in MVP |
-| Monorepo | Turborepo | Fast caching, parallel builds |
-| Docker | Single docker-compose.yml | Self-hostable by anyone |
+| Layer      | Choice                                          | Rationale                                |
+| ---------- | ----------------------------------------------- | ---------------------------------------- |
+| Mobile     | Expo SDK 52+, React Native 0.76+                | Managed workflow, OTA updates            |
+| Web        | React Native Web (via Expo)                     | Single codebase, feature parity          |
+| State      | Zustand                                         | Minimal, works on RN + web identically   |
+| Nav        | expo-router (file-based)                        | Shared navigation between web + mobile   |
+| Maps       | OpenLayers 10                                   | FOSS, mature, vector tile support        |
+| Tiles      | OpenMapTiles schema, Martin tile server         | FOSS, PostGIS-backed, MBTiles export     |
+| Offline DB | op-sqlite (Android), expo-sqlite (web fallback) | Fast SQLite bindings                     |
+| Backend    | Bun + Hono 4                                    | Fast, TypeScript-native, easy Docker     |
+| ORM        | Drizzle ORM                                     | Type-safe, good PostGIS support          |
+| DB         | PostgreSQL 16 + PostGIS 3                       | Spatial queries, proven                  |
+| Media      | BYTEA in PG (MVP) → MinIO (later)               | Simple first, scalable later             |
+| Auth       | None for MVP; JWT later                         | Anonymous contributor_name string in MVP |
+| Monorepo   | Turborepo                                       | Fast caching, parallel builds            |
+| Docker     | Single docker-compose.yml                       | Self-hostable by anyone                  |
 
 ### 5.3 FOSS Commitment
+
 - No Mapbox dependency. OpenLayers + OpenMapTiles + Martin.
 - No proprietary tile services. Self-hosted or free tile sources.
 - MIT or AGPL license (TBD).
@@ -371,6 +379,7 @@ pending_contributions (local queue), downloaded_packs
 ```
 
 `pending_contributions` schema:
+
 ```sql
 CREATE TABLE pending_contributions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -414,13 +423,13 @@ Both platforms share `shared/` — trail styling, feature icons, layer definitio
 
 ### 7.3 Tile Stack
 
-| Layer | Source |
-|---|---|
+| Layer                      | Source                                                  |
+| -------------------------- | ------------------------------------------------------- |
 | Base map (terrain/streets) | OpenMapTiles public instance (free tier) or self-hosted |
-| Hillshade / satellite | Optional overlay (self-hosted or public) |
-| Trail overlays | Martin tile server from PostGIS (vector tiles) |
-| System boundaries | Martin tile server |
-| Features / landmarks | GeoJSON layer (fetched per-viewport) |
+| Hillshade / satellite      | Optional overlay (self-hosted or public)                |
+| Trail overlays             | Martin tile server from PostGIS (vector tiles)          |
+| System boundaries          | Martin tile server                                      |
+| Features / landmarks       | GeoJSON layer (fetched per-viewport)                    |
 
 ### 7.4 OpenLayers Bridge (Mobile)
 
@@ -478,6 +487,7 @@ OpenLayers reads MBTiles natively on mobile (via WebView → SQLite plugin bridg
 ### 8.4 Sync Engine
 
 **Upload (local → server):**
+
 1. App checks connectivity on foreground
 2. If online + pending queue non-empty → POST `/api/sync/contributions` with array of changes
 3. Each change includes `base_revision_id` (the revision the edit was based on)
@@ -487,23 +497,24 @@ OpenLayers reads MBTiles natively on mobile (via WebView → SQLite plugin bridg
 7. User resolves conflict manually (view diff → keep mine / keep theirs / merge)
 
 **Download (server → local):**
+
 - On reconnect, client sends `last_synced_timestamp`
 - Server returns diff of changes since then for all downloaded systems
 - Client applies updates locally
 
 ### 8.5 Offline-Only Features
 
-| Feature | Online | Offline |
-|---|---|---|
-| Browse map | Yes | Yes (MBTiles) |
-| View trails/systems | Yes | Yes |
-| Read wiki pages | Yes | Yes |
-| Edit wiki pages | Yes | Yes (queued) |
-| Add features | Yes | Yes (queued) |
-| Attach photos | Yes | Yes (queued, stored as base64 in SQLite) |
-| Search | Yes | Yes (SQLite FTS) |
-| View revision history | Yes | Partial (local + server history, no full log) |
-| Admin actions | Yes | No |
+| Feature               | Online | Offline                                       |
+| --------------------- | ------ | --------------------------------------------- |
+| Browse map            | Yes    | Yes (MBTiles)                                 |
+| View trails/systems   | Yes    | Yes                                           |
+| Read wiki pages       | Yes    | Yes                                           |
+| Edit wiki pages       | Yes    | Yes (queued)                                  |
+| Add features          | Yes    | Yes (queued)                                  |
+| Attach photos         | Yes    | Yes (queued, stored as base64 in SQLite)      |
+| Search                | Yes    | Yes (SQLite FTS)                              |
+| View revision history | Yes    | Partial (local + server history, no full log) |
+| Admin actions         | Yes    | No                                            |
 
 ---
 
@@ -511,95 +522,95 @@ OpenLayers reads MBTiles natively on mobile (via WebView → SQLite plugin bridg
 
 ### 9.1 Phase 0 — Scaffold
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/health` | Server health check |
-| `GET` | `/api/systems` | List systems (paginated) |
-| `GET` | `/api/systems/:id` | System detail with boundary GeoJSON |
-| `GET` | `/api/trails` | List trails (paginated, filterable) |
-| `GET` | `/api/trails/:id` | Trail detail with geometry GeoJSON |
-| `POST` | `/api/seed` | Dev-only: seed Ohio test data from OSM extract |
+| Method | Path               | Description                                    |
+| ------ | ------------------ | ---------------------------------------------- |
+| `GET`  | `/api/health`      | Server health check                            |
+| `GET`  | `/api/systems`     | List systems (paginated)                       |
+| `GET`  | `/api/systems/:id` | System detail with boundary GeoJSON            |
+| `GET`  | `/api/trails`      | List trails (paginated, filterable)            |
+| `GET`  | `/api/trails/:id`  | Trail detail with geometry GeoJSON             |
+| `POST` | `/api/seed`        | Dev-only: seed Ohio test data from OSM extract |
 
 ### 9.2 Phase 1 — Map & Browse
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/systems/:id/trails` | Trails in a system |
-| `GET` | `/api/systems/:id/features` | Features in a system |
-| `GET` | `/api/trails/:id/segments` | Segments of a trail (ordered) |
-| `GET` | `/api/trails/:id/features` | Features on a trail |
-| `GET` | `/api/search?q=&type=` | Full-text search across systems, trails, features |
-| `GET` | `/api/tiles/{z}/{x}/{y}.pbf` | Proxy to Martin tile server |
+| Method | Path                         | Description                                       |
+| ------ | ---------------------------- | ------------------------------------------------- |
+| `GET`  | `/api/systems/:id/trails`    | Trails in a system                                |
+| `GET`  | `/api/systems/:id/features`  | Features in a system                              |
+| `GET`  | `/api/trails/:id/segments`   | Segments of a trail (ordered)                     |
+| `GET`  | `/api/trails/:id/features`   | Features on a trail                               |
+| `GET`  | `/api/search?q=&type=`       | Full-text search across systems, trails, features |
+| `GET`  | `/api/tiles/{z}/{x}/{y}.pbf` | Proxy to Martin tile server                       |
 
 ### 9.3 Phase 2 — Wiki Pages
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/wiki-pages?target_type=&target_id=` | Get wiki page for target |
-| `POST` | `/api/wiki-pages` | Create wiki page |
-| `PUT` | `/api/wiki-pages/:id` | Update wiki page (creates revision) |
-| `GET` | `/api/wiki-pages/:id/revisions` | Revision history (paginated) |
-| `GET` | `/api/wiki-pages/:id/revisions/:rev_id` | Specific revision content |
-| `POST` | `/api/wiki-pages/:id/revert` | Revert to a specific revision (creates new revision) |
-| `POST` | `/api/citations` | Add citation to wiki page |
-| `DELETE` | `/api/citations/:id` | Remove citation |
-| `GET` | `/api/revisions/recent` | Recent edits across all targets (admin preview) |
+| Method   | Path                                      | Description                                          |
+| -------- | ----------------------------------------- | ---------------------------------------------------- |
+| `GET`    | `/api/wiki-pages?target_type=&target_id=` | Get wiki page for target                             |
+| `POST`   | `/api/wiki-pages`                         | Create wiki page                                     |
+| `PUT`    | `/api/wiki-pages/:id`                     | Update wiki page (creates revision)                  |
+| `GET`    | `/api/wiki-pages/:id/revisions`           | Revision history (paginated)                         |
+| `GET`    | `/api/wiki-pages/:id/revisions/:rev_id`   | Specific revision content                            |
+| `POST`   | `/api/wiki-pages/:id/revert`              | Revert to a specific revision (creates new revision) |
+| `POST`   | `/api/citations`                          | Add citation to wiki page                            |
+| `DELETE` | `/api/citations/:id`                      | Remove citation                                      |
+| `GET`    | `/api/revisions/recent`                   | Recent edits across all targets (admin preview)      |
 
 ### 9.4 Phase 3 — Offline
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/offline-packs/:system_id/info` | Size estimate, last generated timestamp |
-| `POST` | `/api/offline-packs/generate/:system_id` | Generate (or return cached) pack |
-| `GET` | `/api/offline-packs/:system_id/download` | Download pack file |
-| `POST` | `/api/sync/contributions` | Bulk upload pending offline changes |
-| `GET` | `/api/sync/updates?since=` | Get changes since timestamp |
+| Method | Path                                     | Description                             |
+| ------ | ---------------------------------------- | --------------------------------------- |
+| `GET`  | `/api/offline-packs/:system_id/info`     | Size estimate, last generated timestamp |
+| `POST` | `/api/offline-packs/generate/:system_id` | Generate (or return cached) pack        |
+| `GET`  | `/api/offline-packs/:system_id/download` | Download pack file                      |
+| `POST` | `/api/sync/contributions`                | Bulk upload pending offline changes     |
+| `GET`  | `/api/sync/updates?since=`               | Get changes since timestamp             |
 
 ### 9.5 Phase 4 — Features & Media
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/features` | Create feature |
-| `PUT` | `/api/features/:id` | Update feature |
-| `DELETE` | `/api/features/:id` | Delete feature |
-| `POST` | `/api/media` | Upload media (attached to feature/trail/system) |
-| `GET` | `/api/media/:id` | Download media file |
-| `DELETE` | `/api/media/:id` | Delete media |
+| Method   | Path                | Description                                     |
+| -------- | ------------------- | ----------------------------------------------- |
+| `POST`   | `/api/features`     | Create feature                                  |
+| `PUT`    | `/api/features/:id` | Update feature                                  |
+| `DELETE` | `/api/features/:id` | Delete feature                                  |
+| `POST`   | `/api/media`        | Upload media (attached to feature/trail/system) |
+| `GET`    | `/api/media/:id`    | Download media file                             |
+| `DELETE` | `/api/media/:id`    | Delete media                                    |
 
 ### 9.6 Phase 5 — Segments
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/trails/:id/segments` | Create segment |
-| `PUT` | `/api/segments/:id` | Update segment metadata |
-| `DELETE` | `/api/segments/:id` | Delete segment |
-| `POST` | `/api/trails/:id/segments/reorder` | Reorder segments (pass array of IDs) |
-| `POST` | `/api/trails/:id/segments/split` | Split segment at a point |
-| `POST` | `/api/trails/:id/segments/merge` | Merge two adjacent segments |
+| Method   | Path                               | Description                          |
+| -------- | ---------------------------------- | ------------------------------------ |
+| `POST`   | `/api/trails/:id/segments`         | Create segment                       |
+| `PUT`    | `/api/segments/:id`                | Update segment metadata              |
+| `DELETE` | `/api/segments/:id`                | Delete segment                       |
+| `POST`   | `/api/trails/:id/segments/reorder` | Reorder segments (pass array of IDs) |
+| `POST`   | `/api/trails/:id/segments/split`   | Split segment at a point             |
+| `POST`   | `/api/trails/:id/segments/merge`   | Merge two adjacent segments          |
 
 ### 9.7 Phase 6 — Auth & Admin
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/auth/register` | Create account |
-| `POST` | `/api/auth/login` | Login, get JWT |
-| `GET` | `/api/auth/me` | Current user info |
-| `GET` | `/api/admin/revisions` | Recent revisions (paginated, with filters) |
-| `POST` | `/api/admin/revisions/:id/revert` | Admin revert |
-| `DELETE` | `/api/admin/wiki-pages/:id` | Admin delete wiki page |
-| `DELETE` | `/api/admin/features/:id` | Admin delete feature |
-| `POST` | `/api/admin/users/:id/ban` | Ban user |
-| `GET` | `/api/users/:id` | Public user profile |
-| `GET` | `/api/users/:id/contributions` | User's revisions |
+| Method   | Path                              | Description                                |
+| -------- | --------------------------------- | ------------------------------------------ |
+| `POST`   | `/api/auth/register`              | Create account                             |
+| `POST`   | `/api/auth/login`                 | Login, get JWT                             |
+| `GET`    | `/api/auth/me`                    | Current user info                          |
+| `GET`    | `/api/admin/revisions`            | Recent revisions (paginated, with filters) |
+| `POST`   | `/api/admin/revisions/:id/revert` | Admin revert                               |
+| `DELETE` | `/api/admin/wiki-pages/:id`       | Admin delete wiki page                     |
+| `DELETE` | `/api/admin/features/:id`         | Admin delete feature                       |
+| `POST`   | `/api/admin/users/:id/ban`        | Ban user                                   |
+| `GET`    | `/api/users/:id`                  | Public user profile                        |
+| `GET`    | `/api/users/:id/contributions`    | User's revisions                           |
 
 ### 9.8 Phase 9 — Attestations
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/attestations/strong` | Upload GPS track (strong attestation) |
-| `POST` | `/api/attestations/weak` | Thumbs up/down (weak attestation) |
-| `GET` | `/api/trails/:id/attestations` | Attestation stats for trail |
-| `GET` | `/api/users/:id/trust-score` | User trust score |
+| Method | Path                           | Description                           |
+| ------ | ------------------------------ | ------------------------------------- |
+| `POST` | `/api/attestations/strong`     | Upload GPS track (strong attestation) |
+| `POST` | `/api/attestations/weak`       | Thumbs up/down (weak attestation)     |
+| `GET`  | `/api/trails/:id/attestations` | Attestation stats for trail           |
+| `GET`  | `/api/users/:id/trust-score`   | User trust score                      |
 
 ---
 
@@ -758,6 +769,7 @@ packages/app/src/components/
    - `GET /api/systems` returns JSON
 
 #### Deliverables
+
 - Monorepo builds without errors
 - API serves test data from PostGIS
 - App skeleton renders on web with tab navigation
@@ -818,6 +830,7 @@ packages/app/src/components/
    - Deep link support: `/map?lat=40.0&lon=-83.0&zoom=12`
 
 #### Deliverables
+
 - Ohio trails displayed on map with color-coded surface types
 - Complete System → Trail → Segment drill-down
 - Search working end-to-end
@@ -861,6 +874,7 @@ packages/app/src/components/
    - Future migration path: replace with JWT auth in Phase 6
 
 #### Deliverables
+
 - Create, edit, view wiki pages on any target
 - Full revision history with revert
 - Citations (URL + image) working
@@ -934,6 +948,7 @@ packages/app/src/components/
     - Updates reactively on connectivity change
 
 #### Deliverables
+
 - User downloads a System → goes offline → browses map, trails, wiki pages
 - User edits wiki page offline → reconnects → edit syncs successfully
 - Conflict resolution works (user sees diff, picks version)
@@ -978,6 +993,7 @@ packages/app/src/components/
    - All queued offline if needed
 
 #### Deliverables
+
 - Create features from map long-press
 - Attach photos to features/trails/systems
 - Feature icons on map
@@ -1020,6 +1036,7 @@ packages/app/src/components/
    - Trail elevation gain computed from sum of segment gains
 
 #### Deliverables
+
 - Create, edit, split, merge, reorder segments
 - Segments visually distinct on map
 - Hazard/road-connector flags visible
@@ -1065,6 +1082,7 @@ packages/app/src/components/
    - Admin can "flag" revisions → flagged feed
 
 #### Deliverables
+
 - User registration and login
 - Admin dashboard with revision feed, revert, ban
 - Anonymous editing still works
@@ -1107,6 +1125,7 @@ packages/app/src/components/
    - No user tracking, no PII
 
 #### Deliverables
+
 - Web app fully functional
 - Admin polished
 - Performance acceptable (map loads <2s, list scroll 60fps)
@@ -1119,6 +1138,7 @@ packages/app/src/components/
 **Goal:** App runs on iOS.
 
 #### Tasks
+
 - Add iOS build target in Expo
 - Test on iOS Simulator
 - Fix camera/gallery permissions (Info.plist)
@@ -1128,6 +1148,7 @@ packages/app/src/components/
 - Submit to TestFlight (if desired)
 
 #### Deliverables
+
 - iOS build works
 - All features parity with Android
 
@@ -1174,6 +1195,7 @@ packages/app/src/components/
    - Opacity indicates trust score of submitter
 
 #### Deliverables
+
 - Record and submit GPS tracks
 - Verified trail badges
 - Trust score system
@@ -1251,6 +1273,7 @@ CMD ["bun", "run", "start"]
 ```
 
 ### Hosting notes
+
 - Single `docker compose up -d` on any VPS
 - Reverse proxy (nginx/Caddy) recommended for SSL
 - Postgres volume persists data across restarts
@@ -1287,6 +1310,7 @@ npx expo run:android --variant release
 ```
 
 Known issues:
+
 - Expo autolinker may generate `expo.core.ExpoModulesPackage` import instead of `expo.modules.ExpoModulesPackage` — create a delegating `expo/core/ExpoModulesPackage.java` wrapper class in the expo module's android source directory as a workaround.
 - Gradle needs Java 21 (OpenJDK 26+ not supported).
 - If you start an emulator via the back_background tool, leave OUT the timeout param. This way the default timeout of 'infinity' is chosen
@@ -1318,6 +1342,7 @@ osm2pgsql \
 ```
 
 ### Initial Regions
+
 1. Ohio (test region, manageable size)
 2. Expand to full US (via Geofabrik extracts)
 3. User-contributed trails (drawn in-app) for unmapped areas
@@ -1328,16 +1353,16 @@ osm2pgsql \
 
 ### 14.1 Test Pyramid
 
-| Layer | Tool | What | Priority |
-|---|---|---|---|
-| API unit tests | Bun test | Hono route handlers, Drizzle queries | High |
-| API integration | Bun test + Testcontainers | Seed DB → test endpoints | High |
-| Shared validation | Bun test | Zod schemas, API client, constants | High |
-| App components | React Native Testing Library | UI components in isolation | Medium |
-| Map (web) | Playwright | OpenLayers renders, layer toggles, clicks → events | Medium |
-| App E2E (web-parity) | Playwright | Full user flows via RNW (existing) | Medium |
-| App E2E (mobile-only) | **Detox** (Android) | Offline, sync, camera, GPS, WebView map | High |
-| Offline sync logic | Bun test | SyncService, conflict resolution, queue logic | High |
+| Layer                 | Tool                         | What                                               | Priority |
+| --------------------- | ---------------------------- | -------------------------------------------------- | -------- |
+| API unit tests        | Bun test                     | Hono route handlers, Drizzle queries               | High     |
+| API integration       | Bun test + Testcontainers    | Seed DB → test endpoints                           | High     |
+| Shared validation     | Bun test                     | Zod schemas, API client, constants                 | High     |
+| App components        | React Native Testing Library | UI components in isolation                         | Medium   |
+| Map (web)             | Playwright                   | OpenLayers renders, layer toggles, clicks → events | Medium   |
+| App E2E (web-parity)  | Playwright                   | Full user flows via RNW (existing)                 | Medium   |
+| App E2E (mobile-only) | **Detox** (Android)          | Offline, sync, camera, GPS, WebView map            | High     |
+| Offline sync logic    | Bun test                     | SyncService, conflict resolution, queue logic      | High     |
 
 ### 14.2 Feature-Parity Rule
 
@@ -1347,49 +1372,49 @@ When a feature has **identical behavior on web and mobile**, test it with Playwr
 
 These have the same UI, routes, and state management on web + RN:
 
-| Feature | Playwright Coverage |
-|---|---|
+| Feature                                            | Playwright Coverage               |
+| -------------------------------------------------- | --------------------------------- |
 | Tab navigation (Explore, Systems, Trails, Profile) | `tests/e2e/flows/01-tabs.spec.ts` |
-| System listing, search, filter | `02-browse-systems.spec.ts` |
-| System detail (mini-map, trail list, wiki) | `03-system-detail.spec.ts` |
-| Trail detail (stats, segments, features, wiki) | `04-trail-detail.spec.ts` |
-| Feature/landmark detail | `10-feature-detail.spec.ts` |
-| Wiki page view + edit + revision history | (Phase 2 specs) |
-| Search (typeahead, cross-entity) | `08-search.spec.ts` |
-| Deep linking | `09-deeplink.spec.ts` |
-| Error states (404, API-down) | `06-error-states.spec.ts` |
-| User journeys / happy paths | `07-journey.spec.ts` |
-| Auth flows (login, register, profile) | (Phase 6 specs) |
-| Admin dashboard, revision feed, ban | (Phase 6 specs) |
-| Segment editor, split/merge/reorder | (Phase 5 specs) |
-| Feature CRUD forms | (Phase 4 specs) |
-| Media gallery (photo grid, full-screen) | (Phase 4 specs) |
-| Citations (add URL/image, delete) | (Phase 2 specs) |
-| Storage manager UI shell | (Phase 3 specs) |
-| Responsive layout (desktop sidebar ↔ mobile stack) | (Phase 7 specs) |
+| System listing, search, filter                     | `02-browse-systems.spec.ts`       |
+| System detail (mini-map, trail list, wiki)         | `03-system-detail.spec.ts`        |
+| Trail detail (stats, segments, features, wiki)     | `04-trail-detail.spec.ts`         |
+| Feature/landmark detail                            | `10-feature-detail.spec.ts`       |
+| Wiki page view + edit + revision history           | (Phase 2 specs)                   |
+| Search (typeahead, cross-entity)                   | `08-search.spec.ts`               |
+| Deep linking                                       | `09-deeplink.spec.ts`             |
+| Error states (404, API-down)                       | `06-error-states.spec.ts`         |
+| User journeys / happy paths                        | `07-journey.spec.ts`              |
+| Auth flows (login, register, profile)              | (Phase 6 specs)                   |
+| Admin dashboard, revision feed, ban                | (Phase 6 specs)                   |
+| Segment editor, split/merge/reorder                | (Phase 5 specs)                   |
+| Feature CRUD forms                                 | (Phase 4 specs)                   |
+| Media gallery (photo grid, full-screen)            | (Phase 4 specs)                   |
+| Citations (add URL/image, delete)                  | (Phase 2 specs)                   |
+| Storage manager UI shell                           | (Phase 3 specs)                   |
+| Responsive layout (desktop sidebar ↔ mobile stack) | (Phase 7 specs)                   |
 
 #### Mobile-Only Features (Detox)
 
 These depend on native APIs, device sensors, app lifecycle, or offline-first architecture:
 
-| Feature | Requires Detox | Why Mobile-Only |
-|---|---|---|
-| Offline browsing (map, trails, wiki from SQLite) | Yes | `navigator.onLine`, SQLite, MBTiles |
-| Download for Offline (MBTiles + GeoJSON + Wiki JSON) | Yes | File system, background fetch, progress |
-| Offline edit queue (wiki, features, media) | Yes | Queued in SQLite, sync on reconnect |
-| Sync upload (pending contributions → server) | Yes | App foreground detection, chunked upload |
-| Sync conflict resolution (diff view, keep mine/theirs) | Yes | Conflict UI is mobile-specific |
-| Connectivity status indicator (🟢🟡🔴⚪) | Yes | `@react-native-community/netinfo` |
-| Storage manager interactions (download, delete, size bars) | Yes | SQLite reads, file deletion |
-| WebView map bridge (pinch-zoom, tap, long-press, drag) | Yes | `postMessage` bridge is platform-specific |
-| Camera capture + gallery pick for media | Yes | `expo-camera`, `expo-image-picker` |
-| GPS tracking / Record Hike | Yes | `expo-location`, background tasks |
-| Background location for attestation | Yes | `expo-task-manager` |
-| JWT storage in SecureStore | Yes | `expo-secure-store` |
-| App lifecycle (background → foreground sync trigger) | Yes | React Native `AppState` |
-| Network toggle (airplane mode simulation) | Yes | Device-specific |
-| Offline tile rendering fallback (MBTiles → grey overlay) | Yes | WebView SQLite bridge |
-| Android-specific: back button, deep link from notification | Yes | Android navigation |
+| Feature                                                    | Requires Detox | Why Mobile-Only                           |
+| ---------------------------------------------------------- | -------------- | ----------------------------------------- |
+| Offline browsing (map, trails, wiki from SQLite)           | Yes            | `navigator.onLine`, SQLite, MBTiles       |
+| Download for Offline (MBTiles + GeoJSON + Wiki JSON)       | Yes            | File system, background fetch, progress   |
+| Offline edit queue (wiki, features, media)                 | Yes            | Queued in SQLite, sync on reconnect       |
+| Sync upload (pending contributions → server)               | Yes            | App foreground detection, chunked upload  |
+| Sync conflict resolution (diff view, keep mine/theirs)     | Yes            | Conflict UI is mobile-specific            |
+| Connectivity status indicator (🟢🟡🔴⚪)                   | Yes            | `@react-native-community/netinfo`         |
+| Storage manager interactions (download, delete, size bars) | Yes            | SQLite reads, file deletion               |
+| WebView map bridge (pinch-zoom, tap, long-press, drag)     | Yes            | `postMessage` bridge is platform-specific |
+| Camera capture + gallery pick for media                    | Yes            | `expo-camera`, `expo-image-picker`        |
+| GPS tracking / Record Hike                                 | Yes            | `expo-location`, background tasks         |
+| Background location for attestation                        | Yes            | `expo-task-manager`                       |
+| JWT storage in SecureStore                                 | Yes            | `expo-secure-store`                       |
+| App lifecycle (background → foreground sync trigger)       | Yes            | React Native `AppState`                   |
+| Network toggle (airplane mode simulation)                  | Yes            | Device-specific                           |
+| Offline tile rendering fallback (MBTiles → grey overlay)   | Yes            | WebView SQLite bridge                     |
+| Android-specific: back button, deep link from notification | Yes            | Android navigation                        |
 
 ### 14.3 Detox Setup (Android)
 
@@ -1414,51 +1439,51 @@ bun add -g detox-cli
 
 ```js
 module.exports = {
-  logger: { level: process.env.CI ? 'error' : 'info' },
+  logger: { level: process.env.CI ? "error" : "info" },
   testRunner: {
-    $0: 'jest',
+    $0: "jest",
     args: {
-      config: 'e2e/jest.config.js',
-      _: ['e2e']
-    }
+      config: "e2e/jest.config.js",
+      _: ["e2e"],
+    },
   },
   apps: {
-    'android.debug': {
-      type: 'android.apk',
-      binaryPath: 'packages/app/android/app/build/outputs/apk/debug/app-debug.apk',
+    "android.debug": {
+      type: "android.apk",
+      binaryPath: "packages/app/android/app/build/outputs/apk/debug/app-debug.apk",
       build: `
         export JAVA_HOME=/usr/lib/jvm/java-21-openjdk && \
         cd packages/app/android && \
         ./gradlew app:assembleDebug app:assembleAndroidTest -DtestBuildType=debug -x lint -x test -PreactNativeArchitectures=x86_64
       `,
-      reversePorts: [8081, 3000]
+      reversePorts: [8081, 3000],
     },
-    'android.release': {
-      type: 'android.apk',
-      binaryPath: 'packages/app/android/app/build/outputs/apk/release/app-release.apk',
+    "android.release": {
+      type: "android.apk",
+      binaryPath: "packages/app/android/app/build/outputs/apk/release/app-release.apk",
       build: `
         export JAVA_HOME=/usr/lib/jvm/java-21-openjdk && \
         cd packages/app/android && \
         ./gradlew app:assembleRelease app:assembleAndroidTest -DtestBuildType=release -x lint -x test -PreactNativeArchitectures=x86_64
-      `
-    }
+      `,
+    },
   },
   devices: {
     emulator: {
-      type: 'android.emulator',
-      device: { avdName: 'detox_test' }
-    }
+      type: "android.emulator",
+      device: { avdName: "detox_test" },
+    },
   },
   configurations: {
-    'android.emu.debug': {
-      device: 'emulator',
-      app: 'android.debug'
+    "android.emu.debug": {
+      device: "emulator",
+      app: "android.debug",
     },
-    'android.emu.release': {
-      device: 'emulator',
-      app: 'android.release'
-    }
-  }
+    "android.emu.release": {
+      device: "emulator",
+      app: "android.release",
+    },
+  },
 };
 ```
 
@@ -1466,19 +1491,19 @@ module.exports = {
 
 ```js
 module.exports = {
-  rootDir: '..',
-  testMatch: ['<rootDir>/e2e/**/*.test.js'],
+  rootDir: "..",
+  testMatch: ["<rootDir>/e2e/**/*.test.js"],
   testTimeout: 120000,
   maxWorkers: 1,
-  globalSetup: 'detox/runners/jest/globalSetup',
-  globalTeardown: 'detox/runners/jest/globalTeardown',
-  testEnvironment: 'detox/runners/jest/testEnvironment',
-  setupFilesAfterSetup: ['./e2e/setup.ts'],
+  globalSetup: "detox/runners/jest/globalSetup",
+  globalTeardown: "detox/runners/jest/globalTeardown",
+  testEnvironment: "detox/runners/jest/testEnvironment",
+  setupFilesAfterSetup: ["./e2e/setup.ts"],
   reporters: [
-    'detox/runners/jest/reporter',
-    ['jest-junit', { outputDirectory: 'e2e/.results', outputName: 'report.xml' }]
+    "detox/runners/jest/reporter",
+    ["jest-junit", { outputDirectory: "e2e/.results", outputName: "report.xml" }],
   ],
-  verbose: true
+  verbose: true,
 };
 ```
 
@@ -1565,6 +1590,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 #### Phase 3: Offline Mode (Critical Path — 6 test files)
 
 **`01-offline-download.test.ts`** — Download a System for offline use:
+
 1. Navigate to System detail page
 2. Tap "Download for Offline" button
 3. Verify progress indicator appears (0% → 50% → 100%)
@@ -1573,6 +1599,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 6. Kill app, go offline, relaunch → verify system is accessible
 
 **`02-offline-browse.test.ts`** — Browse downloaded content while offline:
+
 1. Pre-condition: system pack downloaded
 2. Enable airplane mode
 3. Verify status indicator shows 🔴 "Offline (no data)" on undownloaded tab
@@ -1583,6 +1610,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 8. Map → verify MBTiles render, grey "not downloaded" overlay for outside area
 
 **`03-offline-edit.test.ts`** — Edit wiki pages while offline:
+
 1. Pre-condition: system pack downloaded, go offline
 2. Open wiki page for a trail, tap "Edit"
 3. Modify content: "Updated this offline"
@@ -1593,6 +1621,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 8. Re-edit and save again → verify queue has 1 pending again
 
 **`04-sync-upload.test.ts`** — Sync pending edits on reconnect:
+
 1. Pre-condition: 3 offline edits queued (wiki, feature, media)
 2. Re-enable network (disable airplane mode)
 3. Wait for auto-sync to trigger (debounced, ~5s)
@@ -1603,6 +1632,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 8. Pull-to-refresh to verify server content matches
 
 **`05-sync-conflict.test.ts`** — Handle edit conflicts:
+
 1. Pre-condition: edit wiki page offline (base_revision_id = v42)
 2. While offline, simulate another user editing the same page via API (revision v43)
 3. Reconnect → sync attempt returns 409 Conflict
@@ -1613,6 +1643,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 8. Retry with no resolution → verify conflict remains pending
 
 **`06-storage-manager.test.ts`** — Manage downloaded packs:
+
 1. Download 3 systems (42MB, 89MB, 128MB)
 2. Navigate to Settings → Storage
 3. Verify total usage bar: `████████░ 259MB / 500MB`
@@ -1625,6 +1656,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 #### Phase 1: Map Interactions on Mobile (1 test file)
 
 **`07-webview-map.test.ts`** — Verify WebView map bridge:
+
 1. Open Explore tab → map loads (verify WebView renders)
 2. Pinch zoom → verify map zooms (check zoom level via bridge)
 3. Double-tap → verify zoom in
@@ -1638,6 +1670,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 #### Phase 4: Camera & Gallery (1 test file)
 
 **`08-camera-gallery.test.ts`** — Media capture on mobile:
+
 1. Navigate to feature detail, tap "Add Photo"
 2. Tap "Take Photo" → verify camera launches
 3. Capture photo → verify thumbnail appears in gallery
@@ -1649,6 +1682,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 #### Phase 9: GPS Recording (1 test file)
 
 **`09-gps-recording.test.ts`** — Record and upload GPS tracks:
+
 1. Navigate to trail detail, tap "Record Hike"
 2. Verify tracking starts → timer running, distance accumulating
 3. Simulate location changes (mock `expo-location` via Detox launch args)
@@ -1660,6 +1694,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 #### Phase 6: Auth (1 test file)
 
 **`10-auth-secure-store.test.ts`** — JWT persistence across app restarts:
+
 1. Login → verify JWT stored in SecureStore
 2. Kill app completely (adb force-stop)
 3. Relaunch app → verify user is still authenticated (token read from SecureStore)
@@ -1669,6 +1704,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 #### Platform-Specific (2 test files)
 
 **`11-app-lifecycle.test.ts`** — Background/foreground sync:
+
 1. Queue 2 offline edits
 2. Put app in background (Home button)
 3. Re-enable network while app is in background
@@ -1676,6 +1712,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 5. Verify edits synced
 
 **`12-back-navigation.test.ts`** — Android hardware back button:
+
 1. Navigate Trail → Segment → verify back button returns to Trail
 2. Navigate System → Trail → verify back button returns to System
 3. From editor with unsaved changes → verify "Discard changes?" dialog
@@ -1684,6 +1721,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 #### Full Journey Smoke Test (1 test file)
 
 **`13-full-journey.test.ts`** — End-to-end user journey:
+
 1. Launch app online → browse systems, find "Hocking Hills"
 2. Download system (42MB)
 3. Go offline → browse map, trails, read wiki
@@ -1697,6 +1735,7 @@ CI=true detox test --configuration android.emu.release --cleanup
 ### 14.5 Playwright E2E Integration
 
 Existing Playwright tests in `tests/e2e/` cover web-parity features (10 spec files). They use:
+
 - `playwright.config.ts` — Chromium, parallel, Expo web build served locally
 - `tests/e2e/helpers/api-mock.ts` — Route interception mocking the API
 - `tests/e2e/fixtures/data.ts` — Test seed data
@@ -1706,13 +1745,13 @@ Existing Playwright tests in `tests/e2e/` cover web-parity features (10 spec fil
 
 As new phases add web-parity features, add corresponding Playwright specs:
 
-| Phase | New Playwright Specs |
-|---|---|
-| Phase 2 (Wiki) | `tests/e2e/flows/11-wiki-view.spec.ts`, `12-wiki-edit.spec.ts`, `13-wiki-revisions.spec.ts`, `14-citations.spec.ts` |
-| Phase 4 (Features) | `tests/e2e/flows/15-feature-create.spec.ts`, `16-feature-edit.spec.ts`, `17-media-upload.spec.ts` |
-| Phase 5 (Segments) | `tests/e2e/flows/18-segment-create.spec.ts`, `19-segment-split-merge.spec.ts`, `20-segment-reorder.spec.ts` |
-| Phase 6 (Auth) | `tests/e2e/flows/21-auth-register.spec.ts`, `22-auth-login.spec.ts`, `23-admin-dashboard.spec.ts`, `24-admin-moderation.spec.ts` |
-| Phase 7 (Polish) | `tests/e2e/flows/25-desktop-layout.spec.ts`, `26-responsive.spec.ts` |
+| Phase              | New Playwright Specs                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 2 (Wiki)     | `tests/e2e/flows/11-wiki-view.spec.ts`, `12-wiki-edit.spec.ts`, `13-wiki-revisions.spec.ts`, `14-citations.spec.ts`              |
+| Phase 4 (Features) | `tests/e2e/flows/15-feature-create.spec.ts`, `16-feature-edit.spec.ts`, `17-media-upload.spec.ts`                                |
+| Phase 5 (Segments) | `tests/e2e/flows/18-segment-create.spec.ts`, `19-segment-split-merge.spec.ts`, `20-segment-reorder.spec.ts`                      |
+| Phase 6 (Auth)     | `tests/e2e/flows/21-auth-register.spec.ts`, `22-auth-login.spec.ts`, `23-admin-dashboard.spec.ts`, `24-admin-moderation.spec.ts` |
+| Phase 7 (Polish)   | `tests/e2e/flows/25-desktop-layout.spec.ts`, `26-responsive.spec.ts`                                                             |
 
 ### 14.6 Component Unit Tests (React Native Testing Library)
 
@@ -1868,8 +1907,8 @@ jobs:
     // Dev
     "dev:android": "cd packages/app && npx expo run:android",
     "log:android": "adb logcat -s ReactNativeJS:V",
-    "screenshot:android": "adb exec-out screencap -p > screenshot.png"
-  }
+    "screenshot:android": "adb exec-out screencap -p > screenshot.png",
+  },
 }
 ```
 
@@ -1879,45 +1918,45 @@ jobs:
 
 Each phase must pass the following before being considered "done":
 
-| Phase | Must Pass |
-|---|---|
-| Phase 1 | Playwright: tabs, browse, system/trail detail, search, deep links. Detox: WebView map interactions. |
-| Phase 2 | Playwright: wiki view, edit, revisions, citations. |
+| Phase   | Must Pass                                                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Phase 1 | Playwright: tabs, browse, system/trail detail, search, deep links. Detox: WebView map interactions.                                                                      |
+| Phase 2 | Playwright: wiki view, edit, revisions, citations.                                                                                                                       |
 | Phase 3 | **Detox: all 6 offline test files (download, browse, edit, sync, conflict, storage).** Playwright: storage manager UI shell. Bun test: syncService, conflict resolution. |
-| Phase 4 | Playwright: feature CRUD, media gallery. Detox: camera/gallery. |
-| Phase 5 | Playwright: segment CRUD, split/merge/reorder. |
-| Phase 6 | Playwright: auth flows, admin dashboard. Detox: SecureStore persistence, app lifecycle. |
-| Phase 7 | Playwright: responsive layout, accessibility. Performance benchmarks (Lighthouse). |
-| Phase 8 | Detox: all iOS tests (reuse Android test JS, different `.detoxrc.js` config). |
-| Phase 9 | Detox: GPS recording, track playback. Bun test: attestation logic, trust score math. |
+| Phase 4 | Playwright: feature CRUD, media gallery. Detox: camera/gallery.                                                                                                          |
+| Phase 5 | Playwright: segment CRUD, split/merge/reorder.                                                                                                                           |
+| Phase 6 | Playwright: auth flows, admin dashboard. Detox: SecureStore persistence, app lifecycle.                                                                                  |
+| Phase 7 | Playwright: responsive layout, accessibility. Performance benchmarks (Lighthouse).                                                                                       |
+| Phase 8 | Detox: all iOS tests (reuse Android test JS, different `.detoxrc.js` config).                                                                                            |
+| Phase 9 | Detox: GPS recording, track playback. Bun test: attestation logic, trust score math.                                                                                     |
 
 ---
 
 ### 14.11 Risks & Mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Detox + Expo compatibility | Use `@config-plugins/detox` Expo plugin; test on SDK 52 early |
-| Detox + WebView interactions | WebView inside RN is opaque to Detox matchers; use `testID` on RN wrapper views, use `webview.element(by.webView())` for OL events |
-| Detox + op-sqlite | Native SQLite binding may not work in Android emulator with Detox; fall back to `expo-sqlite` for Detox test builds if needed |
-| Long test runtime (emulator boot) | Cache AVD snapshot; run only `android.emu.release` in CI; parallelize by test file (future) |
-| Flaky WebView map tests | Retry with visual diff; use `waitFor` with generous timeouts (15s for tile render) |
-| MBTiles generation in CI | Pre-generate test packs, commit to repo or upload as CI artifact |
-| Network toggle flakiness | Use Detox's `device.setURLBlacklist()` to simulate offline rather than airplane mode |
+| Risk                              | Mitigation                                                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Detox + Expo compatibility        | Use `@config-plugins/detox` Expo plugin; test on SDK 52 early                                                                      |
+| Detox + WebView interactions      | WebView inside RN is opaque to Detox matchers; use `testID` on RN wrapper views, use `webview.element(by.webView())` for OL events |
+| Detox + op-sqlite                 | Native SQLite binding may not work in Android emulator with Detox; fall back to `expo-sqlite` for Detox test builds if needed      |
+| Long test runtime (emulator boot) | Cache AVD snapshot; run only `android.emu.release` in CI; parallelize by test file (future)                                        |
+| Flaky WebView map tests           | Retry with visual diff; use `waitFor` with generous timeouts (15s for tile render)                                                 |
+| MBTiles generation in CI          | Pre-generate test packs, commit to repo or upload as CI artifact                                                                   |
+| Network toggle flakiness          | Use Detox's `device.setURLBlacklist()` to simulate offline rather than airplane mode                                               |
 
 ---
 
 ## 15. Risks & Mitigations
 
-| Risk | Mitigation |
-|---|---|
-| WebView map performance | Profile tile rendering, use simplified geometries at lower zooms, lazy load features |
-| MBTiles files too large | Compress with gzip, limit max zoom to 14, prune unpopulated tiles |
-| Sync conflicts frequent | Clear merge UI, eventually consider CRDT (automerge) for text |
-| OSM data quality varies | Allow user edits from day 1, attestation system verifies over time |
-| Spam/vandalism | Anonymous rate limiting, admin tools in Phase 6, trust scores in Phase 9 |
-| PostGIS hosting burden for self-hosters | Provide pre-loaded DB dump, simple docker compose, document resource needs |
-| OpenLayers WebView bridge fragile | Keep bridge surface small, version-lock the HTML bundle, test on multiple Android versions |
+| Risk                                    | Mitigation                                                                                 |
+| --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| WebView map performance                 | Profile tile rendering, use simplified geometries at lower zooms, lazy load features       |
+| MBTiles files too large                 | Compress with gzip, limit max zoom to 14, prune unpopulated tiles                          |
+| Sync conflicts frequent                 | Clear merge UI, eventually consider CRDT (automerge) for text                              |
+| OSM data quality varies                 | Allow user edits from day 1, attestation system verifies over time                         |
+| Spam/vandalism                          | Anonymous rate limiting, admin tools in Phase 6, trust scores in Phase 9                   |
+| PostGIS hosting burden for self-hosters | Provide pre-loaded DB dump, simple docker compose, document resource needs                 |
+| OpenLayers WebView bridge fragile       | Keep bridge surface small, version-lock the HTML bundle, test on multiple Android versions |
 
 ---
 
@@ -2161,6 +2200,7 @@ magnum/
 ## 18. Appendix B: Key Dependencies
 
 ### API (`packages/api`)
+
 ```json
 {
   "dependencies": {
@@ -2170,9 +2210,9 @@ magnum/
     "drizzle-kit": "^0.30",
     "pg": "^8",
     "zod": "^3",
-    "bcryptjs": "^2",        // Phase 6
-    "jsonwebtoken": "^9",    // Phase 6
-    "@turf/turf": "^7"       // Geometry operations
+    "bcryptjs": "^2", // Phase 6
+    "jsonwebtoken": "^9", // Phase 6
+    "@turf/turf": "^7" // Geometry operations
   },
   "devDependencies": {
     "@types/pg": "^8",
@@ -2182,6 +2222,7 @@ magnum/
 ```
 
 ### App (`packages/app`)
+
 ```json
 {
   "dependencies": {
@@ -2210,6 +2251,7 @@ magnum/
 ```
 
 ### Map (`packages/map`)
+
 ```json
 {
   "dependencies": {
@@ -2222,6 +2264,7 @@ magnum/
 ```
 
 ### Shared (`packages/shared`)
+
 ```json
 {
   "dependencies": {
@@ -2235,6 +2278,7 @@ magnum/
 ## 19. Appendix C: Screenshot Wireframes (Textual)
 
 ### Explore Tab (Map View)
+
 ```
 ┌─────────────────────────────┐
 │  🔍 Search trails...    🟢  │  ← StatusIndicator
@@ -2261,6 +2305,7 @@ magnum/
 ```
 
 ### Trail Detail Page
+
 ```
 ┌─────────────────────────────┐
 │  ← Trail Detail             │
@@ -2294,6 +2339,7 @@ magnum/
 ```
 
 ### Wiki Editor
+
 ```
 ┌─────────────────────────────┐
 │  ← Edit Wiki       [Save]   │
@@ -2331,6 +2377,7 @@ magnum/
 ```
 
 ### Offline Status Bar States
+
 ```
 🟢 Online                          — connected, can edit
 🟡 Offline (3 pending changes)     — disconnected, has unsynced work
@@ -2339,6 +2386,7 @@ magnum/
 ```
 
 ### Storage Manager
+
 ```
 ┌─────────────────────────────┐
 │  Settings > Storage         │
@@ -2365,8 +2413,8 @@ magnum/
 
 ---
 
-*Last updated: 2026-06-21*
-*Phase 0 starts with: monorepo scaffold, Docker Compose, DB schema, API skeleton, RN app shell.*
+_Last updated: 2026-06-21_
+_Phase 0 starts with: monorepo scaffold, Docker Compose, DB schema, API skeleton, RN app shell._
 
 ---
 
@@ -2424,6 +2472,7 @@ When only editing JS/TS code (no native changes):
 ### 20.4 When Rebuild IS Required
 
 Rebuild the APK only when:
+
 - Adding/removing native dependencies (`bun add`/`bun remove` anything with native code)
 - Changing `app.json` or Expo config
 - Adding new native asset files (images, fonts in `assets/`)
@@ -2452,16 +2501,19 @@ adb logcat -c && adb logcat -s ReactNativeJS:V
 ### 20.6 Common Issues
 
 **Build fails with "Plugin [id: 'expo-module-gradle-plugin'] was not found"**
+
 - This happens when Bun's nested node_modules layout confuses Gradle
 - The `expo-module-gradle-plugin` npm package is an empty placeholder — remove it if installed
 - For expo modules using the new plugin format, convert them to use `apply plugin: 'com.android.library'` + manual `ExpoModulesCorePlugin.gradle` application
 - Or use `npx expo install expo-sqlite@~15.0.0` to get SDK 52 compatible versions
 
 **Build fails with Kotlin compilation errors (Unresolved reference: NativeArrayBuffer etc.)**
+
 - Version mismatch: package is for a newer Expo SDK than 52
 - Install compatible version: `bun add expo-sqlite@~15.0.0`
 
 **Bun install breaks the Android build**
+
 - Bun uses a nested `node_modules/.bun/` structure that Gradle can't resolve
 - If the build breaks after `bun install`, try running `npx expo prebuild --platform android --clean` first
 - If `expo-modules-core` isn't resolvable, manually symlink it:
@@ -2471,12 +2523,14 @@ adb logcat -c && adb logcat -s ReactNativeJS:V
   ```
 
 **Emulator not found by adb**
+
 ```bash
 adb kill-server && adb start-server
 adb devices  # should show emulator-5554
 ```
 
 **Metro port already in use**
+
 ```bash
 lsof -i :8081 | grep LISTEN | awk '{print $2}' | xargs kill
 ```
@@ -2502,20 +2556,21 @@ cd packages/api && bun run db:migrate
 
 Copy `.env.example` to `.env` and customize:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DB_HOST` | localhost | PostgreSQL host |
-| `DB_NAME` | magnum | Database name |
-| `DB_USER` | magnum | Database user |
-| `DB_PASSWORD` | changeme | Database password |
-| `MARTIN_URL` | http://localhost:3001 | Martin tile server |
-| `EXPO_PUBLIC_API_URL` | http://localhost:3000 | API URL (exposed to app) |
+| Variable                 | Default               | Description                 |
+| ------------------------ | --------------------- | --------------------------- |
+| `DB_HOST`                | localhost             | PostgreSQL host             |
+| `DB_NAME`                | magnum                | Database name               |
+| `DB_USER`                | magnum                | Database user               |
+| `DB_PASSWORD`            | changeme              | Database password           |
+| `MARTIN_URL`             | http://localhost:3001 | Martin tile server          |
+| `EXPO_PUBLIC_API_URL`    | http://localhost:3000 | API URL (exposed to app)    |
 | `EXPO_PUBLIC_MARTIN_URL` | http://localhost:3001 | Martin URL (exposed to app) |
-| `ADMIN_SECRET` | dev-secret-change-me | Admin header secret |
+| `ADMIN_SECRET`           | dev-secret-change-me  | Admin header secret         |
 
 **IMPORTANT**: `EXPO_PUBLIC_*` variables are inlined at BUILD TIME. If you change them, you must rebuild the APK.
 
 For Metro dev server, set them when starting:
+
 ```bash
 EXPO_PUBLIC_API_URL=http://localhost:3000 npx expo start --dev-client --port 8081
 ```

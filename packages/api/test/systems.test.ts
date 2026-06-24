@@ -19,7 +19,12 @@ describe("GET /api/systems", () => {
   test("returns paginated list", async () => {
     const res = await buildApp().request("/api/systems");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { items: unknown[]; total: number; page: number; pageSize: number };
+    const body = (await res.json()) as {
+      items: unknown[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
     expect(Array.isArray(body.items)).toBe(true);
     expect(body.page).toBe(1);
     expect(body.pageSize).toBe(20);
@@ -51,7 +56,10 @@ describe("POST /api/systems", () => {
       body: JSON.stringify({ name: "", slug: "Invalid Slug With Spaces" }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string; details: { fieldErrors: Record<string, string[]> } };
+    const body = (await res.json()) as {
+      error: string;
+      details: { fieldErrors: Record<string, string[]> };
+    };
     expect(body.error).toBe("invalid_input");
     expect(body.details.fieldErrors).toBeDefined();
     expect(state.insertCalls.length).toBe(0);
