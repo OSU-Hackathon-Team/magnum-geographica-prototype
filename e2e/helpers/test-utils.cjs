@@ -181,19 +181,17 @@ async function waitForText(text, timeout = 30000) {
 }
 
 /**
- * Launch the app in offline mode.  The offline flag is embedded as a query
- * parameter in the Expo dev-client URL so Metro still connects while the
- * OfflineProvider's useURL() hook detects it and sets `isOnline = false`.
- *
- * Previous versions used `url: "magnum://offline"` which overrode the Expo
- * dev-client URL entirely, preventing Metro from loading the JS bundle.
+ * Launch the app in offline mode.  The offline flag is smuggled inside the
+ * Metro URL (not a top-level Expo query param, which the dev client strips).
+ * The full URL returned by Linking.getInitialURL() is then:
+ *   org.magnum.app://expo-development-client/?url=http://10.0.2.2:8081?offlineMode=true
+ * and the OfflineProvider's url.includes("offline") matches "offlineMode".
  */
 async function launchAppOffline(launchArgs = {}) {
-  // Embed the offline flag into the Expo URL so both Metro and the app
-  // receive it.  Expo ignores extra query params; Linking.getInitialURL()
-  // returns the full URL including &offlineMode=true.
+  // Metro ignores query params on the bundle URL, so ?offlineMode=true
+  // is harmless for JS loading but visible to getInitialURL().
   const expoUrl =
-    "org.magnum.app://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081&offlineMode=true";
+    "org.magnum.app://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081%3FofflineMode%3Dtrue";
   return launchAppAndWait({
     ...launchArgs,
     url: expoUrl,

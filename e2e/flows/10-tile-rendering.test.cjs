@@ -1,5 +1,6 @@
 const {
   launchAppAndWait,
+  launchAppOffline,
   forceStopApp,
   sleep,
   waitForScreen,
@@ -93,5 +94,52 @@ describe("10c Download", () => {
     await element(by.id("profile-screen")).scroll(500, "down");
     await expectVisible("storage-manager", 15000);
     await expect(element(by.id("storage-empty"))).not.toExist();
+  });
+});
+
+describe("10d Offline — Basemap Renders", () => {
+  beforeAll(async () => {
+    // Drop the adb reverse for API and Martin so the emulator has no
+    // backend reachability — simulates true airplane mode.
+    try {
+      execSync("adb reverse --remove tcp:3000", { encoding: "utf8" });
+      execSync("adb reverse --remove tcp:3001", { encoding: "utf8" });
+    } catch (_) { /* non-fatal */ }
+    await sleep(2000);
+    await forceStopApp();
+  });
+
+  afterAll(async () => {
+    execSync("adb reverse tcp:3000 tcp:3000 2>/dev/null || true", {
+      encoding: "utf8",
+    });
+    execSync("adb reverse tcp:3001 tcp:3001 2>/dev/null || true", {
+      encoding: "utf8",
+    });
+    await sleep(1000);
+  });
+
+  it("launches offline and shows offline indicator", async () => {
+    // launchAppOffline embeds offlineMode=true inside the Metro URL
+    // query string, which survives Expo dev-client URL stripping.
+    await launchAppOffline();
+    await waitForScreen("explore-screen");
+
+    // Status indicator must show "Offline"
+    await expectVisible("status-indicator", 30000);
+    await expect(element(by.id("status-label"))).toHaveText("Offline");
+
+    // Map container must still exist
+    await expectVisible("explore-map", 15000);
+  });
+
+  it("verifies the map.html is intact after offline launch", () => {
+    const html = execSync(
+      'adb shell "run-as org.magnum.app cat files/magnum-map/map.html"',
+      { encoding: "utf8", timeout: 10000 },
+    );
+    expect(html.length).toBeGreaterThan(5000);
+    expect(html).toContain("http://localhost:3001/basemap/{z}/{x}/{y}");
+    expect(html).not.toMatch(/\/\/\+\$\/,'/);
   });
 });

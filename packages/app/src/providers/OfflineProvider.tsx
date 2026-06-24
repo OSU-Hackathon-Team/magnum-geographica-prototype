@@ -28,18 +28,28 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   // Detox e2e tests cannot toggle airplane mode (it kills the adb reverse
   // bridge that Metro depends on).  Instead they launch the app with
-  //   device.launchApp({ url: "magnum://offline" })
-  // which lands here and forces the store into offline mode so the app
-  // reads from the local SQLite database.
+  //   device.launchApp({ url: ".../expo-development-client/?url=...&offlineMode=true" })
+  // which lands here.  The Expo dev-client URL is read via
+  // expo-linking's getInitialURL() (not useURL() — that hook starts as
+  // null and the enclosing useEffect would already have finished).
   useEffect(() => {
     if (Platform.OS !== "web") {
-      try {
-        const { useURL } = require("expo-linking");
-        const url = useURL();
-        if (url && url.includes("offline")) {
-          setOnline(false);
+      let cancelled = false;
+      (async () => {
+        try {
+          const Linking = await import("expo-linking");
+          if (cancelled) return;
+          const url = await Linking.getInitialURL();
+          console.log("[OfflineProvider] getInitialURL =", url);
+          if (url && url.includes("offline")) {
+            console.log("[OfflineProvider] forcing offline via deep link");
+            setOnline(false);
+          }
+        } catch (e) {
+          console.warn("[OfflineProvider] expo-linking unavailable:", e);
         }
-      } catch { /* expo-linking not available — skip */ }
+      })();
+      return () => { cancelled = true; };
     }
   }, [setOnline]);
 
