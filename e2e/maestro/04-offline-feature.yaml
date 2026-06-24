@@ -1,0 +1,67 @@
+appId: org.magnum.app
+---
+# Disable wifi before launching the app
+- runScript: adb shell svc wifi disable
+
+- launchApp:
+    clearState: true
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "explore-screen"
+    timeout: 90000
+
+# Tap add feature FAB
+- tapOn:
+    id: "explore-add-feature"
+- assertVisible:
+    id: "explore-placing-banner"
+
+# Tap on the map to place the feature (center of map area)
+- tapOn:
+    point: "50%,55%"
+
+# Wait for the create feature form
+- extendedWaitUntil:
+    visible:
+      id: "create-feature-form"
+    timeout: 15000
+- assertVisible:
+    id: "create-feature-offline-banner"
+
+# Select trailhead type
+- tapOn:
+    id: "feature-type-trailhead"
+
+# Type feature name
+- tapOn:
+    id: "feature-form-name"
+- inputText: "Test Maestro Trailhead"
+
+# Select system: Hocking Hills State Park
+- tapOn:
+    id: "feature-system-hocking-hills-state-park"
+
+# Save the feature
+- tapOn:
+    id: "feature-form-save"
+
+# Should navigate back to explore
+- assertVisible:
+    id: "explore-screen"
+
+# Navigate to Profile and verify pending queue
+- tapOn:
+    id: "tab-profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-screen"
+    timeout: 30000
+- scroll
+- assertVisible:
+    id: "pending-queue"
+- assertNotVisible:
+    id: "pending-queue-empty"
+
+# Re-enable wifi
+- runScript: adb shell svc wifi enable

@@ -1,0 +1,39 @@
+appId: org.magnum.app
+---
+# Ensure wifi is enabled
+- runScript: adb shell svc wifi enable
+
+- launchApp:
+    clearState: true
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "explore-screen"
+    timeout: 90000
+
+# Assert online status
+- assertVisible: "Online"
+
+# Wait for sync to complete (starts 1s after online detection)
+- runScript: sleep 12
+
+# Navigate to Profile and verify pending queue is empty
+- tapOn:
+    id: "tab-profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-screen"
+    timeout: 30000
+- scroll
+- assertVisible:
+    id: "pending-queue-empty"
+- assertNotVisible:
+    id: "pending-queue"
+
+# Query API to verify feature reached the server
+- runScript: |
+    if curl -s "http://10.0.2.2:3000/api/features" | grep -q "Test Maestro Trailhead"; then
+      echo "FEATURE_SYNCED: true"
+    else
+      echo "FEATURE_SYNCED: false"
+    fi

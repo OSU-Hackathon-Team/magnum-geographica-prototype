@@ -1,0 +1,52 @@
+appId: org.magnum.app
+---
+# Disable wifi before launching the app
+- runScript: adb shell svc wifi disable
+
+- launchApp:
+    clearState: true
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "explore-screen"
+    timeout: 90000
+
+# Assert offline status indicator
+- waitForAnimationToEnd
+- assertVisible: "Offline"
+
+# Navigate to Systems tab
+- tapOn:
+    id: "tab-systems"
+- extendedWaitUntil:
+    visible:
+      id: "systems-list"
+    timeout: 30000
+- assertVisible:
+    id: "systems-list"
+- assertNotVisible:
+    id: "systems-empty"
+
+# Tap on a system card
+- tapOn:
+    id: "system-card-hocking-hills-state-park"
+- extendedWaitUntil:
+    visible: "Hocking Hills State Park"
+    timeout: 15000
+
+# Go back to systems list
+- pressKey: back
+
+# Navigate to Profile and verify storage manager
+- tapOn:
+    id: "tab-profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-screen"
+    timeout: 30000
+- scroll
+- assertVisible:
+    id: "storage-manager"
+
+# Re-enable wifi
+- runScript: adb shell svc wifi enable

@@ -1,0 +1,82 @@
+appId: org.magnum.app
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "explore-screen"
+    timeout: 90000
+- assertVisible:
+    id: "explore-map"
+- assertVisible: "Explore"
+
+# Tap download area button
+- tapOn:
+    id: "explore-download-area"
+- waitForAnimationToEnd
+
+# Draw bbox with slow swipe on the map area
+- swipe:
+    start: "30%,50%"
+    end: "65%,70%"
+    duration: 4000
+
+# Wait for download sheet
+- extendedWaitUntil:
+    visible:
+      id: "explore-download-sheet"
+    timeout: 30000
+- assertVisible:
+    id: "download-estimate"
+
+# Start download
+- tapOn:
+    id: "download-start"
+
+# Wait for download to complete (up to 5 min for tile generation)
+- extendedWaitUntil:
+    visible: "Downloaded successfully"
+    timeout: 300000
+
+# Close the download sheet
+- tapOn:
+    id: "download-sheet-close"
+
+# Switch to satellite layer
+- tapOn:
+    id: "explore-base-layer-switcher-trigger"
+- tapOn:
+    id: "explore-base-layer-switcher-option-satellite"
+
+# Repeat download for satellite basemap
+- tapOn:
+    id: "explore-download-area"
+- waitForAnimationToEnd
+- swipe:
+    start: "30%,50%"
+    end: "65%,70%"
+    duration: 4000
+- extendedWaitUntil:
+    visible:
+      id: "explore-download-sheet"
+    timeout: 30000
+- tapOn:
+    id: "download-start"
+- extendedWaitUntil:
+    visible: "Downloaded successfully"
+    timeout: 300000
+- tapOn:
+    id: "download-sheet-close"
+
+# Navigate to Profile and verify storage manager
+- tapOn:
+    id: "tab-profile"
+- extendedWaitUntil:
+    visible:
+      id: "storage-manager"
+    timeout: 30000
+- assertVisible:
+    id: "storage-manager"
+- assertNotVisible:
+    id: "storage-empty"

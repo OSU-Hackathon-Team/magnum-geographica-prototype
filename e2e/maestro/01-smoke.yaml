@@ -1,0 +1,17 @@
+appId: org.magnum.app
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "explore-screen"
+    timeout: 90000
+- assertVisible: "Explore"
+
+# Status indicator may need a moment after store hydration
+- waitForAnimationToEnd
+- assertVisible:
+    id: "status-indicator"
+- assertVisible:
+    id: "explore-map"
