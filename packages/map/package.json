@@ -17,6 +17,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
+    "expo-asset": "~11.0.5",
+    "expo-file-system": "~18.0.12",
     "ol": "^10.3.1"
   },
   "peerDependencies": {
@@ -29,6 +31,12 @@
       "optional": true
     },
     "react-native-webview": {
+      "optional": true
+    },
+    "expo-asset": {
+      "optional": true
+    },
+    "expo-file-system": {
       "optional": true
     }
   },

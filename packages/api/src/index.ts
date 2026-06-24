@@ -14,6 +14,7 @@ import { offlineRoute } from "./routes/offline.js";
 import { syncRoute } from "./routes/sync.js";
 import { mediaRoute } from "./routes/media.js";
 import { segmentDetailRoute, trailSegmentsRoute } from "./routes/segments.js";
+import { metroProxy } from "./middleware/metro-proxy.js";
 
 const app = new Hono();
 
@@ -37,9 +38,7 @@ app.route("/api/trails", trailSegmentsRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));
 
-app.notFound((c) =>
-  c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),
-);
+app.all("*", metroProxy());
 
 app.onError((err, c) => {
   console.error("api error:", err);

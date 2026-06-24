@@ -29,7 +29,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:3001:3000"
+      - "3001:3000"
     command: ["--config", "/etc/martin.yaml"]
     restart: unless-stopped
 
@@ -38,11 +38,14 @@ services:
       context: ..
       dockerfile: docker/api.Dockerfile
     container_name: magnum-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: postgres://${DB_USER:-magnum}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-magnum}
       MARTIN_URL: http://martin:3000
       ADMIN_SECRET: ${ADMIN_SECRET:-dev-secret-change-me}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:8081,http://localhost:19006,http://localhost:3000}
+      METRO_URL: ${METRO_URL:-http://host.docker.internal:8081}
       API_PORT: "3000"
       NODE_ENV: development
     depends_on:
@@ -51,7 +54,7 @@ services:
       martin:
         condition: service_started
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     volumes:
       - ../packages/api/src:/app/src:ro
       - ../packages/shared:/app/shared:ro

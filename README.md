@@ -25,7 +25,9 @@ bun install                                         # workspace install
 
 docker compose -f docker/docker-compose.yml up -d   # start postgres + martin + api
 bun run --cwd packages/api db:migrate               # apply schema
-curl -X POST http://localhost:3000/api/seed         # seed demo data
+# Seed demo data (admin secret header optional in development):
+curl -X POST http://localhost:3000/api/seed \
+  -H "x-admin-secret: ${ADMIN_SECRET:-dev-secret-change-me}"
 bun run --cwd packages/app web                      # Expo dev server (web)
 ```
 

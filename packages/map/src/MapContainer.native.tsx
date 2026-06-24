@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, View, StyleSheet } from "react-native";
 import WebView, { type WebViewMessageEvent } from "react-native-webview";
+import { Asset } from "expo-asset";
 import {
   defaultMapConfig,
   resolveBaseLayers,
@@ -14,6 +15,16 @@ import type { BridgeCommand, BridgeEvent } from "./bridge/types.js";
 export type { MapContainerProps };
 
 const OFFLINE_BG_COLOR = "#e8e8e8";
+
+// OpenLayers JS + CSS bundled as raw Metro assets. The `.bin` extension is
+// registered in metro.config.js so `Asset.fromModule()` resolves them. We
+// cannot simply read them from `bundleDirectory/assets/...` because Metro
+// does not treat `.js`/`.css` as asset extensions by default, so those files
+// never make it into the APK.
+// @ts-expect-error - non-TS asset module (resolved by Metro at bundle time)
+import olJsAssetModule from "../assets/ol.bin";
+// @ts-expect-error - non-TS asset module (resolved by Metro at bundle time)
+import olCssAssetModule from "../assets/ol-styles.bin";
 
 function buildMapHtml(
   martinUrl: string | null,
@@ -54,7 +65,8 @@ function buildMapHtml(
           baseLayerImpls={},
           activeBaseLayer=null,
           dragBox=null,
-          dragLayer=null;
+          dragLayer=null,
+          savedDragPan=null;
 
       function postToRN(e){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(e))}}
 
@@ -266,10 +278,91 @@ function buildMapHtml(
         map.on('moveend',function(){var v=map.getView();var c=ol.proj.toLonLat(v.getCenter());postToRN({type:'moveEnd',center:c,zoom:v.getZoom()})});
       }
 
+      // Auto-initialize the map when the page loads. The React Native side
+      // can no longer rely on injectJavaScript to call olBridge.init because
+      // Android WebView runs injected scripts in a separate "about:blank"
+      // context where the ol global is undefined. Building the map here
+      // guarantees it is ready as soon as OL finishes loading.
+      buildMap();
+      postToRN({type:'ready'});
+
+      // Handle commands sent from React Native via window.postMessage. This
+      // is the only reliable channel on Android because injectJavaScript
+      // runs in an isolated about:blank context that can't see ol, map, etc.
+      // The handler is hoisted to a top-level function so it closes over
+      // enterDrawMode, setActiveBaseLayer, etc. (the olBridge methods are
+      // not in scope from a sibling function defined inside the object).
+      function onHostMessage(payload){
+        if(!payload || typeof payload !== 'object') return;
+        try{
+          var m = payload.method;
+          var a = payload.args;
+          if(m === 'setBaseLayer' && a && a.id){
+            setActiveBaseLayer(a.id);
+          }else if(m === 'setOfflineMode' && a){
+            offlineMode = !!a.offline; updateLayerVisibility();
+          }else if(m === 'setOfflineData' && a){
+            if(a.superSystems && vectorLayers.superSystems){
+              var ssf = (new ol.format.GeoJSON()).readFeatures(a.superSystems, {featureProjection:'EPSG:3857'});
+              vectorLayers.superSystems.getSource().clear();
+              vectorLayers.superSystems.getSource().addFeatures(ssf);
+            }
+            if(a.trails && vectorLayers.trails){
+              var tf = (new ol.format.GeoJSON()).readFeatures(a.trails, {featureProjection:'EPSG:3857'});
+              vectorLayers.trails.getSource().clear();
+              vectorLayers.trails.getSource().addFeatures(tf);
+            }
+            if(a.systems && vectorLayers.systems){
+              var sf = (new ol.format.GeoJSON()).readFeatures(a.systems, {featureProjection:'EPSG:3857'});
+              vectorLayers.systems.getSource().clear();
+              vectorLayers.systems.getSource().addFeatures(sf);
+            }
+            if(a.features && vectorLayers.features){
+              var ff = (new ol.format.GeoJSON()).readFeatures(a.features, {featureProjection:'EPSG:3857'});
+              vectorLayers.features.getSource().clear();
+              vectorLayers.features.getSource().addFeatures(ff);
+            }
+          }else if(m === 'flyTo' && a){
+            if(!map) return;
+            map.getView().animate({center: ol.proj.fromLonLat([a.lon, a.lat]), zoom: a.zoom || map.getView().getZoom(), duration: 500});
+          }else if(m === 'setViewport' && a){
+            if(!map) return;
+            map.getView().setCenter(ol.proj.fromLonLat(a.center));
+            if(typeof a.zoom === 'number') map.getView().setZoom(a.zoom);
+          }else if(m === 'highlightTrail'){
+            highlightedId = a && a.id; applyHighlight();
+          }else if(m === 'enterDrawMode'){
+            if(window.olBridge && typeof window.olBridge.enterDrawMode === 'function'){
+              window.olBridge.enterDrawMode();
+            }
+          }else if(m === 'exitDrawMode'){
+            if(window.olBridge && typeof window.olBridge.exitDrawMode === 'function'){
+              window.olBridge.exitDrawMode();
+            }
+          }
+        }catch(err){
+          postToRN({type:'error', message: 'onHostMessage: ' + (err && err.message || String(err))});
+        }
+      }
+
+      window.addEventListener('message', function(ev){
+        var data = ev && ev.data;
+        if(!data) return;
+        var payload = null;
+        if(typeof data === 'string'){
+          try { payload = JSON.parse(data); } catch(e){ return; }
+        }else if(typeof data === 'object'){
+          payload = data;
+        }
+        if(payload && payload.method) onHostMessage(payload);
+      });
+
       window.olBridge={
         init:function(opts){
-          // If init is called with explicit baseLayer / center / zoom, use them;
-          // otherwise the buildMap() defaults (embedded in the HTML) are used.
+          // The map is built automatically when the page loads. init is
+          // kept as a no-op for backwards compatibility with the host
+          // onLoadEnd handler; any host overrides (baseLayers/center/zoom)
+          // are still honored.
           if(opts && opts.baseLayers){
             for(var i = 0; i < opts.baseLayers.length; i++){
               var d = opts.baseLayers[i];
@@ -348,6 +441,18 @@ function buildMapHtml(
           dragLayer=new ol.layer.Vector({source:new ol.source.Vector(),style:new ol.style.Style({fill:new ol.style.Fill({color:'rgba(34,197,94,0.1)'}),stroke:new ol.style.Stroke({color:'#22c55e',width:2,lineDash:[6,4]})})});
           dragLayer.set('name','draw-layer');
           map.addLayer(dragLayer);
+          // DragBox needs to win against the default DragPan so the user's
+          // drag is interpreted as drawing a bbox, not panning the map.
+          // We disable DragPan while drawing and re-enable it on exit.
+          savedDragPan=null;
+          var defaults=map.getInteractions().getArray();
+          for(var i=0;i<defaults.length;i++){
+            if(defaults[i] instanceof ol.interaction.DragPan){
+              savedDragPan=defaults[i];
+              map.removeInteraction(defaults[i]);
+              break;
+            }
+          }
           dragBox=new ol.interaction.DragBox({condition:ol.events.condition.always});
           map.addInteraction(dragBox);
           dragBox.on('boxend',function(){
@@ -363,6 +468,7 @@ function buildMapHtml(
         exitDrawMode:function(){
           if(dragBox){map.removeInteraction(dragBox);dragBox=null}
           if(dragLayer){map.removeLayer(dragLayer);dragLayer=null}
+          if(savedDragPan){map.addInteraction(savedDragPan);savedDragPan=null}
         }
       };
       window.addEventListener('error',function(e){postToRN({type:'error',message:e.message})});
@@ -418,23 +524,24 @@ export default function MapContainer({
         const cssPath = `${dir}ol.css`;
         const jsPath = `${dir}ol.js`;
 
-        // Write OL CSS if not present
-        const cssInfo = await FS.getInfoAsync(cssPath);
-        if (!cssInfo.exists) {
-          const cssData = await FS.readAsStringAsync(
-            `${FS.bundleDirectory}assets/ol.css`,
-          ).catch(() => null);
-          if (cssData) await FS.writeAsStringAsync(cssPath, cssData);
+        // Resolve and (if needed) download the bundled OpenLayers assets.
+        // `Asset.fromModule()` returns a local `file://` URI once downloaded;
+        // without this the WebView's `<script src="./ol.js">` and
+        // `<link href="./ol.css">` 404 and the map renders blank.
+        const cssAsset = Asset.fromModule(olCssAssetModule);
+        const jsAsset = Asset.fromModule(olJsAssetModule);
+        if (!cssAsset.localUri) await cssAsset.downloadAsync();
+        if (!jsAsset.localUri) await jsAsset.downloadAsync();
+        const cssLocal = cssAsset.localUri;
+        const jsLocal = jsAsset.localUri;
+        if (!cssLocal || !jsLocal) {
+          throw new Error("Failed to resolve bundled OL assets to a local URI");
         }
 
-        // Write OL JS if not present
-        const jsInfo = await FS.getInfoAsync(jsPath);
-        if (!jsInfo.exists) {
-          const jsData = await FS.readAsStringAsync(
-            `${FS.bundleDirectory}assets/ol.js`,
-          ).catch(() => null);
-          if (jsData) await FS.writeAsStringAsync(jsPath, jsData);
-        }
+        // Copy into the same directory the WebView loads `map.html` from so
+        // the relative `./ol.css` / `./ol.js` references resolve correctly.
+        await FS.copyAsync({ from: cssLocal, to: cssPath });
+        await FS.copyAsync({ from: jsLocal, to: jsPath });
 
         // Write map HTML (with basemap info baked in).
         const html = buildMapHtml(
@@ -483,18 +590,28 @@ export default function MapContainer({
   );
 
   const send = useCallback((command: BridgeCommand) => {
-    const script = commandToScript(command);
-    webViewRef.current?.injectJavaScript(script);
+    // Use window.postMessage rather than injectJavaScript. On Android the
+    // WebView runs injected scripts in a separate about:blank context where
+    // the page's globals (ol, map, the olBridge wrapper) are not defined, so
+    // commands silently fail. window.postMessage lands in the page's main
+    // context where the listener installed in buildMapHtml can dispatch them.
+    if (!webViewRef.current) return;
+    try {
+      webViewRef.current.postMessage(JSON.stringify(command));
+    } catch (e) {
+      // Fall back to injectJavaScript for environments where postMessage is
+      // not yet wired up. The bridge listener is a defensive copy.
+      const script = commandToScript(command);
+      webViewRef.current.injectJavaScript(script);
+    }
   }, []);
 
   const onLoadEnd = useCallback(() => {
-    if (initSentRef.current) return;
+    // The WebView auto-initializes the map and posts `{type:'ready'}` to the
+    // host as soon as OL finishes loading. The original `injectJavaScript`
+    // init call was a no-op on the JS side and is no longer needed.
     initSentRef.current = true;
-    // Init is a no-op on the JS side (the HTML already has baseLayerDefaults
-    // baked in). Keep it for symmetry with the web MapContainer and to allow
-    // future pre-init configuration.
-    send({ method: "init", args: {} as never });
-  }, [send]);
+  }, []);
 
   // Expose send function to parent
   useEffect(() => {
@@ -577,7 +694,15 @@ export default function MapContainer({
         style={styles.webview}
         javaScriptEnabled
         domStorageEnabled
+        // The WebView is loaded from a `file://` URI and needs to fetch
+        // `./ol.js`, `./ol.css`, and tile/vector sources over both `file://`
+        // (offline basemap) and `http(s)://` (Martin, EOX satellite). Without
+        // these flags the same-origin policy blocks the relative script/css
+        // imports and the map stays blank.
         allowFileAccess
+        allowFileAccessFromFileURLs
+        allowUniversalAccessFromFileURLs
+        mixedContentMode="always"
         scalesPageToFit={false}
         scrollEnabled={false}
         bounces={false}

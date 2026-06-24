@@ -8,6 +8,11 @@ const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [workspaceRoot];
 
+// Treat .bin files in `assets/` as Metro assets so `Asset.fromModule()` can
+// resolve them. These are used by the native WebView bridge to load the
+// OpenLayers JS/CSS bundle offline (without depending on a CDN at runtime).
+config.resolver.assetExts = [...(config.resolver.assetExts ?? []), "bin"];
+
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),

@@ -42,6 +42,33 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// `Buffer` is a Node.js API and is not available in React Native. We only
+// need `Buffer.byteLength` for size reporting — `Blob` gives us the same byte
+// count across both web and native.
+function byteLength(str: string): number {
+  if (typeof Blob !== "undefined") return new Blob([str]).size;
+  return str.length;
+}
+
+// `Buffer.from(...).toString("base64")` was being used to binary-encode a
+// tar entry for `writeAsStringAsync`. We use a tiny base64 encoder that works
+// in both web and React Native.
+const BASE64_CHARS =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b1 = bytes[i]!;
+    const b2 = bytes[i + 1] ?? 0;
+    const b3 = bytes[i + 2] ?? 0;
+    out += BASE64_CHARS[b1 >> 2];
+    out += BASE64_CHARS[((b1 & 0x03) << 4) | (b2 >> 4)];
+    out += i + 1 < bytes.length ? BASE64_CHARS[((b2 & 0x0f) << 2) | (b3 >> 6)] : "=";
+    out += i + 2 < bytes.length ? BASE64_CHARS[b3 & 0x3f] : "=";
+  }
+  return out;
+}
+
 async function extractTar(
   tarBuffer: ArrayBuffer,
   outputDir: string,
@@ -76,7 +103,7 @@ async function extractTar(
       const filePath = `${outputDir}/${name}`;
       const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
       await FS.makeDirectoryAsync(dirPath, { intermediates: true }).catch(() => {});
-      await FS.writeAsStringAsync(filePath, Buffer.from(fileData).toString("base64"), {
+      await FS.writeAsStringAsync(filePath, uint8ArrayToBase64(fileData), {
         encoding: FS.EncodingType.Base64,
       });
       filesWritten++;
@@ -99,15 +126,10 @@ export async function estimateRegionSize(
   maxZoom: number,
 ): Promise<BboxInfoResponse> {
   const client = createMagnumClient(API_URL);
-  return client.raw.request<BboxInfoResponse>("POST", "/api/offline-bbox/info", {
-    minLon,
-    minLat,
-    maxLon,
-    maxLat,
-    baseLayerId,
-    minZoom,
-    maxZoom,
-  });
+  return client.raw.post<BboxInfoResponse>(
+    "/api/offline-bbox/info",
+    { minLon, minLat, maxLon, maxLat, baseLayerId, minZoom, maxZoom },
+  );
 }
 
 export async function downloadRegion(
@@ -126,8 +148,7 @@ export async function downloadRegion(
 
   onProgress?.("Generating pack on server...", 5);
 
-  const generateResult = await client.raw.request<GenerateResponse>(
-    "POST",
+  const generateResult = await client.raw.post<GenerateResponse>(
     "/api/offline-bbox/generate",
     { minLon, minLat, maxLon, maxLat, baseLayerId, minZoom, maxZoom },
   );
@@ -180,7 +201,7 @@ export async function downloadRegion(
          min_lon=excluded.min_lon, max_lon=excluded.max_lon,
          min_lat=excluded.min_lat, max_lat=excluded.max_lat,
          updated_at=excluded.updated_at`,
-      [s.id, s.name, s.slug, s.description, bbox.minLon, bbox.maxLon, bbox.minLat, bbox.maxLat, now],
+      [s.id, s.name, s.slug, s.description, minLon, maxLon, minLat, maxLat, now],
     );
   }
 
@@ -201,8 +222,8 @@ export async function downloadRegion(
       [
         t.id, t.name, t.slug, t.description, t.difficulty, t.length_meters,
         t.elevation_gain_meters, null,
-        bounds?.minLon ?? bbox.minLon, bounds?.maxLon ?? bbox.maxLon,
-        bounds?.minLat ?? bbox.minLat, bounds?.maxLat ?? bbox.maxLat,
+        bounds?.minLon ?? minLon, bounds?.maxLon ?? maxLon,
+        bounds?.minLat ?? minLat, bounds?.maxLat ?? maxLat,
         t.verified ? 1 : 0, now,
       ],
     );
@@ -260,7 +281,7 @@ export async function downloadRegion(
       minLon, minLat, maxLon, maxLat,
       minZoom, maxZoom,
       generateResult.tileCount, generateResult.tileSizeBytes,
-      Buffer.byteLength(geojsonStr), Buffer.byteLength(wikiStr),
+      byteLength(geojsonStr), byteLength(wikiStr),
       tilesPath, now, now, now,
     ],
   );
@@ -273,8 +294,8 @@ export async function downloadRegion(
     minZoom, maxZoom,
     totalTiles: generateResult.tileCount,
     tileSizeBytes: generateResult.tileSizeBytes,
-    geojsonSizeBytes: Buffer.byteLength(geojsonStr),
-    wikiSizeBytes: Buffer.byteLength(wikiStr),
+    geojsonSizeBytes: byteLength(geojsonStr),
+    wikiSizeBytes: byteLength(wikiStr),
     tilesPath,
     generatedAt: now,
     lastSynced: now,

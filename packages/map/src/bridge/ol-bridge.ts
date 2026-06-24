@@ -56,5 +56,6 @@ export function isBridgeEvent(value: unknown): value is BridgeEvent {
     "moveEnd",
     "featureSelect",
     "error",
+    "drawEnd",
   ].includes(t);
 }

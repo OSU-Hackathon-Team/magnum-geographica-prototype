@@ -6,7 +6,7 @@ RUN apk add --no-cache curl
 
 COPY packages/shared/ ./shared/
 
-COPY packages/api/package.json packages/api/bun.lock* ./
+COPY packages/api/package.json bun.lock ./
 RUN sed -i 's|workspace:\*|file:./shared|' package.json
 RUN bun install --no-save
 
