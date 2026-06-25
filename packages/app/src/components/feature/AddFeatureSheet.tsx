@@ -22,6 +22,12 @@ export interface AddFeatureSheetResult {
   name: string;
   answers: Record<string, string | boolean>;
   description?: string;
+  /**
+   * Pre-detected system id, if the parent passed one in via
+   * `detectedSystemId` and the user didn't override it. The parent
+   * uses this to default `system_id` on the create payload.
+   */
+  system_id?: string | null;
 }
 
 export interface AddFeatureSheetProps {
@@ -33,6 +39,11 @@ export interface AddFeatureSheetProps {
    * near a known landmark, suggest "Shelter" as the default name).
    */
   initialName?: string;
+  /**
+   * Auto-detected system id from the point-in-polygon endpoint
+   * (§21.4 "Mountains Park" pre-fill). Passed up to the route layer.
+   */
+  detectedSystemId?: string | null;
   submitting?: boolean;
   testID?: string;
 }
@@ -54,6 +65,7 @@ export function AddFeatureSheet({
   onClose,
   onSubmit,
   initialName = "",
+  detectedSystemId,
   submitting,
   testID,
 }: AddFeatureSheetProps) {
@@ -138,8 +150,9 @@ export function AddFeatureSheet({
       name: name.trim() || selectedPreset.label,
       answers,
       description: description.trim() || undefined,
+      system_id: detectedSystemId,
     });
-  }, [answers, description, name, onSubmit, selectedPreset]);
+  }, [answers, description, detectedSystemId, name, onSubmit, selectedPreset]);
 
   if (!visible) return null;
 

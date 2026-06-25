@@ -40,6 +40,23 @@ import {
   createPresetInputSchema,
   updatePresetInputSchema,
   presetQuerySchema,
+  createSuperSystemInputSchema,
+  updateSuperSystemInputSchema,
+  createSubSystemInputSchema,
+  updateSubSystemInputSchema,
+  updateSystemInputSchema,
+  moveSystemInputSchema,
+  assignTrailsInputSchema,
+  pointInPolygonQuerySchema,
+  hierarchyTreeNodeSchema,
+  hierarchyTreeSchema,
+  containsResponseSchema,
+  gpsTraceSchema,
+  createTraceInputSchema,
+  importTraceInputSchema,
+  traceQuerySchema,
+  traceSegmentSchema,
+  traceSegmentVoteInputSchema,
 } from "../schemas/index.js";
 
 export type Difficulty = "easy" | "moderate" | "hard" | "expert";
@@ -107,6 +124,35 @@ export type CreatePresetInput = z.infer<typeof createPresetInputSchema>;
 export type UpdatePresetInput = z.infer<typeof updatePresetInputSchema>;
 export type PresetQuery = z.infer<typeof presetQuerySchema>;
 export type { PresetCategory, PresetQuestionType } from "../constants.js";
+
+// §21.5 — hierarchy
+export type CreateSuperSystemInput = z.infer<typeof createSuperSystemInputSchema>;
+export type UpdateSuperSystemInput = z.infer<typeof updateSuperSystemInputSchema>;
+export type CreateSubSystemInput = z.infer<typeof createSubSystemInputSchema>;
+export type UpdateSubSystemInput = z.infer<typeof updateSubSystemInputSchema>;
+export type UpdateSystemInput = z.infer<typeof updateSystemInputSchema>;
+export type MoveSystemInput = z.infer<typeof moveSystemInputSchema>;
+export type AssignTrailsInput = z.infer<typeof assignTrailsInputSchema>;
+export type PointInPolygonQuery = z.infer<typeof pointInPolygonQuerySchema>;
+export type HierarchyTreeNode = {
+  id: string;
+  name: string;
+  slug: string;
+  tier: "super" | "system" | "sub";
+  children: HierarchyTreeNode[];
+};
+export type HierarchyTree = z.infer<typeof hierarchyTreeSchema>;
+export type ContainsResponse = z.infer<typeof containsResponseSchema>;
+export type { HierarchyAction, ProvenanceSource } from "../constants.js";
+
+// §21.6 — GPS traces
+export type GpsTrace = z.infer<typeof gpsTraceSchema>;
+export type CreateTraceInput = z.infer<typeof createTraceInputSchema>;
+export type ImportTraceInput = z.infer<typeof importTraceInputSchema>;
+export type TraceQuery = z.infer<typeof traceQuerySchema>;
+export type TraceSegment = z.infer<typeof traceSegmentSchema>;
+export type TraceSegmentVoteInput = z.infer<typeof traceSegmentVoteInputSchema>;
+export type { TraceSource, TraceStatus } from "../constants.js";
 
 export interface GeoJSONPolygon {
   type: "Polygon";

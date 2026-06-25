@@ -184,6 +184,8 @@ export const FEATURES: Record<string, unknown> = {
     description: "Recessed gorge with waterfall.",
     trail_id: "trail-1",
     system_id: null,
+    created_by_user_id: "user-100",
+    contributor_name: "hiker1",
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
     center: { lat: 39.4342, lon: -82.5412 },
@@ -195,6 +197,8 @@ export const FEATURES: Record<string, unknown> = {
     description: "Main trailhead for the Towpath.",
     trail_id: "trail-2",
     system_id: "sys-2",
+    created_by_user_id: "user-100",
+    contributor_name: "hiker1",
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
     center: { lat: 41.2627, lon: -81.5618 },
@@ -206,9 +210,33 @@ export const FEATURES: Record<string, unknown> = {
     description: null,
     trail_id: "trail-2",
     system_id: "sys-2",
+    created_by_user_id: "user-100",
+    contributor_name: "hiker1",
     created_at: "2026-06-21T00:00:00.000Z",
     updated_at: "2026-06-21T00:00:00.000Z",
     center: { lat: 41.2854, lon: -81.5761 },
+  },
+  // Feature with a preset — used to test preset rendering on the
+  // detail page (answer badges, preset label) and the vote control
+  // against a feature whose author is a known user.
+  "f-4": {
+    id: "f-4",
+    name: "Cedar Falls Overlook",
+    type_tag: "viewpoint",
+    description: "Panoramic overlook of Cedar Falls.",
+    trail_id: "trail-1",
+    system_id: "sys-1",
+    preset_id: "preset-18",
+    preset_key: "viewpoint",
+    preset_label: "Viewpoint",
+    preset_icon_name: "eye",
+    preset_icon_color: "#f59e0b",
+    answers: { panoramic: true, covered: false },
+    created_by_user_id: "user-100",
+    contributor_name: "hiker1",
+    created_at: "2026-06-21T00:00:00.000Z",
+    updated_at: "2026-06-21T00:00:00.000Z",
+    center: { lat: 39.4355, lon: -82.5421 },
   },
 };
 
@@ -217,3 +245,19 @@ export const TRAILS_BY_SYSTEM: Record<string, (typeof TRAILS)[number][]> = {
   "sys-2": [TRAILS[1]],
   "sys-3": [],
 };
+
+/**
+ * Pre-seeded users that features reference via `created_by_user_id`.
+ * The mock seeds these into MOCK_USERS on `resetApiMock()` so that
+ * vote-karma attribution and `/api/votes/users/:id/karma` lookups
+ * resolve to a real user record.
+ */
+export const SEED_USERS = [
+  {
+    id: "user-100",
+    username: "hiker1",
+    email: "hiker1@example.com",
+    role: "contributor",
+    trust_score: 25,
+  },
+] as const;

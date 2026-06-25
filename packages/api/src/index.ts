@@ -21,6 +21,14 @@ import { adminRoute } from "./routes/admin.js";
 import { votesRoute } from "./routes/votes.js";
 import { patrolRoute } from "./routes/patrol.js";
 import { presetsRoute } from "./routes/presets.js";
+import {
+  superSystemsRoute,
+  subSystemsRoute,
+  systemMoveRoute,
+  systemTreeRoute,
+  systemContainsRoute,
+} from "./routes/hierarchy.js";
+import { tracesRoute, traceSegmentsRoute } from "./routes/traces.js";
 import { metroProxy } from "./middleware/metro-proxy.js";
 
 const app = new Hono();
@@ -48,6 +56,13 @@ app.route("/api/users", usersRoute);
 app.route("/api/votes", votesRoute);
 app.route("/api/admin/patrol", patrolRoute);
 app.route("/api/presets", presetsRoute);
+app.route("/api/super-systems", superSystemsRoute);
+app.route("/api/sub-systems", subSystemsRoute);
+app.route("/api/systems", systemMoveRoute);
+app.route("/api/systems", systemTreeRoute);
+app.route("/api/systems", systemContainsRoute);
+app.route("/api/traces", tracesRoute);
+app.route("/api/trace-segments", traceSegmentsRoute);
 app.route("/api/admin", adminRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));

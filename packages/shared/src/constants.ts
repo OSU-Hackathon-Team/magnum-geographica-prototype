@@ -276,3 +276,224 @@ export const TRAIL_TIER_COLORS: Record<TrailTier, string> = {
   elevated: "#22c55e",
   synthesized: "#3b82f6",
 };
+
+// ========== Hierarchy actions (§21.5) ==========
+
+export const HIERARCHY_ACTIONS = [
+  "move_to_super",
+  "move_out_of_super",
+  "promote_to_system",
+  "demote_to_sub_system",
+  "merge_into",
+  "assign_trail",
+  "unassign_trail",
+] as const;
+export type HierarchyAction = (typeof HIERARCHY_ACTIONS)[number];
+
+// Required provenance fields for a system boundary per outline.md.
+// `ownership_source` and `source_date` are NOT NULL; the route layer
+// rejects new systems that don't supply both.
+export const PROVENANCE_SOURCES = [
+  "PAD-US",
+  "USGS",
+  "USDA-FS",
+  "OSM",
+  "state-gis",
+  "county-gis",
+  "user-drawn",
+  "imported",
+] as const;
+export type ProvenanceSource = (typeof PROVENANCE_SOURCES)[number];
+
+// ========== GPS traces (§21.6) ==========
+
+export const TRACE_SOURCES = ["import", "recorded"] as const;
+export type TraceSource = (typeof TRACE_SOURCES)[number];
+
+export const TRACE_STATUSES = ["active", "ignored", "removed"] as const;
+export type TraceStatus = (typeof TRACE_STATUSES)[number];
+
+// Hard limits — a 24h recording is more than enough, 50k points is
+// well past the upper bound of a 30s-interval walkathon trace.
+export const TRACE_MAX_POINTS = 50_000;
+export const TRACE_MAX_DURATION_HOURS = 24;
+// Per §21.6 — segments are cut at significant vertices. The simplify
+// tolerance is in meters; a small number preserves shape, a larger
+// number smooths aggressively. The default is tuned for foot-traces.
+export const TRACE_SIMPLIFY_TOLERANCE_M = 5;
+
+/** Polyline simplification (Ramer–Douglas–Peucker) on a list of
+ * `[lon, lat]` vertices. Distance is approximated in meters via the
+ * equirectangular projection at the centroid latitude. This is good
+ * enough for trace-cleaning at the scales we care about (5m error at
+ * the equator is negligible for our use case).
+ */
+export function simplifyRdp(
+  points: Array<[number, number]>,
+  toleranceMeters: number,
+): Array<[number, number]> {
+  if (points.length <= 2 || toleranceMeters <= 0) return points;
+  const keep = new Array<boolean>(points.length).fill(false);
+  keep[0] = true;
+  keep[points.length - 1] = true;
+  const stack: Array<[number, number]> = [[0, points.length - 1]];
+  while (stack.length > 0) {
+    const popped = stack.pop();
+    if (!popped) break;
+    const [start, end] = popped;
+    const a = points[start]!;
+    const b = points[end]!;
+    let maxDist = 0;
+    let maxIdx = -1;
+    for (let i = start + 1; i < end; i++) {
+      const d = perpDistanceMeters(points[i]!, a, b);
+      if (d > maxDist) {
+        maxDist = d;
+        maxIdx = i;
+      }
+    }
+    if (maxDist > toleranceMeters && maxIdx > -1) {
+      keep[maxIdx] = true;
+      stack.push([start, maxIdx]);
+      stack.push([maxIdx, end]);
+    }
+  }
+  return points.filter((_, i) => keep[i]);
+}
+
+function perpDistanceMeters(
+  p: [number, number],
+  a: [number, number],
+  b: [number, number],
+): number {
+  // Equirectangular projection at the segment's centroid latitude.
+  const [lon, lat] = p;
+  const [aLon, aLat] = a;
+  const [bLon, bLat] = b;
+  const lat0 = (aLat + bLat) / 2;
+  const cosLat = Math.cos((lat0 * Math.PI) / 180);
+  const ax = (aLon - lon) * cosLat;
+  const ay = aLat - lat;
+  const bx = (bLon - lon) * cosLat;
+  const by = bLat - lat;
+  // |AB|^2 in lon/lat space (not strictly the projection but close
+  // enough at our scales).
+  const dx = bx - ax;
+  const dy = by - ay;
+  if (dx === 0 && dy === 0) return Math.hypot(ax, ay) * 111_320;
+  const t = Math.max(0, Math.min(1, (-(ax * dx) - ay * dy) / (dx * dx + dy * dy)));
+  const px = ax + dx * t;
+  const py = ay + dy * t;
+  return Math.hypot(px, py) * 111_320;
+}
+
+/**
+ * Total planar length of a polyline in meters.
+ */
+export function traceLengthMeters(points: Array<[number, number]>): number {
+  if (points.length < 2) return 0;
+  let total = 0;
+  const cosLat = Math.cos((points[0]![1] * Math.PI) / 180);
+  for (let i = 1; i < points.length; i++) {
+    const [lon1, lat1] = points[i - 1]!;
+    const [lon2, lat2] = points[i]!;
+    const dx = (lon2 - lon1) * cosLat;
+    const dy = lat2 - lat1;
+    total += Math.hypot(dx, dy) * 111_320;
+  }
+  return total;
+}
+
+/**
+ * Split a polyline into segments at "significant" vertices — points
+ * where the heading changes by more than `angleThresholdDeg` from the
+ * average. Returns the list of sub-polylines.
+ */
+export function splitAtTurns(
+  points: Array<[number, number]>,
+  angleThresholdDeg: number,
+): Array<Array<[number, number]>> {
+  if (points.length < 3) return [points];
+  const out: Array<Array<[number, number]>> = [];
+  let current: Array<[number, number]> = [points[0]!];
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]!;
+    const here = points[i]!;
+    const next = points[i + 1]!;
+    const headingIn = Math.atan2(here[1] - prev[1], here[0] - prev[0]);
+    const headingOut = Math.atan2(next[1] - here[1], next[0] - here[0]);
+    let d = Math.abs(headingOut - headingIn) * (180 / Math.PI);
+    if (d > 180) d = 360 - d;
+    current.push(here);
+    if (d > angleThresholdDeg) {
+      out.push(current);
+      current = [here];
+    }
+  }
+  current.push(points[points.length - 1]!);
+  out.push(current);
+  return out;
+}
+
+/**
+ * Parse a GPX file into a list of `[lon, lat]` vertices. We accept
+ * any `<trkpt>` regardless of namespace; the rest of the GPX is
+ * ignored. The parser is intentionally lenient — bad input throws so
+ * the route can surface a useful 400.
+ */
+export function parseGpx(gpx: string): Array<[number, number]> {
+  const points: Array<[number, number]> = [];
+  const trkptRegex = /<trkpt\b[^>]*lat="([^"]+)"\s*lon="([^"]+)"/gi;
+  let match: RegExpExecArray | null;
+  while ((match = trkptRegex.exec(gpx)) !== null) {
+    const lat = Number(match[1]);
+    const lon = Number(match[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      points.push([lon, lat]);
+    }
+  }
+  if (points.length === 0) {
+    throw new Error("GPX has no <trkpt> entries");
+  }
+  return points;
+}
+
+/**
+ * Parse a GeoJSON LineString/MultiLineString into a list of vertices.
+ * Only `LineString` and `MultiLineString` are accepted; throws on
+ * anything else.
+ */
+export function parseGeoJsonTrace(input: unknown): Array<[number, number]> {
+  if (!input || typeof input !== "object") {
+    throw new Error("GeoJSON must be an object");
+  }
+  const gj = input as { type?: string; coordinates?: unknown };
+  if (gj.type === "LineString") {
+    if (!Array.isArray(gj.coordinates)) throw new Error("LineString missing coordinates");
+    return gj.coordinates.map((c) => {
+      if (!Array.isArray(c) || c.length < 2) throw new Error("invalid coordinate");
+      const [lon, lat] = c;
+      if (typeof lon !== "number" || typeof lat !== "number") {
+        throw new Error("coordinate must be [lon, lat] numbers");
+      }
+      return [lon, lat] as [number, number];
+    });
+  }
+  if (gj.type === "MultiLineString") {
+    if (!Array.isArray(gj.coordinates)) throw new Error("MultiLineString missing coordinates");
+    const out: Array<[number, number]> = [];
+    for (const line of gj.coordinates) {
+      if (!Array.isArray(line)) throw new Error("invalid MultiLineString ring");
+      for (const c of line) {
+        if (!Array.isArray(c) || c.length < 2) throw new Error("invalid coordinate");
+        const [lon, lat] = c;
+        if (typeof lon !== "number" || typeof lat !== "number") {
+          throw new Error("coordinate must be [lon, lat] numbers");
+        }
+        out.push([lon, lat]);
+      }
+    }
+    return out;
+  }
+  throw new Error(`GeoJSON type '${String(gj.type)}' is not a trace (LineString or MultiLineString)`);
+}

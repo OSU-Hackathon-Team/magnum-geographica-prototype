@@ -392,6 +392,105 @@ export const patrolFlags = pgTable(
   }),
 );
 
+// ========== GPS traces (§21.6) ==========
+
+export const gpsTraces = pgTable(
+  "gps_traces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id"),
+    contributorName: text("contributor_name").notNull().default("anonymous"),
+    geometry: multiLineString("geometry").notNull(),
+    source: text("source").notNull(),
+    weight: doublePrecision("weight").notNull().default(1.0),
+    upvotes: integer("upvotes").notNull().default(0),
+    downvotes: integer("downvotes").notNull().default(0),
+    status: text("status").notNull().default("active"),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    geomIdx: index("idx_gps_traces_geom").using("gist", t.geometry),
+    userIdx: index("idx_gps_traces_user").on(t.userId, t.createdAt),
+    statusIdx: index("idx_gps_traces_status").on(t.status, t.createdAt),
+  }),
+);
+
+// Auto-tagged by geometry ∩ system boundary. Many-to-many.
+export const traceSystems = pgTable(
+  "trace_systems",
+  {
+    traceId: uuid("trace_id")
+      .notNull()
+      .references(() => gpsTraces.id, { onDelete: "cascade" }),
+    systemId: uuid("system_id")
+      .notNull()
+      .references(() => systems.id, { onDelete: "cascade" }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.traceId, t.systemId] }),
+  }),
+);
+
+// Server-cut pieces of a trace.
+export const gpsTraceSegments = pgTable(
+  "gps_trace_segments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    traceId: uuid("trace_id")
+      .notNull()
+      .references(() => gpsTraces.id, { onDelete: "cascade" }),
+    geometry: multiLineString("geometry").notNull(),
+    clusterId: integer("cluster_id"),
+    proposedTrailId: uuid("proposed_trail_id").references(() => trails.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    traceIdx: index("idx_segments_trace").on(t.traceId),
+    clusterIdx: index("idx_segments_cluster").on(t.clusterId),
+  }),
+);
+
+// §21.6 — wiki-style user marking of a segment → a trail.
+export const traceSegmentVotes = pgTable(
+  "trace_segment_votes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    segmentId: uuid("segment_id")
+      .notNull()
+      .references(() => gpsTraceSegments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id"),
+    trailId: uuid("trail_id").references(() => trails.id, { onDelete: "set null" }),
+    // vote = +1 (agrees), -1 (disagrees). NULL trailId + vote=-1 = "propose new".
+    vote: integer("vote").notNull(),
+    contributorName: text("contributor_name").notNull().default("anonymous"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("idx_segment_votes_user").on(t.segmentId, t.userId),
+    segmentIdx: index("idx_segment_votes_segment").on(t.segmentId),
+  }),
+);
+
+// §21.6 — audit/history of synthesis regeneration runs.
+export const synthesisRuns = pgTable(
+  "synthesis_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    systemId: uuid("system_id")
+      .notNull()
+      .references(() => systems.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    trailsUpdated: integer("trails_updated").notNull().default(0),
+    trailsProposed: integer("trails_proposed").notNull().default(0),
+    status: text("status").notNull().default("running"),
+  },
+  (t) => ({
+    systemIdx: index("idx_synthesis_system").on(t.systemId, t.startedAt),
+  }),
+);
+
 export const media = pgTable(
   "media",
   {
@@ -466,3 +565,11 @@ export type PatrolFlag = typeof patrolFlags.$inferSelect;
 export type NewPatrolFlag = typeof patrolFlags.$inferInsert;
 export type Preset = typeof presets.$inferSelect;
 export type NewPreset = typeof presets.$inferInsert;
+export type GpsTrace = typeof gpsTraces.$inferSelect;
+export type NewGpsTrace = typeof gpsTraces.$inferInsert;
+export type GpsTraceSegment = typeof gpsTraceSegments.$inferSelect;
+export type NewGpsTraceSegment = typeof gpsTraceSegments.$inferInsert;
+export type TraceSegmentVote = typeof traceSegmentVotes.$inferSelect;
+export type NewTraceSegmentVote = typeof traceSegmentVotes.$inferInsert;
+export type SynthesisRun = typeof synthesisRuns.$inferSelect;
+export type NewSynthesisRun = typeof synthesisRuns.$inferInsert;

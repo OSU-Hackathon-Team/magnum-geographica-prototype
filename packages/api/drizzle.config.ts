@@ -28,6 +28,12 @@ const APP_TABLES = [
   "patrol_flags",
   // §21.4
   "presets",
+  // §21.6
+  "gps_traces",
+  "trace_systems",
+  "gps_trace_segments",
+  "trace_segment_votes",
+  "synthesis_runs",
 ] as const;
 
 const databaseUrl =

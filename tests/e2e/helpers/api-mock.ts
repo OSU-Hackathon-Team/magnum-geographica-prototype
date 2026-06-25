@@ -7,6 +7,7 @@ import {
   SEGMENTS_BY_TRAIL,
   FEATURES_BY_TRAIL,
   FEATURES,
+  SEED_USERS,
 } from "../fixtures/data.js";
 
 // Deep-clone the initial fixture data so `resetApiMock()` can restore it
@@ -27,7 +28,16 @@ type Handler = (params: {
   method: string;
   body: Json;
   query: Record<string, string>;
+  headers: Record<string, string>;
 }) => { status?: number; body: Json } | undefined;
+
+/** Parse the bearer token from an Authorization header. */
+function bearerUser(headers: Record<string, string>): { id: string } | null {
+  const auth = headers["authorization"] ?? headers["Authorization"];
+  if (!auth?.startsWith("Bearer mock-access-")) return null;
+  const id = auth.slice("Bearer mock-access-".length);
+  return { id };
+}
 
 function ok(body: Json, status = 200) {
   return { status, body };
@@ -78,6 +88,282 @@ let nextPendingId = 1;
 const MOCK_USERS: Record<string, { id: string; username: string; email: string; role: string; trust_score: number }> = {};
 let nextUserId = 900;
 
+// Seeds an admin user with a fixed id so tests can authenticate as
+// admin by driving the register form with `role=admin` or by relying
+// on the auto-seeded admin in `resetApiMock()`.
+const ADMIN_ID = "admin-1";
+
+function ensureAdminSeeded() {
+  if (!MOCK_USERS[ADMIN_ID]) {
+    MOCK_USERS[ADMIN_ID] = {
+      id: ADMIN_ID,
+      username: "admin",
+      email: "admin@example.com",
+      role: "admin",
+      trust_score: 999,
+    };
+  }
+}
+
+// Re-seeds the fixture-defined users (e.g. the author of seeded
+// features) so vote-karma attribution and `/api/votes/users/:id/karma`
+// always resolve to a real user.
+function ensureFixtureUsersSeeded() {
+  for (const u of SEED_USERS) {
+    if (!MOCK_USERS[u.id]) {
+      MOCK_USERS[u.id] = { ...u };
+    }
+  }
+}
+
+// --- §21.4 presets ----------------------------------------------------
+const PRESETS: Array<{
+  id: string;
+  key: string;
+  label: string;
+  icon_name: string;
+  icon_color: string;
+  category: string;
+  osm_tags: Record<string, string>;
+  questions: Array<{
+    key: string;
+    type: "boolean" | "select";
+    label: string;
+    options?: Array<{ value: string; label: string }>;
+  }>;
+  upstreamable: boolean;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}> = [];
+let nextPresetId = 1;
+
+// --- §21.5 hierarchy --------------------------------------------------
+const SUPER_SYSTEMS: Array<{
+  id: string;
+  name: string;
+  slug: string;
+  official: boolean;
+  description: string | null;
+  external_url: string | null;
+  created_at: string;
+  updated_at: string;
+}> = [];
+const SUB_SYSTEMS: Array<{
+  id: string;
+  name: string;
+  slug: string;
+  system_id: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}> = [];
+const SYSTEM_SUPER_MEMBERSHIPS: Array<{ system_id: string; super_system_id: string }> = [];
+let nextSuperId = 1;
+let nextSubId = 1;
+
+// --- §21.7 votes ------------------------------------------------------
+const VOTES: Array<{
+  id: string;
+  target_type: string;
+  target_id: string;
+  user_id: string | null;
+  value: 1 | -1;
+  voter_karma: number;
+  voter_tier: string;
+  created_at: string;
+  updated_at: string;
+}> = [];
+const ENTITY_SCORES: Record<string, { upvotes: number; downvotes: number; net: number; hidden: boolean }> = {};
+let nextVoteId = 1;
+
+function scoreKey(targetType: string, targetId: string): string {
+  return `${targetType}:${targetId}`;
+}
+
+function tierWeight(tier: string): number {
+  if (tier === "trusted" || tier === "moderator") return 3;
+  if (tier === "established") return 2;
+  return 1;
+}
+
+function tierFromKarma(karma: number): string {
+  if (karma >= 500) return "trusted";
+  if (karma >= 50) return "established";
+  return "new";
+}
+
+function getOrCreateScore(targetType: string, targetId: string) {
+  const key = scoreKey(targetType, targetId);
+  if (!ENTITY_SCORES[key]) {
+    ENTITY_SCORES[key] = { upvotes: 0, downvotes: 0, net: 0, hidden: false };
+  }
+  return ENTITY_SCORES[key];
+}
+
+function authorForTarget(targetType: string, targetId: string): string | null {
+  // Look up the author of a votable target so we can award karma.
+  if (targetType === "feature") {
+    return ((FEATURES[targetId] as { created_by_user_id?: string } | undefined)
+      ?.created_by_user_id) ?? null;
+  }
+  if (targetType === "system") {
+    const sys = SYSTEMS.find((s) => s.id === targetId) as
+      | { created_by_user_id?: string }
+      | undefined;
+    return sys?.created_by_user_id ?? null;
+  }
+  return null;
+}
+
+// --- §21.8 patrol ----------------------------------------------------
+const PATROL_FLAGS: Array<{
+  id: string;
+  revision_id: string;
+  reason: string;
+  resolved: boolean;
+  created_at: string;
+  details: Record<string, unknown> | null;
+}> = [];
+let nextPatrolId = 1;
+
+// --- Fixture seeders (called from resetApiMock) -------------------------
+//
+// The redux §21 schemas ship with default fixtures (23 presets, 2
+// super-systems, 2 sub-systems, memberships) that mirror the SQL seed
+// in `0004_presets.sql`. These are re-seeded on every `resetApiMock()` so
+// tests get a clean slate but the lookup data is always present.
+function seedPresetsFixtures() {
+  const now = "2026-06-21T00:00:00.000Z";
+  const presets: Array<{
+    key: string;
+    label: string;
+    icon_name: string;
+    icon_color: string;
+    category: string;
+    osm_tags: Record<string, string>;
+    questions: Array<{
+      key: string;
+      type: "boolean" | "select";
+      label: string;
+      options?: Array<{ value: string; label: string }>;
+    }>;
+    upstreamable: boolean;
+    sort_order: number;
+  }> = [
+    { key: "bench", label: "Bench", icon_name: "cafe", icon_color: "#8B4513", category: "rest_shelter", osm_tags: { amenity: "bench" }, questions: [{ key: "material", type: "select", label: "Material", options: [{ value: "wood", label: "Wood" }, { value: "stone", label: "Stone" }, { value: "metal", label: "Metal" }] }, { key: "backrest", type: "boolean", label: "Has backrest" }], upstreamable: true, sort_order: 10 },
+    { key: "picnic_table", label: "Picnic Table", icon_name: "restaurant", icon_color: "#8B4513", category: "rest_shelter", osm_tags: { leisure: "picnic_table" }, questions: [{ key: "covered", type: "boolean", label: "Covered" }], upstreamable: true, sort_order: 20 },
+    { key: "shelter", label: "Shelter", icon_name: "home", icon_color: "#059669", category: "rest_shelter", osm_tags: { amenity: "shelter" }, questions: [{ key: "type", type: "select", label: "Type", options: [{ value: "lean_to", label: "Lean-to" }, { value: "cabin", label: "Cabin" }] }], upstreamable: true, sort_order: 30 },
+    { key: "campsite", label: "Campsite", icon_name: "bonfire", icon_color: "#059669", category: "rest_shelter", osm_tags: { tourism: "camp_site" }, questions: [], upstreamable: true, sort_order: 40 },
+    { key: "drinking_water", label: "Drinking Water", icon_name: "water", icon_color: "#3b82f6", category: "water_sanitation", osm_tags: { amenity: "drinking_water" }, questions: [{ key: "potable", type: "select", label: "Potable", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] }], upstreamable: true, sort_order: 50 },
+    { key: "spring", label: "Spring", icon_name: "water", icon_color: "#3b82f6", category: "water_sanitation", osm_tags: { natural: "spring" }, questions: [], upstreamable: false, sort_order: 60 },
+    { key: "restroom", label: "Restroom", icon_name: "man", icon_color: "#6366f1", category: "water_sanitation", osm_tags: { amenity: "toilets" }, questions: [], upstreamable: true, sort_order: 70 },
+    { key: "waste_basket", label: "Waste Basket", icon_name: "trash", icon_color: "#6366f1", category: "water_sanitation", osm_tags: { amenity: "waste_basket" }, questions: [], upstreamable: false, sort_order: 80 },
+    { key: "trailhead", label: "Trailhead", icon_name: "flag", icon_color: "#22c55e", category: "navigation", osm_tags: { highway: "trailhead" }, questions: [], upstreamable: true, sort_order: 90 },
+    { key: "map_board", label: "Map Board", icon_name: "map", icon_color: "#22c55e", category: "navigation", osm_tags: { information: "map" }, questions: [], upstreamable: true, sort_order: 100 },
+    { key: "guidepost", label: "Guidepost", icon_name: "navigate", icon_color: "#22c55e", category: "navigation", osm_tags: { information: "guidepost" }, questions: [], upstreamable: true, sort_order: 110 },
+    { key: "sign", label: "Sign", icon_name: "information-circle", icon_color: "#dc2626", category: "navigation", osm_tags: { information: "sign" }, questions: [], upstreamable: false, sort_order: 120 },
+    { key: "intersection", label: "Intersection", icon_name: "git-merge", icon_color: "#f97316", category: "navigation", osm_tags: { highway: "crossing" }, questions: [], upstreamable: false, sort_order: 130 },
+    { key: "fallen_tree", label: "Fallen Tree", icon_name: "warning", icon_color: "#dc2626", category: "hazards_obstacles", osm_tags: { hazard: "fallen_tree" }, questions: [{ key: "passable", type: "select", label: "Passable", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] }], upstreamable: true, sort_order: 140 },
+    { key: "washout", label: "Washout", icon_name: "warning", icon_color: "#dc2626", category: "hazards_obstacles", osm_tags: { hazard: "washout" }, questions: [], upstreamable: true, sort_order: 150 },
+    { key: "steep_section", label: "Steep Section", icon_name: "trending-up", icon_color: "#f59e0b", category: "hazards_obstacles", osm_tags: { hazard: "steep" }, questions: [], upstreamable: true, sort_order: 160 },
+    { key: "road_connector", label: "Road Connector", icon_name: "car-sport", icon_color: "#888888", category: "hazards_obstacles", osm_tags: { highway: "residential" }, questions: [], upstreamable: false, sort_order: 170 },
+    { key: "viewpoint", label: "Viewpoint", icon_name: "eye", icon_color: "#f59e0b", category: "landmarks", osm_tags: { tourism: "viewpoint" }, questions: [{ key: "panoramic", type: "boolean", label: "Panoramic" }, { key: "covered", type: "boolean", label: "Covered" }], upstreamable: true, sort_order: 180 },
+    { key: "notable_tree", label: "Notable Tree", icon_name: "leaf", icon_color: "#16a34a", category: "landmarks", osm_tags: { natural: "tree" }, questions: [], upstreamable: true, sort_order: 190 },
+    { key: "waterfall", label: "Waterfall", icon_name: "rainy", icon_color: "#3b82f6", category: "landmarks", osm_tags: { waterway: "waterfall" }, questions: [], upstreamable: true, sort_order: 200 },
+    { key: "cave_entrance", label: "Cave Entrance", icon_name: "moon", icon_color: "#475569", category: "landmarks", osm_tags: { natural: "cave_entrance" }, questions: [], upstreamable: true, sort_order: 210 },
+    { key: "bridge", label: "Bridge", icon_name: "git-network", icon_color: "#7c3aed", category: "landmarks", osm_tags: { bridge: "yes" }, questions: [], upstreamable: true, sort_order: 220 },
+    { key: "tunnel", label: "Tunnel", icon_name: "subway", icon_color: "#475569", category: "landmarks", osm_tags: { tunnel: "yes" }, questions: [], upstreamable: true, sort_order: 230 },
+  ];
+  for (let i = 0; i < presets.length; i++) {
+    const p = presets[i]!;
+    PRESETS.push({
+      id: `preset-${i + 1}`,
+      key: p.key,
+      label: p.label,
+      icon_name: p.icon_name,
+      icon_color: p.icon_color,
+      category: p.category,
+      osm_tags: p.osm_tags,
+      questions: p.questions,
+      upstreamable: p.upstreamable,
+      sort_order: p.sort_order,
+      created_by: null,
+      created_at: now,
+      updated_at: now,
+    });
+  }
+}
+
+function seedHierarchyFixtures() {
+  const now = "2026-06-21T00:00:00.000Z";
+  SUPER_SYSTEMS.push(
+    {
+      id: "super-1",
+      name: "Ohio Erie Trail",
+      slug: "ohio-erie-trail",
+      official: true,
+      description: "A long-distance trail concept linking Ohio's Lake Erie shore.",
+      external_url: null,
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "super-2",
+      name: "US Bike Route 50",
+      slug: "us-bike-route-50",
+      official: false, // Unofficial self-organized
+      description: "Unofficial US Bike Route 50 alignment through Ohio.",
+      external_url: null,
+      created_at: now,
+      updated_at: now,
+    },
+  );
+  SUB_SYSTEMS.push(
+    {
+      id: "sub-1",
+      name: "Old Man's Cave Area",
+      slug: "old-mans-cave-area",
+      system_id: "sys-1",
+      description: "Sub-region around Old Man's Cave.",
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "sub-2",
+      name: "Ash Cave Area",
+      slug: "ash-cave-area",
+      system_id: "sys-1",
+      description: "Sub-region around Ash Cave.",
+      created_at: now,
+      updated_at: now,
+    },
+  );
+  SYSTEM_SUPER_MEMBERSHIPS.push(
+    { system_id: "sys-1", super_system_id: "super-1" },
+    { system_id: "sys-2", super_system_id: "super-1" },
+  );
+}
+
+// --- §21.8 generalized revisions -------------------------------------
+const REVISIONS: Array<{
+  id: string;
+  target_type: string;
+  target_id: string;
+  wiki_page_id: string | null;
+  content_md: string | null;
+  payload_before: Record<string, unknown> | null;
+  payload_after: Record<string, unknown> | null;
+  action: string;
+  contributor_name: string;
+  author_id: string | null;
+  edit_summary: string | null;
+  reverted_from_id: string | null;
+  created_at: string;
+}> = [];
+let nextRevisionId = 1;
+
 // Wiki page key: `${targetType}:${targetId}`
 function wikiKey(targetType: string, targetId: string) {
   return `${targetType}:${targetId}`;
@@ -94,7 +380,16 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     pattern: /\/api\/auth\/register$/,
     handler: ({ method, body }) => {
       if (method !== "POST") return undefined;
-      const b = body as { username?: string; email?: string; password?: string };
+      const b = body as {
+        username?: string;
+        email?: string;
+        password?: string;
+        // The route accepts an optional role + trust_score so tests can
+        // seed an admin or a high-trust contributor. Production never
+        // honors these — they exist only for the e2e mock.
+        role?: string;
+        trust_score?: number;
+      };
       if (!b?.username || !b?.email || !b?.password)
         return { status: 400, body: { error: "invalid_input", message: "all fields required" } };
       if (Object.values(MOCK_USERS).some((u) => u.email === b.email))
@@ -104,8 +399,8 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
         id,
         username: b.username,
         email: b.email,
-        role: "contributor",
-        trust_score: 0,
+        role: b.role ?? "contributor",
+        trust_score: b.trust_score ?? 0,
       };
       MOCK_USERS[id] = user;
       return ok(
@@ -138,11 +433,17 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
   },
   {
     pattern: /\/api\/auth\/me$/,
-    handler: ({ method }) => {
+    handler: ({ method, headers }) => {
       if (method !== "GET") return undefined;
-      const user = Object.values(MOCK_USERS)[0];
-      if (!user) return { status: 401, body: { error: "unauthorized", message: "authentication required" } };
-      return ok(user);
+      // Token-based lookup so multiple seeded users can coexist without
+      // the "first user wins" bug. Falls back to 401 when no token is
+      // present (or the token doesn't resolve to a known user).
+      const token = bearerUser(headers);
+      if (token) {
+        const user = MOCK_USERS[token.id];
+        if (user) return ok(user);
+      }
+      return { status: 401, body: { error: "unauthorized", message: "authentication required" } };
     },
   },
   {
@@ -176,14 +477,6 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
   {
     pattern: /\/api\/systems\/([^/]+)\/features$/,
     handler: () => ok({ items: [], total: 0 }),
-  },
-  {
-    pattern: /\/api\/systems$/,
-    handler: ({ query }) => {
-      const q = query.q?.toLowerCase() ?? "";
-      const items = q ? SYSTEMS.filter((s) => s.name.toLowerCase().includes(q)) : [...SYSTEMS];
-      return ok({ items, total: items.length, page: 1, pageSize: 20 });
-    },
   },
   {
     pattern: /\/api\/trails\/by-slug\/([^/]+)$/,
@@ -777,6 +1070,718 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
       return undefined;
     },
   },
+  // ===========================================================================
+  // §21.4 — presets
+  // ===========================================================================
+  {
+    pattern: /\/api\/presets\/by-key\/([^/]+)$/,
+    handler: ({ url }) => {
+      const key = url.pathname.split("/").pop();
+      const p = PRESETS.find((x) => x.key === key);
+      return p ? ok(p) : notFound(`preset '${key}' not found`);
+    },
+  },
+  {
+    pattern: /\/api\/presets\/([^/]+)$/,
+    handler: ({ url, method, body, headers }) => {
+      const id = url.pathname.split("/").pop()!;
+      if (method === "GET") {
+        const p = PRESETS.find((x) => x.id === id);
+        return p ? ok(p) : notFound(`preset ${id} not found`);
+      }
+      // Mod+ required.
+      const token = bearerUser(headers);
+      if (!token || MOCK_USERS[token.id]?.role !== "admin") {
+        return { status: 401, body: { error: "unauthorized", message: "admin access required" } };
+      }
+      if (method === "PUT") {
+        const idx = PRESETS.findIndex((x) => x.id === id);
+        if (idx < 0) return notFound("preset not found");
+        const b = body as {
+          label?: string;
+          icon_name?: string;
+          icon_color?: string;
+          category?: string;
+          osm_tags?: Record<string, string>;
+          questions?: unknown;
+          upstreamable?: boolean;
+          sort_order?: number;
+        };
+        PRESETS[idx] = { ...PRESETS[idx], ...b, updated_at: new Date().toISOString() };
+        return ok(PRESETS[idx]);
+      }
+      if (method === "DELETE") {
+        const idx = PRESETS.findIndex((x) => x.id === id);
+        if (idx < 0) return notFound("preset not found");
+        PRESETS.splice(idx, 1);
+        return ok({ ok: true });
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/presets$/,
+    handler: ({ method, body, query, headers }) => {
+      if (method === "GET") {
+        const category = query.category;
+        const filtered = category
+          ? PRESETS.filter((p) => p.category === category)
+          : PRESETS;
+        return ok({ items: filtered, total: filtered.length });
+      }
+      if (method === "POST") {
+        const token = bearerUser(headers);
+        if (!token || MOCK_USERS[token.id]?.role !== "admin") {
+          return { status: 401, body: { error: "unauthorized", message: "admin access required" } };
+        }
+        const b = body as {
+          key: string;
+          label: string;
+          icon_name: string;
+          icon_color: string;
+          category: string;
+          osm_tags?: Record<string, string>;
+          questions?: Array<{ key: string; type: "boolean" | "select"; label: string; options?: Array<{ value: string; label: string }> }>;
+          upstreamable?: boolean;
+          sort_order?: number;
+        };
+        if (!b?.key || !b?.label || !b?.icon_name || !b?.icon_color || !b?.category) {
+          return { status: 400, body: { error: "invalid_input", message: "missing required fields" } };
+        }
+        const now = new Date().toISOString();
+        const preset = {
+          id: `preset-${nextPresetId++}`,
+          key: b.key,
+          label: b.label,
+          icon_name: b.icon_name,
+          icon_color: b.icon_color,
+          category: b.category,
+          osm_tags: b.osm_tags ?? {},
+          questions: b.questions ?? [],
+          upstreamable: b.upstreamable ?? false,
+          sort_order: b.sort_order ?? 100,
+          created_by: token.id,
+          created_at: now,
+          updated_at: now,
+        };
+        PRESETS.push(preset);
+        return ok(preset, 201);
+      }
+      return undefined;
+    },
+  },
+  // ===========================================================================
+  // §21.5 — super-systems + sub-systems + move
+  // ===========================================================================
+  {
+    pattern: /\/api\/super-systems\/([^/]+)$/,
+    handler: ({ url, method, headers }) => {
+      const id = url.pathname.split("/").pop()!;
+      if (method === "GET") {
+        const s = SUPER_SYSTEMS.find((x) => x.id === id);
+        return s ? ok(s) : notFound(`super-system ${id} not found`);
+      }
+      const token = bearerUser(headers);
+      if (!token) return { status: 401, body: { error: "unauthorized" } };
+      if (method === "DELETE") {
+        const idx = SUPER_SYSTEMS.findIndex((x) => x.id === id);
+        if (idx < 0) return notFound();
+        SUPER_SYSTEMS.splice(idx, 1);
+        // Detach memberships
+        for (let i = SYSTEM_SUPER_MEMBERSHIPS.length - 1; i >= 0; i--) {
+          if (SYSTEM_SUPER_MEMBERSHIPS[i]?.super_system_id === id) {
+            SYSTEM_SUPER_MEMBERSHIPS.splice(i, 1);
+          }
+        }
+        return ok({ ok: true });
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/super-systems$/,
+    handler: ({ method, body, headers }) => {
+      if (method === "GET") {
+        return ok({ items: SUPER_SYSTEMS, total: SUPER_SYSTEMS.length });
+      }
+      if (method === "POST") {
+        const token = bearerUser(headers);
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        const b = body as { name: string; slug: string; official?: boolean; description?: string; external_url?: string };
+        if (!b?.name || !b?.slug) return { status: 400, body: { error: "invalid_input" } };
+        const now = new Date().toISOString();
+        const sup = {
+          id: `super-${nextSuperId++}`,
+          name: b.name,
+          slug: b.slug,
+          official: b.official ?? true,
+          description: b.description ?? null,
+          external_url: b.external_url ?? null,
+          created_at: now,
+          updated_at: now,
+        };
+        SUPER_SYSTEMS.push(sup);
+        return ok(sup, 201);
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/sub-systems\/([^/]+)$/,
+    handler: ({ url, method, headers }) => {
+      const id = url.pathname.split("/").pop()!;
+      if (method === "GET") {
+        const s = SUB_SYSTEMS.find((x) => x.id === id);
+        return s ? ok(s) : notFound(`sub-system ${id} not found`);
+      }
+      const token = bearerUser(headers);
+      if (!token) return { status: 401, body: { error: "unauthorized" } };
+      if (method === "DELETE") {
+        const idx = SUB_SYSTEMS.findIndex((x) => x.id === id);
+        if (idx < 0) return notFound();
+        SUB_SYSTEMS.splice(idx, 1);
+        return ok({ ok: true });
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/sub-systems$/,
+    handler: ({ method, body, query, headers }) => {
+      if (method === "GET") {
+        const systemId = query.system_id;
+        const items = systemId
+          ? SUB_SYSTEMS.filter((s) => s.system_id === systemId)
+          : SUB_SYSTEMS;
+        return ok({ items, total: items.length });
+      }
+      if (method === "POST") {
+        const token = bearerUser(headers);
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        const b = body as { system_id: string; name: string; slug: string; description?: string };
+        if (!b?.system_id || !b?.name || !b?.slug) {
+          return { status: 400, body: { error: "invalid_input" } };
+        }
+        const now = new Date().toISOString();
+        const sub = {
+          id: `sub-${nextSubId++}`,
+          name: b.name,
+          slug: b.slug,
+          system_id: b.system_id,
+          description: b.description ?? null,
+          created_at: now,
+          updated_at: now,
+        };
+        SUB_SYSTEMS.push(sub);
+        return ok(sub, 201);
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/systems\/tree$/,
+    handler: () => {
+      // Build the hierarchy tree. Loosely-attached systems (no super)
+      // go under a synthetic "loose" bucket.
+      const nodes: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        tier: "super" | "system" | "sub";
+        children: Array<{
+          id: string;
+          name: string;
+          slug: string;
+          tier: "system" | "sub";
+          children: Array<{ id: string; name: string; slug: string; tier: "sub" }>;
+        }>;
+      }> = [];
+      for (const sup of SUPER_SYSTEMS) {
+        const childSystems = SYSTEMS.filter((s) =>
+          SYSTEM_SUPER_MEMBERSHIPS.some(
+            (m) => m.super_system_id === sup.id && m.system_id === s.id,
+          ),
+        ).map((s) => ({
+          id: s.id,
+          name: s.name,
+          slug: s.slug,
+          tier: "system" as const,
+          children: SUB_SYSTEMS.filter((sub) => sub.system_id === s.id).map((sub) => ({
+            id: sub.id,
+            name: sub.name,
+            slug: sub.slug,
+            tier: "sub" as const,
+          })),
+        }));
+        nodes.push({
+          id: sup.id,
+          name: sup.name,
+          slug: sup.slug,
+          tier: "super",
+          children: childSystems,
+        });
+      }
+      const looseSystemIds = new Set(
+        SYSTEMS
+          .filter((s) => !SYSTEM_SUPER_MEMBERSHIPS.some((m) => m.system_id === s.id))
+          .map((s) => s.id),
+      );
+      if (looseSystemIds.size > 0) {
+        nodes.push({
+          id: "__loose__",
+          name: "Loose systems",
+          slug: "loose",
+          tier: "super",
+          children: SYSTEMS.filter((s) => looseSystemIds.has(s.id)).map((s) => ({
+            id: s.id,
+            name: s.name,
+            slug: s.slug,
+            tier: "system" as const,
+            children: SUB_SYSTEMS.filter((sub) => sub.system_id === s.id).map((sub) => ({
+              id: sub.id,
+              name: sub.name,
+              slug: sub.slug,
+              tier: "sub" as const,
+            })),
+          })),
+        });
+      }
+      return ok({ nodes, total: nodes.length });
+    },
+  },
+  {
+    pattern: /\/api\/systems\/contains$/,
+    handler: ({ query }) => {
+      // Simple bounding-box check against fixture centers. Falls back
+      // to nearest if no containment (mirrors the real endpoint).
+      const lon = Number(query.lon);
+      const lat = Number(query.lat);
+      const EPS = 0.5; // ~50km at the equator
+      const inside = SYSTEMS.filter((s) => {
+        const c = s.center as { lon: number; lat: number } | undefined;
+        if (!c) return false;
+        return Math.abs(c.lon - lon) < EPS && Math.abs(c.lat - lat) < EPS;
+      });
+      if (inside.length > 0) {
+        return ok({
+          systems: inside.map((s) => ({
+            id: s.id,
+            name: s.name,
+            slug: s.slug,
+            distance_m: 0,
+          })),
+          fallback: "point_in_polygon",
+        });
+      }
+      return ok({
+        systems: [],
+        fallback: "nearest",
+      });
+    },
+  },
+  {
+    pattern: /\/api\/systems\/([^/]+)\/move$/,
+    handler: ({ url, method, body, headers }) => {
+      const token = bearerUser(headers);
+      if (!token) return { status: 401, body: { error: "unauthorized" } };
+      const sourceSystemId = url.pathname.split("/")[3];
+      if (method !== "POST") return undefined;
+      const b = body as {
+        action: string;
+        target_super_id?: string;
+        target_system_id?: string;
+        sub_system_id?: string;
+        trail_ids?: string[];
+      };
+      if (!b?.action) return { status: 400, body: { error: "invalid_input" } };
+      const actor = MOCK_USERS[token.id];
+      // Simple protection gate: New tier (karma < 50) gets 403 on
+      // any non-trivial system action.
+      if (b.action === "merge_into") {
+        if (!b.target_system_id) {
+          return { status: 400, body: { error: "invalid_input", message: "target_system_id required" } };
+        }
+        if (sourceSystemId === b.target_system_id) {
+          return { status: 400, body: { error: "invalid_input", message: "cannot merge into self" } };
+        }
+        const srcIdx = SYSTEMS.findIndex((s) => s.id === sourceSystemId);
+        if (srcIdx < 0) return notFound("source system not found");
+        SYSTEMS.splice(srcIdx, 1);
+        return ok({ ok: true, action: b.action, affected: 0 });
+      }
+      if (b.action === "move_to_super") {
+        if (!b.target_super_id) {
+          return { status: 400, body: { error: "invalid_input" } };
+        }
+        // Protection: new-tier users get 403
+        if (actor && actor.trust_score < 50) {
+          return { status: 403, body: { error: "forbidden", message: "protection level 'normal' requires higher trust tier" } };
+        }
+        const exists = SYSTEM_SUPER_MEMBERSHIPS.some(
+          (m) => m.system_id === sourceSystemId && m.super_system_id === b.target_super_id,
+        );
+        if (!exists) {
+          SYSTEM_SUPER_MEMBERSHIPS.push({ system_id: sourceSystemId, super_system_id: b.target_super_id });
+        }
+        return ok({ ok: true, action: b.action, affected: 1 });
+      }
+      if (b.action === "move_out_of_super") {
+        if (!b.target_super_id) {
+          return { status: 400, body: { error: "invalid_input" } };
+        }
+        for (let i = SYSTEM_SUPER_MEMBERSHIPS.length - 1; i >= 0; i--) {
+          if (
+            SYSTEM_SUPER_MEMBERSHIPS[i]?.system_id === sourceSystemId &&
+            SYSTEM_SUPER_MEMBERSHIPS[i]?.super_system_id === b.target_super_id
+          ) {
+            SYSTEM_SUPER_MEMBERSHIPS.splice(i, 1);
+          }
+        }
+        return ok({ ok: true, action: b.action, affected: 1 });
+      }
+      if (b.action === "promote_to_system") {
+        if (!b.sub_system_id) {
+          return { status: 400, body: { error: "invalid_input" } };
+        }
+        const sub = SUB_SYSTEMS.find((s) => s.id === b.sub_system_id);
+        if (!sub) return notFound("sub-system not found");
+        const sys = {
+          ...SYSTEMS[0]!,
+          id: `sys-new-${Date.now().toString(36)}`,
+          name: sub.name,
+          slug: `${sub.slug}-promoted-${Math.random().toString(36).slice(2, 6)}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        SYSTEMS.push(sys);
+        return ok({ ok: true, action: b.action, affected: 1 });
+      }
+      return { status: 400, body: { error: "invalid_input", message: `unknown action ${b.action}` } };
+    },
+  },
+  // ===========================================================================
+  // §21.7 — votes
+  // ===========================================================================
+  {
+    pattern: /\/api\/votes\/users\/([^/]+)\/karma$/,
+    handler: ({ url, method }) => {
+      if (method !== "GET") return undefined;
+      const userId = url.pathname.split("/")[4];
+      const user = MOCK_USERS[userId];
+      if (!user) return notFound("user not found");
+      // Compute trace_count / feature_count from fixtures (mock
+      // simplification — real impl queries gps_traces).
+      const traceCount = 0;
+      const featureCount = Object.values(FEATURES).filter(
+        (f) => (f as { created_by_user_id?: string }).created_by_user_id === userId,
+      ).length;
+      const revisionCount = REVISIONS.filter((r) => r.author_id === userId).length;
+      // Ups: sum of upvotes on features the user authored.
+      let up = 0;
+      let down = 0;
+      for (const f of Object.values(FEATURES)) {
+        const author = (f as { created_by_user_id?: string }).created_by_user_id;
+        if (author === userId) {
+          const key = scoreKey("feature", (f as { id: string }).id);
+          const s = ENTITY_SCORES[key];
+          if (s) {
+            up += s.upvotes;
+            down += s.downvotes;
+          }
+        }
+      }
+      return ok({
+        user_id: userId,
+        karma: user.trust_score,
+        tier: tierFromKarma(user.trust_score),
+        tier_label: tierFromKarma(user.trust_score),
+        upvotes_received: up,
+        downvotes_received: down,
+        trace_count: traceCount,
+        feature_count: featureCount,
+        revision_count: revisionCount,
+      });
+    },
+  },
+  {
+    pattern: /\/api\/votes\/([^/]+)\/([^/]+)$/,
+    handler: ({ url, method, headers }) => {
+      const targetType = url.pathname.split("/")[3];
+      const targetId = url.pathname.split("/")[4];
+      if (method === "GET") {
+        const score = getOrCreateScore(targetType, targetId);
+        const token = bearerUser(headers);
+        const myVote = token
+          ? VOTES.find(
+              (v) =>
+                v.user_id === token.id &&
+                v.target_type === targetType &&
+                v.target_id === targetId,
+            )
+          : undefined;
+        return ok({
+          ...score,
+          my_vote: myVote ? (myVote.value === 1 ? 1 : -1) : 0,
+        });
+      }
+      if (method === "DELETE") {
+        const token = bearerUser(headers);
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        const idx = VOTES.findIndex(
+          (v) => v.user_id === token.id && v.target_type === targetType && v.target_id === targetId,
+        );
+        if (idx < 0) {
+          return ok({
+            upvotes: 0,
+            downvotes: 0,
+            net: 0,
+            hidden: false,
+            my_vote: 0,
+            karma_awarded: 0,
+          });
+        }
+        const existing = VOTES[idx]!;
+        VOTES.splice(idx, 1);
+        const s = getOrCreateScore(targetType, targetId);
+        if (existing.value === 1) s.upvotes = Math.max(0, s.upvotes - 1);
+        else s.downvotes = Math.max(0, s.downvotes - 1);
+        s.net = s.upvotes - s.downvotes;
+        s.hidden = s.net <= -3;
+        // Reverse karma
+        const authorId = authorForTarget(targetType, targetId);
+        if (authorId) {
+          const author = MOCK_USERS[authorId];
+          if (author) {
+            const tier = tierFromKarma(existing.voter_karma);
+            const delta = -1 * tierWeight(tier) * existing.value;
+            author.trust_score = Math.max(0, author.trust_score + delta);
+          }
+        }
+        return ok({
+          ...s,
+          my_vote: 0,
+          karma_awarded: 0,
+        });
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/votes$/,
+    handler: ({ method, body, headers }) => {
+      if (method !== "POST") return undefined;
+      const token = bearerUser(headers);
+      if (!token) return { status: 401, body: { error: "unauthorized" } };
+      const b = body as { target_type: string; target_id: string; value: 1 | -1 };
+      if (!b?.target_type || !b?.target_id || (b.value !== 1 && b.value !== -1)) {
+        return { status: 400, body: { error: "invalid_input" } };
+      }
+      const voter = MOCK_USERS[token.id];
+      if (!voter) return { status: 401, body: { error: "unauthorized" } };
+      // Look for an existing vote by this user on this target.
+      const idx = VOTES.findIndex(
+        (v) => v.user_id === token.id && v.target_type === b.target_type && v.target_id === b.target_id,
+      );
+      const previous = idx >= 0 ? VOTES[idx] : null;
+      const now = new Date().toISOString();
+      if (previous) {
+        previous.value = b.value;
+        previous.voter_karma = voter.trust_score;
+        previous.voter_tier = tierFromKarma(voter.trust_score);
+        previous.updated_at = now;
+      } else {
+        VOTES.push({
+          id: `vote-${nextVoteId++}`,
+          target_type: b.target_type,
+          target_id: b.target_id,
+          user_id: token.id,
+          value: b.value,
+          voter_karma: voter.trust_score,
+          voter_tier: tierFromKarma(voter.trust_score),
+          created_at: now,
+          updated_at: now,
+        });
+      }
+      const s = getOrCreateScore(b.target_type, b.target_id);
+      // Reverse previous then apply new.
+      if (previous?.value === 1) s.upvotes = Math.max(0, s.upvotes - 1);
+      if (previous?.value === -1) s.downvotes = Math.max(0, s.downvotes - 1);
+      if (b.value === 1) s.upvotes += 1;
+      if (b.value === -1) s.downvotes += 1;
+      s.net = s.upvotes - s.downvotes;
+      s.hidden = s.net <= -3;
+      // Karma attribution: target author gets tier-weighted delta.
+      let karmaAwarded = 0;
+      const authorId = authorForTarget(b.target_type, b.target_id);
+      if (authorId) {
+        const author = MOCK_USERS[authorId];
+        if (author) {
+          const voterTier = tierFromKarma(voter.trust_score);
+          const tw = tierWeight(voterTier);
+          // Reverse prior vote's contribution to this user
+          if (previous) {
+            const priorTw = tierWeight(previous.voter_tier);
+            author.trust_score = Math.max(0, author.trust_score - priorTw * previous.value);
+          }
+          const delta = tw * b.value;
+          author.trust_score = Math.max(0, author.trust_score + delta);
+          karmaAwarded = delta;
+        }
+      }
+      return ok({
+        ...s,
+        my_vote: b.value,
+        karma_awarded: karmaAwarded,
+      });
+    },
+  },
+  // ===========================================================================
+  // §21.8 — patrol + generalized revisions
+  // ===========================================================================
+  {
+    pattern: /\/api\/admin\/patrol\/act$/,
+    handler: ({ method, body, headers }) => {
+      const token = bearerUser(headers);
+      if (!token || MOCK_USERS[token.id]?.role !== "admin") {
+        return { status: 401, body: { error: "unauthorized" } };
+      }
+      if (method !== "POST") return undefined;
+      const b = body as { flag_id?: string; revision_id?: string; action: string };
+      if (b.action === "resolve" && b.flag_id) {
+        const idx = PATROL_FLAGS.findIndex((f) => f.id === b.flag_id);
+        if (idx >= 0) {
+          PATROL_FLAGS[idx]!.resolved = true;
+        }
+        return ok({ ok: true, action: "resolve" });
+      }
+      return ok({ ok: true });
+    },
+  },
+  {
+    pattern: /\/api\/admin\/patrol$/,
+    handler: ({ method, query, headers }) => {
+      const token = bearerUser(headers);
+      if (!token || MOCK_USERS[token.id]?.role !== "admin") {
+        return { status: 401, body: { error: "unauthorized" } };
+      }
+      if (method !== "GET") return undefined;
+      const resolved = query.resolved;
+      let items = PATROL_FLAGS;
+      if (resolved === "false") items = items.filter((f) => !f.resolved);
+      if (resolved === "true") items = items.filter((f) => f.resolved);
+      return ok({
+        items: items.map((f) => ({
+          id: f.id,
+          revision_id: f.revision_id,
+          reason: f.reason,
+          resolved: f.resolved,
+          created_at: f.created_at,
+        })),
+        total: items.length,
+      });
+    },
+  },
+  {
+    pattern: /\/api\/admin\/dashboard$/,
+    handler: ({ headers }) => {
+      const token = bearerUser(headers);
+      if (!token || MOCK_USERS[token.id]?.role !== "admin") {
+        return { status: 401, body: { error: "unauthorized" } };
+      }
+      return ok({
+        userCount: Object.keys(MOCK_USERS).length,
+        revisionCount: REVISIONS.length,
+        trailCount: TRAILS.length,
+        featureCount: Object.keys(FEATURES).length,
+        presetCount: PRESETS.length,
+        voteCount: VOTES.length,
+      });
+    },
+  },
+  {
+    pattern: /\/api\/revisions\/recent$/,
+    handler: ({ method, query, headers }) => {
+      if (method !== "GET") return undefined;
+      const token = bearerUser(headers);
+      if (!token || MOCK_USERS[token.id]?.role !== "admin") {
+        return { status: 401, body: { error: "unauthorized" } };
+      }
+      const targetType = query.target_type;
+      let items = REVISIONS;
+      if (targetType) items = items.filter((r) => r.target_type === targetType);
+      // Most recent first
+      return ok({
+        items: [...items].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        total: items.length,
+      });
+    },
+  },
+  {
+    pattern: /\/api\/revisions\/target\/([^/]+)\/([^/]+)$/,
+    handler: ({ url, method }) => {
+      if (method !== "GET") return undefined;
+      const targetType = url.pathname.split("/")[3];
+      const targetId = url.pathname.split("/")[4];
+      const items = REVISIONS.filter(
+        (r) => r.target_type === targetType && r.target_id === targetId,
+      );
+      return ok({
+        items: [...items].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        total: items.length,
+      });
+    },
+  },
+  // ===========================================================================
+  // POST /api/systems (new system)
+  // ===========================================================================
+  {
+    pattern: /\/api\/systems$/,
+    handler: ({ method, body, headers, query }) => {
+      // /api/systems?tree and /api/systems/contains and /api/systems are
+      // handled by their specific patterns above. This catch-all only
+      // matches the bare list / create endpoint.
+      if (method === "GET" && !query.tree && !query.contains) {
+        const q = query.q?.toLowerCase() ?? "";
+        const items = q ? SYSTEMS.filter((s) => s.name.toLowerCase().includes(q)) : [...SYSTEMS];
+        return ok({ items, total: items.length, page: 1, pageSize: 20 });
+      }
+      if (method === "POST") {
+        const token = bearerUser(headers);
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        const b = body as {
+          name: string;
+          slug: string;
+          description?: string;
+          external_url?: string;
+          ownership_source?: string;
+          source_date?: string;
+          color?: string;
+          boundary?: unknown;
+        };
+        if (!b?.name || !b?.slug) {
+          return { status: 400, body: { error: "invalid_input" } };
+        }
+        const now = new Date().toISOString();
+        const sys = {
+          ...SYSTEMS[0]!,
+          id: `sys-new-${Date.now().toString(36)}`,
+          name: b.name,
+          slug: b.slug,
+          description: b.description ?? null,
+          external_url: b.external_url ?? null,
+          ownership_source: b.ownership_source ?? null,
+          source_date: b.source_date ?? null,
+          color: b.color ?? "#22c55e",
+          created_at: now,
+          updated_at: now,
+          center: SYSTEMS[0]?.center ?? { lat: 39.9612, lon: -82.9988 },
+        };
+        SYSTEMS.push(sys);
+        return ok(sys, 201);
+      }
+      return notFound();
+    },
+  },
   // Search
   {
     pattern: /\/api\/search$/,
@@ -815,12 +1820,33 @@ export function resetApiMock() {
   for (const trailId of Object.keys(FEATURES_BY_TRAIL)) {
     FEATURES_BY_TRAIL[trailId] = (INITIAL_FEATURES_BY_TRAIL[trailId] ?? []).map((f) => ({ ...f }));
   }
+  // Clear all redux (§21) state. User seeds are wiped AND the admin
+  // is re-seeded so each test starts from the same baseline.
+  for (const k of Object.keys(MOCK_USERS)) delete MOCK_USERS[k];
+  ensureAdminSeeded();
+  ensureFixtureUsersSeeded();
+  PRESETS.length = 0;
+  SUPER_SYSTEMS.length = 0;
+  SUB_SYSTEMS.length = 0;
+  SYSTEM_SUPER_MEMBERSHIPS.length = 0;
+  VOTES.length = 0;
+  for (const k of Object.keys(ENTITY_SCORES)) delete ENTITY_SCORES[k];
+  PATROL_FLAGS.length = 0;
+  REVISIONS.length = 0;
+  seedHierarchyFixtures();
+  seedPresetsFixtures();
   nextWikiId = 100;
   nextRevId = 200;
   nextCitationId = 300;
   nextMediaId = 400;
   nextFeatureId = 500;
   nextPendingId = 1;
+  nextPresetId = 24; // after 23 seeded defaults (preset-1..preset-23)
+  nextSuperId = 3; // after 2 seeded super-systems (super-1, super-2)
+  nextSubId = 3; // after 2 seeded sub-systems (sub-1, sub-2)
+  nextVoteId = 1;
+  nextPatrolId = 1;
+  nextRevisionId = 1;
 }
 
 export async function installApiMock(page: Page, opts: { failAll?: boolean } = {}) {
@@ -836,9 +1862,14 @@ export async function installApiMock(page: Page, opts: { failAll?: boolean } = {
     url.searchParams.forEach((v, k) => {
       query[k] = v;
     });
+    const headers: Record<string, string> = {};
+    const allHeaders = await req.allHeaders();
+    for (const [k, v] of Object.entries(allHeaders)) {
+      if (typeof v === "string") headers[k.toLowerCase()] = v;
+    }
     for (const { pattern, handler } of handlers) {
       if (pattern.test(url.pathname)) {
-        const result = handler({ url, method: req.method(), body, query });
+        const result = handler({ url, method: req.method(), body, query, headers });
         if (result) {
           await route.fulfill({
             status: result.status ?? 200,

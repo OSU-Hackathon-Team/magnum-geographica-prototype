@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { MapContainer, resolveBaseLayers } from "@magnum/map";
 import {
   createMagnumClient,
@@ -16,6 +17,7 @@ import {
 import { BaseLayerSwitcher } from "../../src/components/map/BaseLayerSwitcher";
 import { DownloadAreaSheet } from "../../src/components/offline/DownloadAreaSheet";
 import { AddFeatureSheet } from "../../src/components/feature/AddFeatureSheet";
+import { UploadTraceSheet } from "../../src/components/trace/UploadTraceSheet";
 import { useMapStore } from "../../src/stores/mapStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useBaseLayerStore } from "../../src/stores/baseLayerStore";
@@ -85,6 +87,8 @@ export default function ExploreScreen() {
   const [showDownloadSheet, setShowDownloadSheet] = useState(false);
   const [addFeatureAt, setAddFeatureAt] = useState<{ lon: number; lat: number } | null>(null);
   const [addFeatureSubmitting, setAddFeatureSubmitting] = useState(false);
+  const [detectedSystemId, setDetectedSystemId] = useState<string | null>(null);
+  const [showUploadTrace, setShowUploadTrace] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
@@ -280,11 +284,22 @@ export default function ExploreScreen() {
     (lon: number, lat: number) => {
       if (isPlacing) {
         setIsPlacing(false);
-        // §21.3.1 — drop a pin and open the Add-Feature bottom sheet
-        // in place. The full /feature/create route is still available
-        // for "Edit from detail" flows.
+        // §21.3.1 + §21.4 — drop a pin, open the Add-Feature bottom sheet
+        // in place, and run a point-in-polygon lookup so the system
+        // chip can pre-fill "📍 Mountains Park" if the user dropped the
+        // pin inside a system boundary.
         setAddFeatureAt({ lon, lat });
         void fetchPresets();
+        const client = createMagnumClient(API_URL);
+        client
+          .getSystemsContaining({ lon, lat })
+          .then((res) => {
+            const top = res.systems[0];
+            if (top) {
+              setDetectedSystemId(top.id);
+            }
+          })
+          .catch(() => undefined);
       }
     },
     [fetchPresets, isPlacing],
@@ -296,6 +311,7 @@ export default function ExploreScreen() {
       name: string;
       answers: Record<string, string | boolean>;
       description?: string;
+      system_id?: string | null;
     }) => {
       if (!addFeatureAt) return;
       setAddFeatureSubmitting(true);
@@ -309,6 +325,9 @@ export default function ExploreScreen() {
         },
         description: result.description,
       };
+      if (result.system_id) {
+        payload.system_id = result.system_id;
+      }
       const offline = !useOfflineStore.getState().isOnline;
       try {
         if (offline) {
@@ -543,6 +562,13 @@ export default function ExploreScreen() {
             </Pressable>
           ) : null}
           <Pressable
+            style={styles.uploadTraceFab}
+            onPress={() => setShowUploadTrace(true)}
+            testID="explore-upload-trace"
+          >
+            <Ionicons name="navigate-outline" size={20} color="#fff" />
+          </Pressable>
+          <Pressable
             style={styles.addFeatureFab}
             onPress={handleStartPlacing}
             testID="explore-add-feature"
@@ -564,10 +590,29 @@ export default function ExploreScreen() {
 
       <AddFeatureSheet
         visible={addFeatureAt !== null}
-        onClose={() => setAddFeatureAt(null)}
-        onSubmit={handleAddFeatureSubmit}
+        onClose={() => {
+          setAddFeatureAt(null);
+          setDetectedSystemId(null);
+        }}
+        onSubmit={async (r) => {
+          await handleAddFeatureSubmit(r);
+          setDetectedSystemId(null);
+        }}
         submitting={addFeatureSubmitting}
+        detectedSystemId={detectedSystemId}
         testID="explore-add-feature-sheet"
+      />
+
+      <UploadTraceSheet
+        visible={showUploadTrace}
+        onClose={() => setShowUploadTrace(false)}
+        onImported={() => {
+          // A trace was uploaded — nothing on the explore map to do
+          // (the new trace shows up in the system it was auto-tagged
+          // into). The user navigates to that system from the
+          // hierarchy tree if they want to see it.
+        }}
+        testID="explore-upload-trace-sheet"
       />
     </View>
   );
@@ -709,6 +754,19 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: "#22c55e",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  uploadTraceFab: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#3b82f6",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",

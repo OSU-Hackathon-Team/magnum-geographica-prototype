@@ -1,9 +1,11 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient } from "@magnum/shared";
 import { SearchBar } from "../../src/components/ui/SearchBar";
 import { Card } from "../../src/components/ui/Card";
+import { Button } from "../../src/components/ui/Button";
 import type { System } from "@magnum/shared";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { getAllDownloadedSystems } from "../../src/services/offlineDataService";
@@ -49,12 +51,31 @@ export default function SystemsScreen() {
 
   return (
     <View style={styles.container} testID="systems-screen">
-      <SearchBar
-        value={q}
-        onChangeText={setQ}
-        placeholder="Filter systems..."
-        testID="systems-search"
-      />
+      <View style={styles.header}>
+        <SearchBar
+          value={q}
+          onChangeText={setQ}
+          placeholder="Filter systems..."
+          testID="systems-search"
+        />
+        <View style={styles.headerActions}>
+          <Button
+            variant="secondary"
+            size="small"
+            onPress={() => router.push("/systems/tree" as never)}
+            testID="systems-tree-button"
+          >
+            <Ionicons name="git-network" size={14} color="#111" /> Tree
+          </Button>
+          <Pressable
+            style={styles.newBtn}
+            onPress={() => router.push("/system/new" as never)}
+            testID="systems-new"
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+          </Pressable>
+        </View>
+      </View>
       <FlatList
         data={items}
         keyExtractor={(s) => s.id}
@@ -83,6 +104,16 @@ export default function SystemsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
+  header: { paddingHorizontal: 12, paddingTop: 8, gap: 8 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  newBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#22c55e",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   list: { padding: 16, gap: 12 },
   empty: { textAlign: "center", color: "#888", marginTop: 24 },
   name: { fontSize: 16, fontWeight: "600" },

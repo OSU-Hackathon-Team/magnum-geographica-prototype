@@ -17,6 +17,10 @@ import {
   PRESET_QUESTION_TYPES,
   PRESET_QUESTIONS_MAX,
   PRESET_SELECT_MAX_OPTIONS,
+  HIERARCHY_ACTIONS,
+  PROVENANCE_SOURCES,
+  TRACE_SOURCES,
+  TRACE_STATUSES,
 } from "../constants.js";
 
 const uuidSchema = z.string().uuid();
@@ -32,6 +36,10 @@ export const superSystemSchema = z.object({
   name: z.string().min(1).max(200),
   slug: slugSchema,
   official: z.boolean(),
+  // §21.5 — super-systems are "Unofficial" if self-organized. Default to
+  // true for backward-compat; the route accepts explicit `unofficial` on
+  // create to mark self-organized groups.
+  boundary: z.unknown().nullable().optional(),
   description: z.string().max(10_000).nullable().optional(),
   external_url: z.string().url().nullable().optional(),
   created_at: isoDateSchema,
@@ -46,8 +54,10 @@ export const systemSchema = z.object({
   slug: slugSchema,
   color: z.string().min(1).max(7).optional(),
   boundary: z.unknown().nullable().optional(),
-  ownership_source: z.string().max(500).nullable().optional(),
-  source_date: z.string().date().nullable().optional(),
+  // §21.5 / outline.md — provenance is required for new systems.
+  ownership_source: z.string().min(1).max(500).nullable().optional(),
+  source_date: z.string().min(1).max(30).nullable().optional(),
+  hidden: z.boolean().optional(),
   description: z.string().max(10_000).nullable().optional(),
   external_url: z.string().url().nullable().optional(),
   created_at: isoDateSchema,
@@ -198,6 +208,8 @@ export const createSystemInputSchema = systemSchema
     external_url: true,
     ownership_source: true,
     source_date: true,
+    color: true,
+    boundary: true,
   })
   .partial({ description: true, external_url: true, ownership_source: true, source_date: true });
 
@@ -689,3 +701,203 @@ export function validateAnswers(
 // ========== Trail tiers §21.6 ==========
 
 export const trailTierSchema = z.enum(TRAIL_TIERS);
+
+// ========== Hierarchy actions (§21.5) ==========
+
+const provenanceSourceSchema = z.enum(PROVENANCE_SOURCES);
+const hierarchyActionSchema = z.enum(HIERARCHY_ACTIONS);
+
+export const createSuperSystemInputSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    slug: slugSchema,
+    official: z.boolean().default(true),
+    boundary: z.unknown().optional(),
+    description: z.string().max(10_000).optional(),
+    external_url: z.string().url().optional(),
+  })
+  .strict();
+
+export const updateSuperSystemInputSchema = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    official: z.boolean().optional(),
+    boundary: z.unknown().optional(),
+    description: z.string().max(10_000).optional(),
+    external_url: z.string().url().optional(),
+  })
+  .strict();
+
+export const createSubSystemInputSchema = z
+  .object({
+    system_id: uuidSchema,
+    name: z.string().min(1).max(200),
+    slug: slugSchema,
+    geometry: z.unknown().optional(),
+    description: z.string().max(10_000).optional(),
+  })
+  .strict();
+
+export const updateSubSystemInputSchema = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    geometry: z.unknown().optional(),
+    description: z.string().max(10_000).optional(),
+  })
+  .strict();
+
+// §21.5 — provenance is required on system create. Update accepts
+// partial patches but rejects empty patches.
+export const updateSystemInputSchema = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    color: z.string().min(1).max(7).optional(),
+    boundary: z.unknown().optional(),
+    ownership_source: provenanceSourceSchema.optional(),
+    source_date: z.string().min(1).max(30).optional(),
+    description: z.string().max(10_000).optional(),
+    external_url: z.string().url().optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "at least one field must be provided",
+  });
+
+/**
+ * §21.5 — Move-to action shape. The route infers the operation from
+ * `action`; e.g. `move_to_super` requires `target_super_id`,
+ * `merge_into` requires `target_system_id`, `promote_to_system`
+ * takes only the source `sub_system_id`.
+ */
+export const moveSystemInputSchema = z
+  .object({
+    action: hierarchyActionSchema,
+    target_super_id: uuidSchema.optional(),
+    target_system_id: uuidSchema.optional(),
+    sub_system_id: uuidSchema.optional(),
+    trail_ids: z.array(uuidSchema).max(500).optional(),
+  })
+  .strict();
+
+export const assignTrailsInputSchema = z
+  .object({
+    trail_ids: z.array(uuidSchema).min(1).max(500),
+  })
+  .strict();
+
+export const pointInPolygonQuerySchema = z.object({
+  lon: z.coerce.number().min(-180).max(180),
+  lat: z.coerce.number().min(-90).max(90),
+});
+
+// Type-only forward reference for the recursive node schema. The Zod
+// shape is exported first; the type is derived after the declaration.
+type HierarchyTreeNodeShape = {
+  id: string;
+  name: string;
+  slug: string;
+  tier: "super" | "system" | "sub";
+  children?: HierarchyTreeNodeShape[];
+};
+export const hierarchyTreeNodeSchema: z.ZodType<HierarchyTreeNodeShape, z.ZodTypeDef, HierarchyTreeNodeShape> = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  slug: z.string(),
+  tier: z.enum(["super", "system", "sub"]),
+  children: z
+    .array(
+      z.lazy(
+        (): z.ZodType<HierarchyTreeNodeShape, z.ZodTypeDef, HierarchyTreeNodeShape> =>
+          hierarchyTreeNodeSchema,
+      ),
+    )
+    .default([]),
+});
+
+export const hierarchyTreeSchema = z.object({
+  nodes: z.array(hierarchyTreeNodeSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export const containsResponseSchema = z.object({
+  systems: z.array(z.object({
+    id: uuidSchema,
+    name: z.string(),
+    slug: z.string(),
+    distance_m: z.number().nonnegative().optional(),
+  })),
+  fallback: z.enum(["point_in_polygon", "nearest"]).default("point_in_polygon"),
+});
+
+// ========== GPS traces §21.6 ==========
+
+const traceSourceSchema = z.enum(TRACE_SOURCES);
+const traceStatusSchema = z.enum(TRACE_STATUSES);
+
+const traceGeometrySchema = z
+  .object({
+    type: z.literal("LineString"),
+    coordinates: z
+      .array(z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]))
+      .min(2)
+      .max(50_000),
+  })
+  .strict();
+
+export const gpsTraceSchema = z.object({
+  id: uuidSchema,
+  user_id: uuidSchema.nullable(),
+  contributor_name: z.string().min(1).max(120),
+  geometry: traceGeometrySchema,
+  source: traceSourceSchema,
+  weight: z.number().min(0).max(1),
+  upvotes: z.number().int().nonnegative(),
+  downvotes: z.number().int().nonnegative(),
+  status: traceStatusSchema,
+  recorded_at: isoDateSchema.nullable(),
+  length_meters: z.number().nonnegative().optional(),
+  created_at: isoDateSchema,
+});
+
+export const createTraceInputSchema = z
+  .object({
+    geometry: traceGeometrySchema,
+    source: traceSourceSchema,
+    recorded_at: isoDateSchema.optional(),
+    contributor_name: z.string().min(1).max(120).default("anonymous"),
+  })
+  .strict();
+
+export const importTraceInputSchema = z
+  .object({
+    format: z.enum(["gpx", "geojson"]),
+    // GPX: a raw string. GeoJSON: the parsed object.
+    payload: z.union([z.string().min(1), z.record(z.string(), z.unknown())]),
+    contributor_name: z.string().min(1).max(120).default("anonymous"),
+    recorded_at: isoDateSchema.optional(),
+  })
+  .strict();
+
+export const traceQuerySchema = z.object({
+  system_id: uuidSchema.optional(),
+  user_id: uuidSchema.optional(),
+  status: traceStatusSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const traceSegmentSchema = z.object({
+  id: uuidSchema,
+  trace_id: uuidSchema,
+  geometry: traceGeometrySchema,
+  cluster_id: z.number().int().nullable(),
+  proposed_trail_id: uuidSchema.nullable(),
+  created_at: isoDateSchema,
+});
+
+export const traceSegmentVoteInputSchema = z
+  .object({
+    trail_id: uuidSchema.nullable(), // null = "propose new trail"
+    contributor_name: z.string().min(1).max(120).default("anonymous"),
+  })
+  .strict();

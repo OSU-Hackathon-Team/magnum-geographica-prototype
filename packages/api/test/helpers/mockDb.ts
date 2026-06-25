@@ -42,6 +42,10 @@ function materializeSql(node: unknown): string {
 
 export interface MockState {
   systems: Array<Record<string, unknown>>;
+  superSystems: Array<Record<string, unknown>>;
+  subSystems: Array<Record<string, unknown>>;
+  systemSuperSystems: Array<Record<string, unknown>>;
+  trailSubSystems: Array<Record<string, unknown>>;
   trails: Array<Record<string, unknown>>;
   features: Array<Record<string, unknown>>;
   wikiPages: Array<Record<string, unknown>>;
@@ -53,6 +57,11 @@ export interface MockState {
   entityProtection: Array<Record<string, unknown>>;
   patrolFlags: Array<Record<string, unknown>>;
   presets: Array<Record<string, unknown>>;
+  gpsTraces: Array<Record<string, unknown>>;
+  traceSystems: Array<Record<string, unknown>>;
+  gpsTraceSegments: Array<Record<string, unknown>>;
+  traceSegmentVotes: Array<Record<string, unknown>>;
+  synthesisRuns: Array<Record<string, unknown>>;
   insertCalls: Array<{ table: string; values: unknown }>;
   updateCalls: Array<{ table: string; values: unknown; where: unknown }>;
   deleteCalls: Array<{ table: string; where: unknown }>;
@@ -299,6 +308,14 @@ function pickTableArray(state: MockState, tableName: string): Array<Record<strin
       return state.presets;
     case "systems":
       return state.systems;
+    case "super_systems":
+      return state.superSystems;
+    case "sub_systems":
+      return state.subSystems;
+    case "system_super_systems":
+      return state.systemSuperSystems;
+    case "trail_sub_systems":
+      return state.trailSubSystems;
     case "trails":
       return state.trails;
     case "features":
@@ -309,6 +326,16 @@ function pickTableArray(state: MockState, tableName: string): Array<Record<strin
       return state.revisions;
     case "citations":
       return state.citations;
+    case "gps_traces":
+      return state.gpsTraces;
+    case "trace_systems":
+      return state.traceSystems;
+    case "gps_trace_segments":
+      return state.gpsTraceSegments;
+    case "trace_segment_votes":
+      return state.traceSegmentVotes;
+    case "synthesis_runs":
+      return state.synthesisRuns;
     default:
       return null;
   }
@@ -352,6 +379,7 @@ function pickRows(state: MockState, table: unknown): unknown[] {
   if (!rows) return [];
   return rows.map((r) => normalizeRowKeys(r as Record<string, unknown>));
 }
+
 
 function applyWhere(rows: unknown[], where: unknown): unknown[] {
   const fn = evalWhere(where);
@@ -442,6 +470,10 @@ function applyLimitOffset(rows: unknown[], limit: number, offset: number): unkno
 export function createMockDb(): { db: Database; state: MockState } {
   const state: MockState = {
     systems: [],
+    superSystems: [],
+    subSystems: [],
+    systemSuperSystems: [],
+    trailSubSystems: [],
     trails: [],
     features: [],
     wikiPages: [],
@@ -453,6 +485,11 @@ export function createMockDb(): { db: Database; state: MockState } {
     entityProtection: [],
     patrolFlags: [],
     presets: [],
+    gpsTraces: [],
+    traceSystems: [],
+    gpsTraceSegments: [],
+    traceSegmentVotes: [],
+    synthesisRuns: [],
     insertCalls: [],
     updateCalls: [],
     deleteCalls: [],
@@ -535,7 +572,6 @@ export function createMockDb(): { db: Database; state: MockState } {
       const apply = () => {
         if (applied) return;
         applied = true;
-        const values = (stashedValues as Record<string, unknown>) ?? {};
         const defaults: Record<string, unknown> = {};
         if (tableName === "users") {
           defaults.role = "contributor";
@@ -549,8 +585,19 @@ export function createMockDb(): { db: Database; state: MockState } {
           defaults.created_at = "2026-01-01T00:00:00.000Z";
           defaults.updated_at = "2026-01-01T00:00:00.000Z";
         }
-        const row = { id: "00000000-0000-0000-0000-000000000001", ...defaults, ...values };
-        applyInsertToState(state, tableName, row, conflictTarget, conflictSet);
+        // `values` can be a single object or an array of objects. The
+        // service uses `db.insert(t).values([rowA, rowB])` for batch
+        // inserts; both shapes need to land in state.
+        const raw = stashedValues;
+        const rows: Array<Record<string, unknown>> = Array.isArray(raw)
+          ? (raw as Array<Record<string, unknown>>)
+          : raw && typeof raw === "object"
+            ? [raw as Record<string, unknown>]
+            : [];
+        for (const v of rows) {
+          const row = { id: "00000000-0000-0000-0000-000000000001", ...defaults, ...v };
+          applyInsertToState(state, tableName, row, conflictTarget, conflictSet);
+        }
       };
       chain.values = (values: unknown) => {
         stashedValues = values;
@@ -564,8 +611,16 @@ export function createMockDb(): { db: Database; state: MockState } {
       };
       chain.returning = () => {
         apply();
-        const row = { id: "00000000-0000-0000-0000-000000000001", ...(stashedValues as Record<string, unknown> | undefined ?? {}) };
-        return Promise.resolve([row]);
+        const raw = stashedValues;
+        const rows: Array<Record<string, unknown>> = Array.isArray(raw)
+          ? (raw as Array<Record<string, unknown>>)
+          : raw && typeof raw === "object"
+            ? [raw as Record<string, unknown>]
+            : [];
+        const returned = rows.length > 0
+          ? rows.map((v) => ({ id: "00000000-0000-0000-0000-000000000001", ...v }))
+          : [{ id: "00000000-0000-0000-0000-000000000001" }];
+        return Promise.resolve(returned);
       };
       chain.onConflictDoNothing = () => {
         apply();

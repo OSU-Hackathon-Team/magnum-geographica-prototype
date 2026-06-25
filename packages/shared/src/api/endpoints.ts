@@ -255,6 +255,114 @@ export function createMagnumClient(
       client.put<Record<string, unknown>>(`/api/presets/${id}`, body),
     deletePreset: (id: string) =>
       client.delete<{ ok: boolean }>(`/api/presets/${id}`),
+
+    // §21.5 — hierarchy
+    listSuperSystems: () =>
+      client.get<{ items: Array<Record<string, unknown>>; total: number }>("/api/super-systems"),
+    getSuperSystem: (id: string) =>
+      client.get<Record<string, unknown>>(`/api/super-systems/${id}`),
+    createSuperSystem: (body: Record<string, unknown>) =>
+      client.post<Record<string, unknown>>("/api/super-systems", body),
+    updateSuperSystem: (id: string, body: Record<string, unknown>) =>
+      client.put<Record<string, unknown>>(`/api/super-systems/${id}`, body),
+    deleteSuperSystem: (id: string) =>
+      client.delete<{ ok: boolean }>(`/api/super-systems/${id}`),
+
+    listSubSystems: (params?: { system_id?: string }) =>
+      client.get<{ items: Array<Record<string, unknown>>; total: number }>(
+        "/api/sub-systems",
+        params,
+      ),
+    getSubSystem: (id: string) =>
+      client.get<Record<string, unknown>>(`/api/sub-systems/${id}`),
+    createSubSystem: (body: Record<string, unknown>) =>
+      client.post<Record<string, unknown>>("/api/sub-systems", body),
+    updateSubSystem: (id: string, body: Record<string, unknown>) =>
+      client.put<Record<string, unknown>>(`/api/sub-systems/${id}`, body),
+    deleteSubSystem: (id: string) =>
+      client.delete<{ ok: boolean }>(`/api/sub-systems/${id}`),
+
+    moveSystem: (
+      systemId: string,
+      body: {
+        action: string;
+        target_super_id?: string;
+        target_system_id?: string;
+        sub_system_id?: string;
+        trail_ids?: string[];
+      },
+    ) => client.post<{ ok: boolean; action: string; affected: number }>(
+      `/api/systems/${systemId}/move`,
+      body,
+    ),
+
+    getHierarchyTree: () =>
+      client.get<{ nodes: Array<Record<string, unknown>>; total: number }>("/api/systems/tree"),
+
+    getSystemsContaining: (params: { lon: number; lat: number }) =>
+      client.get<{ systems: Array<{ id: string; name: string; slug: string; distance_m?: number }>; fallback: "point_in_polygon" | "nearest" }>(
+        "/api/systems/contains",
+        params,
+      ),
+
+    // §21.6 — GPS traces
+    listTraces: (params?: {
+      system_id?: string;
+      user_id?: string;
+      status?: string;
+      page?: number;
+      pageSize?: number;
+    }) =>
+      client.get<{ items: Array<Record<string, unknown>>; total: number; page: number; pageSize: number }>(
+        "/api/traces",
+        params,
+      ),
+    getTrace: (id: string) =>
+      client.get<Record<string, unknown>>(`/api/traces/${id}`),
+    createTrace: (body: {
+      geometry: { type: "LineString"; coordinates: Array<[number, number]> };
+      source: "import" | "recorded";
+      recorded_at?: string;
+      contributor_name?: string;
+    }) =>
+      client.post<{ trace: Record<string, unknown>; tagged_system_ids: string[] }>(
+        "/api/traces",
+        body,
+      ),
+    importTrace: (body: {
+      format: "gpx" | "geojson";
+      payload: string | Record<string, unknown>;
+      recorded_at?: string;
+      contributor_name?: string;
+    }) =>
+      client.post<{ trace: Record<string, unknown>; tagged_system_ids: string[]; points: number; length_meters: number }>(
+        "/api/traces/import",
+        body,
+      ),
+    deleteTrace: (id: string) =>
+      client.delete<{ ok: boolean }>(`/api/traces/${id}`),
+    removeTrace: (id: string) =>
+      client.post<{ ok: boolean }>(`/api/traces/${id}/remove`),
+    cutTraceSegments: (id: string) =>
+      client.post<{ ok: boolean; segments: number }>(`/api/traces/${id}/segments`),
+    listTraceSegments: (id: string) =>
+      client.get<{ items: Array<Record<string, unknown>>; total: number }>(
+        `/api/traces/${id}/segments`,
+      ),
+    voteOnTrace: (id: string, value: 1 | -1) =>
+      client.post<{ upvotes: number; downvotes: number; net: number; hidden: boolean; my_vote: -1 | 0 | 1; karma_awarded: number }>(
+        `/api/traces/${id}/vote`,
+        { value },
+      ),
+    retractTraceVote: (id: string) =>
+      client.delete<{ upvotes: number; downvotes: number; net: number; hidden: boolean; my_vote: 0; karma_awarded: number }>(
+        `/api/traces/${id}/vote`,
+      ),
+    voteOnTraceSegment: (
+      segmentId: string,
+      body: { trail_id?: string | null; contributor_name?: string },
+    ) =>
+      client.post<{ ok: boolean }>(`/api/trace-segments/${segmentId}/vote`, body),
   };
 }
 

@@ -17,6 +17,8 @@ import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
 import { WikiPageView } from "../../src/components/wiki/WikiPageView";
+import { MoveToSheet } from "../../src/components/hierarchy/MoveToSheet";
+import { TrailTracesTab } from "../../src/components/trace/TrailTracesTab";
 import { getAllDownloadedSystems } from "../../src/services/offlineDataService";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 
@@ -45,6 +47,7 @@ export default function SystemDetail() {
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isOfflineAvailable, setIsOfflineAvailable] = useState(false);
+  const [showMoveTo, setShowMoveTo] = useState(false);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const offlineRegions = useOfflineStore((s) => s.offlineRegions);
 
@@ -158,6 +161,14 @@ export default function SystemDetail() {
             </Pressable>
           ) : null}
           <ViewOnMapButton center={system.center ?? null} zoom={9} testID="system-view-on-map" />
+          <Button
+            variant="ghost"
+            size="small"
+            onPress={() => setShowMoveTo(true)}
+            testID="system-move-to"
+          >
+            Move to…
+          </Button>
           {isOfflineAvailable ? (
             <Text style={styles.meta} testID="system-offline-ready">
               Available offline
@@ -197,6 +208,12 @@ export default function SystemDetail() {
           )}
         </View>
 
+        {system ? (
+          <View style={styles.section} testID="system-traces-tab">
+            <TrailTracesTab systemId={system.id} testID="system-traces-tab-content" />
+          </View>
+        ) : null}
+
         <View style={styles.section} testID="system-wiki">
           <View style={styles.row}>
             <Text style={styles.h2}>Wiki</Text>
@@ -228,6 +245,14 @@ export default function SystemDetail() {
           )}
         </View>
       </ScrollView>
+      <MoveToSheet
+        visible={showMoveTo}
+        onClose={() => setShowMoveTo(false)}
+        sourceSystemId={system.id}
+        sourceName={system.name}
+        onMoved={() => router.replace(`/system/${slug}` as never)}
+        testID="system-move-to-sheet"
+      />
     </>
   );
 }
