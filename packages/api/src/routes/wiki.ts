@@ -124,6 +124,7 @@ wikiRoute.post("/", async (c) => {
     await db.insert(revisions).values({
       wikiPageId: wikiPage.id,
       contentMd: content_md,
+      action: "create",
       contributorName: contributor_name,
       authorId: authUser?.id ?? null,
       editSummary: edit_summary ?? null,
@@ -184,6 +185,7 @@ wikiRoute.put("/:id", async (c) => {
   await db.insert(revisions).values({
     wikiPageId,
     contentMd: content_md,
+    action: "update",
     contributorName: contributor_name,
     authorId: authUser?.id ?? null,
     editSummary: edit_summary ?? null,
@@ -271,7 +273,7 @@ wikiRoute.post("/:id/revert", async (c) => {
     .limit(1);
 
   const rev = revRows[0];
-  if (!rev) {
+  if (!rev || rev.contentMd === null) {
     return c.json({ error: "not_found", message: `revision ${revision_id} not found` }, 404);
   }
 
@@ -284,6 +286,7 @@ wikiRoute.post("/:id/revert", async (c) => {
   await db.insert(revisions).values({
     wikiPageId,
     contentMd: rev.contentMd,
+    action: "revert",
     contributorName: contributor_name,
     authorId: authUser?.id ?? null,
     editSummary: edit_summary ?? `Reverted to revision ${revision_id}`,

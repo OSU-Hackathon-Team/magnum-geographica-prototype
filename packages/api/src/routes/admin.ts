@@ -69,8 +69,8 @@ adminRoute.post("/revisions/:id/revert", async (c) => {
     .where(eq(revisions.id, revisionId))
     .limit(1);
 
-  if (!revision) {
-    return c.json({ error: "not_found", message: "revision not found" }, 404);
+  if (!revision || !revision.wikiPageId) {
+    return c.json({ error: "not_found", message: "wiki revision not found" }, 404);
   }
 
   const [page] = await db
@@ -85,12 +85,13 @@ adminRoute.post("/revisions/:id/revert", async (c) => {
 
   await db
     .update(wikiPages)
-    .set({ contentMd: revision.contentMd, updatedAt: new Date() })
+    .set({ contentMd: revision.contentMd ?? "", updatedAt: new Date() })
     .where(eq(wikiPages.id, page.id));
 
   await db.insert(revisions).values({
     wikiPageId: page.id,
-    contentMd: revision.contentMd,
+    contentMd: revision.contentMd ?? "",
+    action: "revert",
     contributorName: "admin-restore",
     editSummary: `Admin revert to revision ${revisionId}`,
     createdAt: new Date(),

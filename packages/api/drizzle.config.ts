@@ -21,6 +21,13 @@ const APP_TABLES = [
   "media",
   "offline_packs",
   "users",
+  // §21.7 / §21.8
+  "votes",
+  "entity_stats",
+  "entity_protection",
+  "patrol_flags",
+  // §21.4
+  "presets",
 ] as const;
 
 const databaseUrl =

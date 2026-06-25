@@ -7,12 +7,29 @@ import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
 import { StorageManager } from "../../src/components/offline/StorageManager";
 import { PendingQueue, type PendingItem } from "../../src/components/offline/PendingQueue";
+import { TrustTierBadge } from "../../src/components/vote/TrustTierBadge";
 import {
   getPendingContributions,
   deleteOfflineRegion as deleteRegion,
   deletePendingContribution,
 } from "../../src/services/offlineDataService";
 import { syncContributions } from "../../src/services/syncService";
+import { createMagnumClient } from "@magnum/shared/api/endpoints";
+import { type TrustTier } from "@magnum/shared/constants";
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+
+interface UserKarma {
+  user_id: string;
+  karma: number;
+  tier: TrustTier;
+  tier_label: string;
+  upvotes_received: number;
+  downvotes_received: number;
+  trace_count: number;
+  feature_count: number;
+  revision_count: number;
+}
 
 export default function ProfileScreen() {
   const contributor = useAuthStore((s) => s.contributorName);
@@ -27,6 +44,7 @@ export default function ProfileScreen() {
 
   const [items, setItems] = useState<PendingItem[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [karma, setKarma] = useState<UserKarma | null>(null);
 
   const refreshPending = useCallback(async () => {
     const pending = await getPendingContributions();
@@ -36,6 +54,21 @@ export default function ProfileScreen() {
   useEffect(() => {
     void refreshPending();
   }, [refreshPending, pending]);
+
+  // Fetch karma + tier for the current user.
+  useEffect(() => {
+    if (!user?.id) {
+      setKarma(null);
+      return;
+    }
+    const client = createMagnumClient(API_URL, {
+      getAuthToken: () => useAuthStore.getState().token ?? undefined,
+    });
+    client
+      .getUserKarma(user.id)
+      .then((k) => setKarma(k as unknown as UserKarma))
+      .catch(() => setKarma(null));
+  }, [user?.id]);
 
   const handleSyncAll = useCallback(async () => {
     setSyncing(true);
@@ -127,6 +160,41 @@ export default function ProfileScreen() {
         <Text style={styles.sub}>{pending} pending change(s)</Text>
       </Card>
 
+      {karma ? (
+        <Card testID="profile-karma">
+          <Text style={styles.label}>Karma</Text>
+          <View style={styles.karmaRow}>
+            <Text style={styles.karmaValue} testID="profile-karma-value">
+              {karma.karma.toFixed(0)}
+            </Text>
+            <TrustTierBadge tier={karma.tier} size="medium" testID="profile-tier-badge" />
+          </View>
+          <View style={styles.karmaStats}>
+            <View style={styles.karmaStat}>
+              <Text style={styles.karmaStatValue}>{karma.upvotes_received}</Text>
+              <Text style={styles.karmaStatLabel}>↑ received</Text>
+            </View>
+            <View style={styles.karmaStat}>
+              <Text style={styles.karmaStatValue}>{karma.trace_count}</Text>
+              <Text style={styles.karmaStatLabel}>traces</Text>
+            </View>
+            <View style={styles.karmaStat}>
+              <Text style={styles.karmaStatValue}>{karma.feature_count}</Text>
+              <Text style={styles.karmaStatLabel}>features</Text>
+            </View>
+            <View style={styles.karmaStat}>
+              <Text style={styles.karmaStatValue}>{karma.revision_count}</Text>
+              <Text style={styles.karmaStatLabel}>edits</Text>
+            </View>
+          </View>
+        </Card>
+      ) : user ? (
+        <Card>
+          <Text style={styles.label}>Karma</Text>
+          <Text style={styles.sub}>Sign in to track your karma and trust tier.</Text>
+        </Card>
+      ) : null}
+
       <Card>
         <StorageManager onDeleteRegion={handleDeleteRegion} />
       </Card>
@@ -151,4 +219,26 @@ const styles = StyleSheet.create({
   sub: { fontSize: 12, color: "#888", marginTop: 4 },
   hint: { fontSize: 12, color: "#22c55e", marginTop: 8 },
   buttonRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  karmaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
+  karmaValue: { fontSize: 32, fontWeight: "700", color: "#22c55e" },
+  karmaStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  karmaStat: {
+    flex: 1,
+    minWidth: 70,
+    padding: 8,
+    backgroundColor: "#f9fafb",
+    borderRadius: 6,
+  },
+  karmaStatValue: { fontSize: 18, fontWeight: "600" },
+  karmaStatLabel: { fontSize: 10, color: "#888" },
 });

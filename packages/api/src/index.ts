@@ -18,6 +18,9 @@ import { segmentDetailRoute, trailSegmentsRoute } from "./routes/segments.js";
 import { authRoute } from "./routes/auth.js";
 import { usersRoute } from "./routes/users.js";
 import { adminRoute } from "./routes/admin.js";
+import { votesRoute } from "./routes/votes.js";
+import { patrolRoute } from "./routes/patrol.js";
+import { presetsRoute } from "./routes/presets.js";
 import { metroProxy } from "./middleware/metro-proxy.js";
 
 const app = new Hono();
@@ -42,6 +45,9 @@ app.route("/api/segments", segmentDetailRoute);
 app.route("/api/trails", trailSegmentsRoute);
 app.route("/api/auth", authRoute);
 app.route("/api/users", usersRoute);
+app.route("/api/votes", votesRoute);
+app.route("/api/admin/patrol", patrolRoute);
+app.route("/api/presets", presetsRoute);
 app.route("/api/admin", adminRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));

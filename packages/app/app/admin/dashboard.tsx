@@ -80,6 +80,16 @@ export default function AdminDashboard() {
             Manage Users
           </Button>
         </Link>
+        <Link href="/admin/patrol" asChild>
+          <Button variant="secondary" testID="admin-link-patrol">
+            Patrol Feed
+          </Button>
+        </Link>
+        <Link href="/admin/presets" asChild>
+          <Button variant="secondary" testID="admin-link-presets">
+            Manage Presets
+          </Button>
+        </Link>
       </View>
     </ScrollView>
   );

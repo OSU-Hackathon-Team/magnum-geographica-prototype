@@ -28,6 +28,9 @@ export default function AdminLayout() {
       <Stack.Screen name="dashboard" options={{ title: "Admin" }} />
       <Stack.Screen name="revisions" options={{ title: "Revisions" }} />
       <Stack.Screen name="users" options={{ title: "Users" }} />
+      <Stack.Screen name="patrol" options={{ title: "Patrol" }} />
+      <Stack.Screen name="presets" options={{ title: "Presets", headerShown: false }} />
+      <Stack.Screen name="presets/[id]" options={{ title: "Preset", headerShown: false }} />
     </Stack>
   );
 }

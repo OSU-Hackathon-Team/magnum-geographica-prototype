@@ -18,6 +18,28 @@ import {
   userSchema,
   loginRequestSchema,
   registerRequestSchema,
+  trustTierSchema,
+  userKarmaSchema,
+  voteTargetTypeSchema,
+  castVoteInputSchema,
+  voteRecordSchema,
+  entityScoreSchema,
+  protectionLevelSchema,
+  entityProtectionSchema,
+  revisionTargetTypeSchema,
+  revisionActionSchema,
+  revisionGeneralizedSchema,
+  revisionQuerySchema,
+  revertRevisionInputSchema,
+  patrolFlagReasonSchema,
+  patrolFlagSchema,
+  patrolQuerySchema,
+  patrolActionSchema,
+  trailTierSchema,
+  presetSchema,
+  createPresetInputSchema,
+  updatePresetInputSchema,
+  presetQuerySchema,
 } from "../schemas/index.js";
 
 export type Difficulty = "easy" | "moderate" | "hard" | "expert";
@@ -40,6 +62,10 @@ export type UserRole = "contributor" | "moderator" | "admin" | "banned";
 export type SyncAction = "create" | "update" | "delete";
 export type SyncStatus = "pending" | "syncing" | "conflict" | "synced";
 
+// §21.7 / §21.8 type unions are re-exported from constants.ts. We
+// deliberately re-import them here as named exports so callers that import
+// only from `@magnum/shared/types` get the same names as constants.ts.
+
 export type SuperSystem = z.infer<typeof superSystemSchema>;
 export type System = z.infer<typeof systemSchema>;
 export type SubSystem = z.infer<typeof subSystemSchema>;
@@ -58,6 +84,29 @@ export type OfflineRegion = z.infer<typeof offlineRegionSchema>;
 export type User = z.infer<typeof userSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
+
+// §21.7 / §21.8 — Type unions (TrustTier, ProtectionLevel, RevisionTargetType,
+// RevisionAction, VoteTargetType, PatrolFlagReason, TrailTier) are defined
+// in constants.ts and re-exported from there. The complex object types below
+// are derived from their zod schemas.
+export type UserKarma = z.infer<typeof userKarmaSchema>;
+export type CastVoteInput = z.infer<typeof castVoteInputSchema>;
+export type VoteRecord = z.infer<typeof voteRecordSchema>;
+export type EntityScore = z.infer<typeof entityScoreSchema>;
+export type EntityProtection = z.infer<typeof entityProtectionSchema>;
+export type RevisionGeneralized = z.infer<typeof revisionGeneralizedSchema>;
+export type RevisionQuery = z.infer<typeof revisionQuerySchema>;
+export type RevertRevisionInput = z.infer<typeof revertRevisionInputSchema>;
+export type PatrolFlag = z.infer<typeof patrolFlagSchema>;
+export type PatrolQuery = z.infer<typeof patrolQuerySchema>;
+export type PatrolActionInput = z.infer<typeof patrolActionSchema>;
+
+// §21.4 — preset system
+export type Preset = z.infer<typeof presetSchema>;
+export type CreatePresetInput = z.infer<typeof createPresetInputSchema>;
+export type UpdatePresetInput = z.infer<typeof updatePresetInputSchema>;
+export type PresetQuery = z.infer<typeof presetQuerySchema>;
+export type { PresetCategory, PresetQuestionType } from "../constants.js";
 
 export interface GeoJSONPolygon {
   type: "Polygon";

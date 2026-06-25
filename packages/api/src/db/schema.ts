@@ -10,6 +10,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  jsonb,
   customType,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -74,6 +75,10 @@ export const systems = pgTable(
     sourceDate: date("source_date"),
     description: text("description"),
     externalUrl: text("external_url"),
+    // §21.7 / §21.5 — system author for karma attribution.
+    createdByUserId: uuid("created_by_user_id"),
+    contributorName: text("contributor_name").notNull().default("anonymous"),
+    hidden: boolean("hidden").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -122,6 +127,11 @@ export const trails = pgTable(
     lengthMeters: doublePrecision("length_meters"),
     elevationGainMeters: doublePrecision("elevation_gain_meters"),
     verified: boolean("verified").notNull().default(false),
+    // §21.6 trail trust tier: premium (official import), elevated (frozen from
+    // synthesized), or synthesized (built/maintained from GPS traces).
+    tier: text("tier").notNull().default("synthesized"),
+    // Trail creator — for karma attribution on upvotes.
+    createdByUserId: uuid("created_by_user_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -193,11 +203,20 @@ export const features = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    typeTag: text("type_tag").notNull(),
+    // Legacy hardcoded tag — kept nullable for rows created under the
+    // new preset system. The new code path is `presetId` + `answers`.
+    typeTag: text("type_tag"),
     point: point("point").notNull(),
+    // §21.4 — preset-based feature typing.
+    presetId: uuid("preset_id").references(() => presets.id, { onDelete: "set null" }),
+    answers: jsonb("answers"),
     trailId: uuid("trail_id").references(() => trails.id, { onDelete: "set null" }),
     systemId: uuid("system_id").references(() => systems.id, { onDelete: "set null" }),
+    // §21.7 — feature author for karma attribution.
+    createdByUserId: uuid("created_by_user_id"),
+    contributorName: text("contributor_name").notNull().default("anonymous"),
     description: text("description"),
+    hidden: boolean("hidden").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -205,6 +224,35 @@ export const features = pgTable(
     pointIdx: index("idx_features_point").using("gist", t.point),
     trailIdx: index("idx_features_trail").on(t.trailId),
     systemIdx: index("idx_features_system").on(t.systemId),
+    presetIdx: index("idx_features_preset").on(t.presetId),
+  }),
+);
+
+// ========== Presets (§21.4) ==========
+
+export const presets = pgTable(
+  "presets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    key: text("key").notNull().unique(),
+    label: text("label").notNull(),
+    iconName: text("icon_name").notNull(),
+    iconColor: text("icon_color").notNull().default("#22c55e"),
+    category: text("category").notNull(),
+    // OSM tag map for future upstreaming (Phase X). Stored as JSONB so
+    // presets can carry nested tag values like {"shop": "bakery"}.
+    osmTags: jsonb("osm_tags").notNull().default(sql`'{}'::jsonb`),
+    // Up to 5 quick questions per the §21.4 spec. Shape:
+    //   [{ key, type: "boolean"|"select", label, options?: [{value,label}] }]
+    questions: jsonb("questions").notNull().default(sql`'[]'::jsonb`),
+    upstreamable: boolean("upstreamable").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(100),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    categoryIdx: index("idx_presets_category").on(t.category, t.sortOrder),
   }),
 );
 
@@ -241,10 +289,17 @@ export const revisions = pgTable(
   "revisions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    wikiPageId: uuid("wiki_page_id")
-      .notNull()
-      .references(() => wikiPages.id, { onDelete: "cascade" }),
-    contentMd: text("content_md").notNull(),
+    // Legacy FK for wiki-page revisions. Kept as nullable so we can generalize
+    // the table to cover any entity (system, preset, feature, trace, trail…).
+    wikiPageId: uuid("wiki_page_id").references(() => wikiPages.id, { onDelete: "cascade" }),
+    // Generalization (§21.8). Either wiki_page_id is set, or target_type/target_id is.
+    targetType: text("target_type"),
+    targetId: uuid("target_id"),
+    action: text("action").notNull().default("update"),
+    payloadBefore: jsonb("payload_before"),
+    payloadAfter: jsonb("payload_after"),
+    revertedFromId: uuid("reverted_from_id"),
+    contentMd: text("content_md"),
     contributorName: text("contributor_name").notNull().default("anonymous"),
     authorId: uuid("author_id"),
     editSummary: text("edit_summary"),
@@ -252,6 +307,88 @@ export const revisions = pgTable(
   },
   (t) => ({
     pageIdx: index("idx_revisions_page").on(t.wikiPageId, t.createdAt),
+    targetIdx: index("idx_revisions_target").on(t.targetType, t.targetId, t.createdAt),
+    authorIdx: index("idx_revisions_author").on(t.authorId, t.createdAt),
+    actionIdx: index("idx_revisions_action").on(t.action, t.createdAt),
+  }),
+);
+
+// ========== Karma / Votes (§21.7) ==========
+
+export const votes = pgTable(
+  "votes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    // null = anonymous vote (karma cannot be awarded for these in the
+    // backward-compatible MVP path; counted for tally but not karma).
+    userId: uuid("user_id"),
+    value: integer("value").notNull(),
+    voterKarma: doublePrecision("voter_karma").notNull().default(0),
+    voterTier: text("voter_tier").notNull().default("new"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    uniq: uniqueIndex("idx_votes_user_target").on(t.targetType, t.targetId, t.userId),
+    targetIdx: index("idx_votes_target").on(t.targetType, t.targetId),
+    authorTargetIdx: index("idx_votes_author_target").on(t.userId, t.targetType, t.targetId),
+  }),
+);
+
+// Cached score per target — avoids COUNT(*) per request.
+export const entityStats = pgTable(
+  "entity_stats",
+  {
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    upvotes: integer("upvotes").notNull().default(0),
+    downvotes: integer("downvotes").notNull().default(0),
+    net: integer("net").notNull().default(0),
+    hidden: boolean("hidden").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.targetType, t.targetId] }),
+  }),
+);
+
+// ========== Protection (§21.8) ==========
+
+export const entityProtection = pgTable(
+  "entity_protection",
+  {
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    level: text("level").notNull().default("normal"),
+    upvotesAt: integer("upvotes_at").notNull().default(0),
+    childrenAt: integer("children_at").notNull().default(0),
+    reason: text("reason"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.targetType, t.targetId] }),
+  }),
+);
+
+// ========== Patrol (§21.8) ==========
+
+export const patrolFlags = pgTable(
+  "patrol_flags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    revisionId: uuid("revision_id").notNull(),
+    reason: text("reason").notNull(),
+    details: jsonb("details"),
+    resolved: boolean("resolved").notNull().default(false),
+    resolvedBy: uuid("resolved_by"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    resolvedIdx: index("idx_patrol_resolved").on(t.resolved, t.createdAt),
+    revisionIdx: index("idx_patrol_revision").on(t.revisionId),
   }),
 );
 
@@ -316,5 +453,16 @@ export type NewFeature = typeof features.$inferInsert;
 export type WikiPage = typeof wikiPages.$inferSelect;
 export type Citation = typeof citations.$inferSelect;
 export type Revision = typeof revisions.$inferSelect;
+export type NewRevision = typeof revisions.$inferInsert;
 export type Media = typeof media.$inferSelect;
 export type OfflinePack = typeof offlinePacks.$inferSelect;
+export type Vote = typeof votes.$inferSelect;
+export type NewVote = typeof votes.$inferInsert;
+export type EntityStat = typeof entityStats.$inferSelect;
+export type NewEntityStat = typeof entityStats.$inferInsert;
+export type EntityProtection = typeof entityProtection.$inferSelect;
+export type NewEntityProtection = typeof entityProtection.$inferInsert;
+export type PatrolFlag = typeof patrolFlags.$inferSelect;
+export type NewPatrolFlag = typeof patrolFlags.$inferInsert;
+export type Preset = typeof presets.$inferSelect;
+export type NewPreset = typeof presets.$inferInsert;

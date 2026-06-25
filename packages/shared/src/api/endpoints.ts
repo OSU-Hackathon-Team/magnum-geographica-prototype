@@ -175,6 +175,86 @@ export function createMagnumClient(
       client.post<{ ok: boolean }>(`/api/admin/users/${id}/ban`),
     adminUnbanUser: (id: string) =>
       client.post<{ ok: boolean }>(`/api/admin/users/${id}/unban`),
+
+    // §21.7 / §21.8 — karma, votes, protection, generalized revisions, patrol.
+    castVote: (body: { target_type: string; target_id: string; value: 1 | -1 }) =>
+      client.post<{
+        upvotes: number;
+        downvotes: number;
+        net: number;
+        hidden: boolean;
+        my_vote: -1 | 1;
+        karma_awarded: number;
+      }>("/api/votes", body),
+    retractVote: (targetType: string, targetId: string) =>
+      client.delete<{
+        upvotes: number;
+        downvotes: number;
+        net: number;
+        hidden: boolean;
+        my_vote: 0;
+        karma_awarded: number;
+      }>(`/api/votes/${targetType}/${targetId}`),
+    getVoteScore: (targetType: string, targetId: string) =>
+      client.get<{
+        target_type: string;
+        target_id: string;
+        upvotes: number;
+        downvotes: number;
+        net: number;
+        hidden: boolean;
+        my_vote?: -1 | 0 | 1;
+      }>(`/api/votes/${targetType}/${targetId}`),
+    getUserKarma: (id: string) =>
+      client.get<{
+        user_id: string;
+        karma: number;
+        tier: string;
+        tier_label: string;
+        upvotes_received: number;
+        downvotes_received: number;
+        trace_count: number;
+        feature_count: number;
+        revision_count: number;
+      }>(`/api/votes/users/${id}/karma`),
+
+    listRevisionsForTarget: (targetType: string, targetId: string, params?: { page?: number; pageSize?: number }) =>
+      client.get<{ items: Revision[]; total: number; page: number; pageSize: number }>(
+        `/api/revisions/target/${targetType}/${targetId}`,
+        params,
+      ),
+    queryRevisions: (params?: { target_type?: string; target_id?: string; author_id?: string; page?: number; pageSize?: number }) =>
+      client.get<{ items: Revision[]; total: number; page: number; pageSize: number }>("/api/revisions", params),
+    revertRevision: (id: string, body?: { contributor_name?: string; edit_summary?: string }) =>
+      client.post<{ ok: boolean; revision_id: string }>(`/api/revisions/${id}/revert`, body ?? {}),
+
+    adminListPatrol: (params?: { reason?: string; user_id?: string; resolved?: boolean; page?: number; pageSize?: number }) =>
+      client.get<{ items: Array<Record<string, unknown>>; total: number; page: number; pageSize: number }>(
+        "/api/admin/patrol",
+        params,
+      ),
+    adminPatrolAct: (body: {
+      flag_id?: string;
+      revision_id?: string;
+      action: "resolve" | "revert" | "rollback";
+      actor_id?: string;
+      target_type?: string;
+      target_id?: string;
+    }) => client.post<{ ok: boolean }>("/api/admin/patrol/act", body),
+
+    // §21.4 — presets
+    listPresets: (params?: { category?: string; upstreamable?: boolean }) =>
+      client.get<{ items: Array<Record<string, unknown>>; total: number }>("/api/presets", params),
+    getPreset: (id: string) =>
+      client.get<Record<string, unknown>>(`/api/presets/${id}`),
+    getPresetByKey: (key: string) =>
+      client.get<Record<string, unknown>>(`/api/presets/by-key/${key}`),
+    createPreset: (body: Record<string, unknown>) =>
+      client.post<Record<string, unknown>>("/api/presets", body),
+    updatePreset: (id: string, body: Record<string, unknown>) =>
+      client.put<Record<string, unknown>>(`/api/presets/${id}`, body),
+    deletePreset: (id: string) =>
+      client.delete<{ ok: boolean }>(`/api/presets/${id}`),
   };
 }
 

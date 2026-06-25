@@ -47,6 +47,7 @@ syncRoute.post("/contributions", async (c) => {
             await db.insert(revisions).values({
               wikiPageId: rows[0].id,
               contentMd: data.content_md,
+              action: "create",
               contributorName: (contrib.contributor_name as string) ?? "anonymous",
             });
           }
@@ -91,6 +92,7 @@ syncRoute.post("/contributions", async (c) => {
           await db.insert(revisions).values({
             wikiPageId: entityId,
             contentMd: data.content_md,
+            action: "update",
             contributorName: (contrib.contributor_name as string) ?? "anonymous",
           });
 
