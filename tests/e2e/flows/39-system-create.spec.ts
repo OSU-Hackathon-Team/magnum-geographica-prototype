@@ -91,6 +91,28 @@ test.describe("New system form (§21.5)", () => {
     await expect(page.getByTestId("new-system-cancel")).toBeVisible();
   });
 
+  test("clicking add-vertex increments the vertex count", async ({ page }) => {
+    await page.goto(`${BASE}/system/new`);
+    const count = page.getByTestId("new-system-vertex-count");
+    const beforeText = (await count.textContent()) ?? "0";
+    const before = Number(beforeText.match(/\d+/)?.[0] ?? "0");
+    await page.getByTestId("new-system-add-vertex").click();
+    await page.getByTestId("new-system-add-vertex").click();
+    const afterText = (await count.textContent()) ?? "0";
+    const after = Number(afterText.match(/\d+/)?.[0] ?? "0");
+    expect(after).toBe(before + 2);
+  });
+
+  test("clear-vertices resets the count to 0", async ({ page }) => {
+    await page.goto(`${BASE}/system/new`);
+    await page.getByTestId("new-system-add-vertex").click();
+    await page.getByTestId("new-system-add-vertex").click();
+    await page.getByTestId("new-system-clear-vertices").click();
+    const count = page.getByTestId("new-system-vertex-count");
+    const text = (await count.textContent()) ?? "0";
+    expect(Number(text.match(/\d+/)?.[0] ?? "0")).toBe(0);
+  });
+
   test("POST /api/systems creates a new system", async ({ page }) => {
     await page.goto(`${BASE}/auth/register`);
     await page.getByTestId("register-username").fill("syscreator");

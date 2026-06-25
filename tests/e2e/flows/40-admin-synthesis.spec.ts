@@ -81,6 +81,34 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
     await expect(page.getByTestId("synthesis-reject")).toBeVisible();
   });
 
+  test("approving a proposal removes it from the list", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/admin/synthesis`);
+    await page.getByTestId("synthesis-system-input").fill("sys-1");
+    await page.getByTestId("synthesis-system-set").click();
+    // Verify both seeded proposals are visible.
+    await expect(page.getByTestId("synthesis-row-prop-1")).toBeVisible();
+    await expect(page.getByTestId("synthesis-row-prop-2")).toBeVisible();
+    // Open the approve/reject modal for prop-1.
+    await page.getByTestId("synthesis-row-prop-1").click();
+    await page.getByTestId("synthesis-name").fill("Approved Trail");
+    await page.getByTestId("synthesis-approve").click();
+    // prop-1 disappears; prop-2 remains.
+    await expect(page.getByTestId("synthesis-row-prop-1")).not.toBeVisible();
+    await expect(page.getByTestId("synthesis-row-prop-2")).toBeVisible();
+  });
+
+  test("rejecting a proposal removes it from the list", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/admin/synthesis`);
+    await page.getByTestId("synthesis-system-input").fill("sys-1");
+    await page.getByTestId("synthesis-system-set").click();
+    await expect(page.getByTestId("synthesis-row-prop-1")).toBeVisible();
+    await page.getByTestId("synthesis-row-prop-1").click();
+    await page.getByTestId("synthesis-reject").click();
+    await expect(page.getByTestId("synthesis-row-prop-1")).not.toBeVisible();
+  });
+
   test("non-admin (low-trust user) gets 403 on the synthesis-proposals endpoint", async ({
     page,
   }) => {

@@ -87,15 +87,16 @@ test.describe("Admin presets list (§21.4)", () => {
     const res = await browserFetch(page, "/api/presets?category=landmarks");
     expect(res.status).toBe(200);
     const body = res.body as { items: Array<{ key: string; category: string }>; total: number };
-    // We just check that filtering by category returns a subset of
-    // the unfiltered list and that all returned items have the
-    // requested category.
-    if (body.items.length > 0) {
-      expect(body.items.every((p) => p.category === "landmarks")).toBe(true);
-    } else {
-      // If 0, fall back to verifying the route is reachable.
-      expect(res.status).toBe(200);
-    }
+    // The fixture seeds 6 landmark presets (viewpoint, notable_tree,
+    // waterfall, cave_entrance, bridge, tunnel). Filtering must return
+    // a non-empty subset and every item must have the requested
+    // category.
+    expect(body.items.length).toBeGreaterThan(0);
+    expect(body.total).toBe(body.items.length);
+    expect(body.items.every((p) => p.category === "landmarks")).toBe(true);
+    // Total is strictly less than the unfiltered list (the filter
+    // actually narrows the result).
+    expect(body.total).toBeLessThan(allBody.total);
   });
 
   test("non-admin user redirected from /admin/presets", async ({ page }) => {

@@ -54,15 +54,56 @@ test.describe("Vote control — feature page (§21.7)", () => {
   });
 
   test("switching from up to down moves score from +1 to -1", async ({ page }) => {
-    // Logged-out, anonymous state. Verify the score column is visible
-    // and the buttons are read-only. A real "switch" test is timing
-    // sensitive (rapid clicks while the up-click API is in-flight) and
-    // is covered by the API-level test in packages/api.
-    await page.goto(`${BASE}/feature/f-1`);
-    const score = page.getByTestId("feature-vote-score");
-    await expect(score).toBeVisible();
-    await expect(page.getByTestId("feature-vote-up")).toBeVisible();
-    await expect(page.getByTestId("feature-vote-down")).toBeVisible();
+    // Use a unique target (f-4, the viewpoint feature) so we don't
+    // race with other tests in the same file that vote on f-1.
+    await registerAndLogin(page, "voter3", "voter3@example.com");
+    const token = await page.evaluate(() =>
+      (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, ""),
+    );
+    // First vote: +1. The mock returns net=1, my_vote=1.
+    const up = await page.evaluate(async (t) => {
+      const r = await fetch("http://localhost:9999/api/votes", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${t}` },
+        body: JSON.stringify({ target_type: "feature", target_id: "f-4", value: 1 }),
+      });
+      return r.json();
+    }, token);
+    const upBody = up as { net: number; my_vote: number; upvotes: number; downvotes: number };
+    expect(upBody.my_vote).toBe(1);
+    expect(upBody.net).toBe(1);
+    // Switch to -1. The mock's previous.value=1, so upvotes goes 1→0
+    // and downvotes goes 0→1, net = -1.
+    const upRaw = await page.evaluate(async (t) => {
+      const r = await fetch("http://localhost:9999/api/votes", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${t}` },
+        body: JSON.stringify({ target_type: "feature", target_id: "f-4", value: 1 }),
+      });
+      return { status: r.status, body: await r.json() };
+    }, token);
+    // eslint-disable-next-line no-console
+    console.log("up raw:", JSON.stringify(upRaw));
+    const upBody = upRaw.body as { net: number; my_vote: number; upvotes: number; downvotes: number };
+    expect(upBody.my_vote).toBe(1);
+    expect(upBody.net).toBe(1);
+    // Switch to -1. The mock's previous.value=1, so upvotes goes 1→0
+    // and downvotes goes 0→1, net = -1.
+    const down = await page.evaluate(async (t) => {
+      const r = await fetch("http://localhost:9999/api/votes", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${t}` },
+        body: JSON.stringify({ target_type: "feature", target_id: "f-4", value: -1 }),
+      });
+      return r.json();
+    }, token);
+    const downBody = down as { net: number; my_vote: number; upvotes: number; downvotes: number };
+    // eslint-disable-next-line no-console
+    console.log("down body:", JSON.stringify(downBody));
+    expect(downBody.my_vote).toBe(-1);
+    expect(downBody.net).toBe(-1);
+    expect(downBody.upvotes).toBe(0);
+    expect(downBody.downvotes).toBe(1);
   });
 
   test("vote persists across navigation", async ({ page }) => {

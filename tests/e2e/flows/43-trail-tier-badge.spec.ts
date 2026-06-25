@@ -111,4 +111,45 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     const synthDetail = await browserFetch(page, `/api/trails/${body.id}`);
     expect(synthDetail.status).toBe(200);
   });
+
+  test("promoting a synthesized trail to elevated swaps the badge", async ({ page }) => {
+    const reg = await browserFetch(page, "/api/auth/register", {
+      method: "POST",
+      body: {
+        username: "mod_promote",
+        email: "modpromote@example.com",
+        password: "testpass123",
+        role: "admin",
+        trust_score: 999,
+      },
+    });
+    expect(reg.status).toBe(201);
+    const { access_token } = reg.body as { access_token: string };
+    // First create a synthetic trail via approve.
+    const approve = await browserFetch(
+      page,
+      "/api/admin/synthesis-proposals/seg-prop-2/approve",
+      {
+        method: "POST",
+        token: access_token,
+        body: { system_id: "sys-1", name: "Eagle Ridge" },
+      },
+    );
+    expect(approve.status).toBe(200);
+    const newId = (approve.body as { id: string }).id;
+    // Navigate to the new trail detail.
+    await page.goto(`${BASE}/trail/eagle-ridge`);
+    await expect(page.getByTestId("trail-tier-badge-synthesized")).toBeVisible();
+    // Promote via API.
+    const promote = await browserFetch(page, `/api/admin/trails/${newId}/promote`, {
+      method: "POST",
+      token: access_token,
+      body: { to: "elevated" },
+    });
+    expect(promote.status).toBe(200);
+    // Reload — the badge should now read "elevated".
+    await page.goto(`${BASE}/trail/eagle-ridge`);
+    await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
+    await expect(page.getByTestId("trail-tier-label")).toHaveText("Elevated");
+  });
 });

@@ -237,6 +237,216 @@ function authorForTarget(targetType: string, targetId: string): string | null {
   return null;
 }
 
+// --- Mock-only helpers for the trace handlers -----------------------
+
+/** Extract lon/lat pairs from a GPX string. Minimal but matches the
+ *  shape of an `expo-document-picker` / `<input type=file>` payload. */
+function extractGpxCoords(gpx: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  const re = /<trkpt[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(gpx)) !== null) {
+    const lat = Number(m[1]);
+    const lon = Number(m[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) out.push([lon, lat]);
+  }
+  return out;
+}
+
+/** Greedy bounding-box check against fixture system centers. The
+ *  real impl does point-in-polygon against `systems.boundary`; the
+ *  mock uses the same center+epsilon check as `/api/systems/contains`. */
+function pickSystemForTrace(coords: Array<[number, number]>): string | null {
+  const EPS = 0.5;
+  for (const [lon, lat] of coords) {
+    const match = SYSTEMS.find((s) => {
+      const c = s.center as { lon: number; lat: number } | undefined;
+      return c ? Math.abs(c.lon - lon) < EPS && Math.abs(c.lat - lat) < EPS : false;
+    });
+    if (match) return match.id;
+  }
+  return null;
+}
+
+/** Approximate LineString length in meters. Haversine — close enough
+ *  for the mock's happy-path length check. */
+function traceLengthMeters(coords: Array<[number, number]>): number {
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const [lon1, lat1] = coords[i - 1]!;
+    const [lon2, lat2] = coords[i]!;
+    const R = 6371000;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    total += 2 * R * Math.asin(Math.sqrt(a));
+  }
+  return total;
+}
+
+// --- §21.6 — GPS traces ---------------------------------------------
+const TRACES: Array<{
+  id: string;
+  user_id: string | null;
+  contributor_name: string;
+  geometry: { type: "LineString"; coordinates: Array<[number, number]> };
+  source: "import" | "recorded";
+  weight: number;
+  upvotes: number;
+  downvotes: number;
+  status: "active" | "ignored" | "removed";
+  recorded_at: string | null;
+  created_at: string;
+  derived_from_segments: number;
+  last_synthesized_at: string | null;
+}> = [];
+let nextTraceId = 1;
+
+const TRACE_SEGMENTS: Array<{
+  id: string;
+  trace_id: string;
+  geometry: { type: "LineString"; coordinates: Array<[number, number]> };
+  cluster_id: number | null;
+  proposed_trail_id: string | null;
+}> = [];
+let nextTraceSegmentId = 1;
+
+const TRACE_SYSTEMS: Array<{ trace_id: string; system_id: string }> = [];
+
+const TRACE_VOTES: Array<{
+  id: string;
+  trace_id: string;
+  user_id: string;
+  value: 1 | -1;
+  created_at: string;
+}> = [];
+
+const TRACE_SEGMENT_VOTES: Array<{
+  id: string;
+  segment_id: string;
+  user_id: string;
+  trail_id: string | null;
+  vote: 1 | -1;
+  created_at: string;
+}> = [];
+
+function traceWeight(up: number, down: number): number {
+  return (up + 1 - down) / (up + down + 2);
+}
+
+function seedTraceFixtures() {
+  TRACES.length = 0;
+  TRACE_SEGMENTS.length = 0;
+  TRACE_SYSTEMS.length = 0;
+  TRACE_VOTES.length = 0;
+  TRACE_SEGMENT_VOTES.length = 0;
+  nextTraceId = 1;
+  nextTraceSegmentId = 1;
+  // Two seeded traces inside sys-1 (Hocking Hills). trace-1 is the
+  // source of the synthesis proposals (prop-1, prop-2).
+  const now = "2026-06-21T00:00:00.000Z";
+  // Seed voters (fictional user ids) so the trace's initial upvote /
+  // downvote counts are backed by real TRACE_VOTES rows. The vote
+  // handler recomputes counts from TRACE_VOTES, so without these the
+  // seed counts would be clobbered on the first vote.
+  for (let i = 0; i < 3; i++) {
+    MOCK_USERS[`seed-voter-${i}`] = {
+      id: `seed-voter-${i}`,
+      username: `seedvoter${i}`,
+      email: `seedvoter${i}@example.com`,
+      role: "contributor",
+      trust_score: 10,
+    };
+  }
+  TRACES.push(
+    {
+      id: "trace-1",
+      user_id: "user-100",
+      contributor_name: "hiker1",
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [-82.5412, 39.4342],
+          [-82.5405, 39.4355],
+          [-82.5398, 39.4368],
+        ],
+      },
+      source: "recorded",
+      weight: 1.0,
+      upvotes: 3,
+      downvotes: 0,
+      status: "active",
+      recorded_at: now,
+      created_at: now,
+      derived_from_segments: 0,
+      last_synthesized_at: null,
+    },
+    {
+      id: "trace-2",
+      user_id: "user-100",
+      contributor_name: "hiker1",
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [-82.5412, 39.4342],
+          [-82.5420, 39.4350],
+          [-82.5428, 39.4358],
+        ],
+      },
+      source: "import",
+      weight: 0.8,
+      upvotes: 1,
+      downvotes: 0,
+      status: "active",
+      recorded_at: now,
+      created_at: now,
+      derived_from_segments: 0,
+      last_synthesized_at: null,
+    },
+  );
+  for (let i = 0; i < 3; i++) {
+    TRACE_VOTES.push({
+      id: `seed-vote-${i}`,
+      trace_id: "trace-1",
+      user_id: `seed-voter-${i}`,
+      value: 1,
+      created_at: now,
+    });
+  }
+  TRACE_VOTES.push({
+    id: "seed-vote-3",
+    trace_id: "trace-2",
+    user_id: "seed-voter-0",
+    value: 1,
+    created_at: now,
+  });
+  nextTraceId = 3;
+  TRACE_SEGMENTS.push(
+    {
+      id: "seg-prop-1",
+      trace_id: "trace-1",
+      geometry: TRACES[0]!.geometry,
+      cluster_id: 1,
+      proposed_trail_id: null,
+    },
+    {
+      id: "seg-prop-2",
+      trace_id: "trace-1",
+      geometry: TRACES[0]!.geometry,
+      cluster_id: 1,
+      proposed_trail_id: null,
+    },
+  );
+  nextTraceSegmentId = 3;
+  TRACE_SYSTEMS.push(
+    { trace_id: "trace-1", system_id: "sys-1" },
+    { trace_id: "trace-2", system_id: "sys-1" },
+  );
+}
+
 // --- §21.8 patrol ----------------------------------------------------
 const PATROL_FLAGS: Array<{
   id: string;
@@ -557,15 +767,33 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     handler: ({ url }) => {
       const slug = url.pathname.split("/").pop();
       const trail = TRAILS.find((t) => t.slug === slug);
-      if (!trail) return notFound(`trail '${slug}' not found`);
-      // Enrich with tier info from SYNTHETIC_TRAILS if the id matches.
-      // Default to "synthesized" so the badge renders (the real DB
-      // tags every trail with a tier; the test fixtures don't).
-      const synth = SYNTHETIC_TRAILS.find((t) => t.id === trail.id);
-      return ok({
-        ...trail,
-        tier: (trail as { tier?: string }).tier ?? synth?.tier ?? "synthesized",
-      });
+      if (trail) {
+        // Enrich with tier info from SYNTHETIC_TRAILS if the id matches.
+        // Default to "synthesized" so the badge renders (the real DB
+        // tags every trail with a tier; the test fixtures don't).
+        const synth = SYNTHETIC_TRAILS.find((t) => t.id === trail.id);
+        return ok({
+          ...trail,
+          tier: (trail as { tier?: string }).tier ?? synth?.tier ?? "synthesized",
+        });
+      }
+      // Synthesized trails (created via the approval flow) live in
+      // SYNTHETIC_TRAILS rather than the TRAILS fixture. Look them up
+      // by slug so /trail/<slug> can render the detail page.
+      const synth = SYNTHETIC_TRAILS.find((t) => t.slug === slug);
+      if (synth) {
+        return ok({
+          id: synth.id,
+          name: synth.name,
+          slug: synth.slug,
+          tier: synth.tier,
+          system_id: synth.system_id,
+          difficulty: synth.difficulty,
+          derived_from_segments: 1,
+          last_synthesized_at: "2026-06-21T00:00:00.000Z",
+        });
+      }
+      return notFound(`trail '${slug}' not found`);
     },
   },
   {
@@ -1716,6 +1944,10 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
         (v) => v.user_id === token.id && v.target_type === b.target_type && v.target_id === b.target_id,
       );
       const previous = idx >= 0 ? VOTES[idx] : null;
+      // Capture the previous value before mutating it — the tally
+      // math below checks the prior value to reverse its contribution.
+      const previousValue = previous?.value;
+      const previousVoterTier = previous?.voter_tier;
       const now = new Date().toISOString();
       if (previous) {
         previous.value = b.value;
@@ -1736,9 +1968,10 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
         });
       }
       const s = getOrCreateScore(b.target_type, b.target_id);
-      // Reverse previous then apply new.
-      if (previous?.value === 1) s.upvotes = Math.max(0, s.upvotes - 1);
-      if (previous?.value === -1) s.downvotes = Math.max(0, s.downvotes - 1);
+      // Reverse previous then apply new. Use the captured value, not
+      // the (now-mutated) previous.value, to reverse the right bucket.
+      if (previousValue === 1) s.upvotes = Math.max(0, s.upvotes - 1);
+      if (previousValue === -1) s.downvotes = Math.max(0, s.downvotes - 1);
       if (b.value === 1) s.upvotes += 1;
       if (b.value === -1) s.downvotes += 1;
       s.net = s.upvotes - s.downvotes;
@@ -1751,10 +1984,16 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
         if (author) {
           const voterTier = tierFromKarma(voter.trust_score);
           const tw = tierWeight(voterTier);
-          // Reverse prior vote's contribution to this user
+          // Reverse prior vote's contribution to this user. Use the
+          // captured values (not the now-mutated previous.voter_tier
+          // / previous.value) so a switch from +1 to -1 reverses the
+          // original +1 contribution before applying -1.
           if (previous) {
-            const priorTw = tierWeight(previous.voter_tier);
-            author.trust_score = Math.max(0, author.trust_score - priorTw * previous.value);
+            const priorTw = tierWeight(previousVoterTier ?? "new");
+            author.trust_score = Math.max(
+              0,
+              author.trust_score - priorTw * (previousValue ?? 0),
+            );
           }
           const delta = tw * b.value;
           author.trust_score = Math.max(0, author.trust_score + delta);
@@ -1779,13 +2018,44 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
         return { status: 401, body: { error: "unauthorized" } };
       }
       if (method !== "POST") return undefined;
-      const b = body as { flag_id?: string; revision_id?: string; action: string };
+      const b = body as {
+        flag_id?: string;
+        revision_id?: string;
+        action: string;
+        reason?: string;
+        revision_target_type?: string;
+        revision_target_id?: string;
+        revision_action?: string;
+        revision_author_id?: string;
+        revision_summary?: string;
+      };
       if (b.action === "resolve" && b.flag_id) {
         const idx = PATROL_FLAGS.findIndex((f) => f.id === b.flag_id);
         if (idx >= 0) {
           PATROL_FLAGS[idx]!.resolved = true;
         }
         return ok({ ok: true, action: "resolve" });
+      }
+      if (b.action === "seed") {
+        // Test-only seed: insert a flag and return its id. Lets spec
+        // files populate the feed and verify resolve + filter
+        // behavior without having to drive a real edit burst.
+        const id = `flag-seed-${nextPatrolId++}`;
+        PATROL_FLAGS.push({
+          id,
+          revision_id: b.revision_id ?? `rev-seed-${id}`,
+          reason: (b.reason as never) ?? "new_tier_semi_edit",
+          resolved: false,
+          created_at: new Date().toISOString(),
+          details: {
+            target_type: b.revision_target_type,
+            target_id: b.revision_target_id,
+            action: b.revision_action,
+            author_id: b.revision_author_id,
+            summary: b.revision_summary,
+          },
+        });
+        return ok({ id, action: "seed" });
       }
       return ok({ ok: true });
     },
@@ -1809,6 +2079,14 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
           reason: f.reason,
           resolved: f.resolved,
           created_at: f.created_at,
+          // The patrol page renders these — include them so the
+          // resolved-action + detail tests can assert on the
+          // rendered text.
+          revision_target_type: (f.details?.target_type as string) ?? "system",
+          revision_target_id: (f.details?.target_id as string) ?? f.revision_id,
+          revision_action: (f.details?.action as string) ?? "edit",
+          revision_author_id: (f.details?.author_id as string) ?? null,
+          revision_summary: (f.details?.summary as string) ?? null,
         })),
         total: items.length,
       });
@@ -2081,6 +2359,332 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
       return ok(trail, 201);
     },
   },
+  // ===========================================================================
+  // §21.6 — GPS traces: list, create, import, detail, vote, remove
+  // ===========================================================================
+  {
+    pattern: /\/api\/traces\/import$/,
+    handler: ({ method, body, headers }) => {
+      if (method !== "POST") return undefined;
+      const token = bearerUser(headers);
+      if (!token) return { status: 401, body: { error: "unauthorized" } };
+      const b = body as {
+        format?: "gpx" | "geojson";
+        payload?: string | Record<string, unknown>;
+        recorded_at?: string;
+        contributor_name?: string;
+      };
+      if (!b?.format || !b?.payload) {
+        return { status: 400, body: { error: "format and payload are required" } };
+      }
+      // Extract a minimal LineString for the mock — real impl parses
+      // GPX / GeoJSON fully. The point of this handler is to verify
+      // the upload happy path.
+      const coords: Array<[number, number]> =
+        b.format === "geojson" && typeof b.payload === "object" && b.payload
+          ? (((b.payload as { coordinates?: Array<[number, number]> }).coordinates ?? []) as Array<[number, number]>)
+          : b.format === "gpx" && typeof b.payload === "string"
+            ? extractGpxCoords(b.payload)
+            : [];
+      if (coords.length < 2) {
+        return { status: 400, body: { error: "payload did not contain at least 2 points" } };
+      }
+      const id = `trace-${nextTraceId++}`;
+      const now = new Date().toISOString();
+      const trace = {
+        id,
+        user_id: token.id,
+        contributor_name: b.contributor_name ?? MOCK_USERS[token.id]?.username ?? "anonymous",
+        geometry: { type: "LineString" as const, coordinates: coords },
+        source: "import" as const,
+        weight: 1.0,
+        upvotes: 0,
+        downvotes: 0,
+        status: "active" as const,
+        recorded_at: b.recorded_at ?? null,
+        created_at: now,
+        derived_from_segments: 0,
+        last_synthesized_at: null,
+      };
+      TRACES.push(trace);
+      // Auto-tag the trace to a system via the same bounding-box check
+      // used by /api/systems/contains. For mock simplicity, the first
+      // matching system wins.
+      const matched = pickSystemForTrace(coords);
+      if (matched) TRACE_SYSTEMS.push({ trace_id: id, system_id: matched });
+      return ok({ trace, tagged_system_ids: matched ? [matched] : [], points: coords.length, length_meters: traceLengthMeters(coords) });
+    },
+  },
+  {
+    pattern: /\/api\/traces\/([^/]+)\/remove$/,
+    handler: ({ url, method, headers }) => {
+      const err = requireModerator(headers);
+      if (err) return err;
+      if (method !== "POST") return undefined;
+      const id = url.pathname.split("/")[3];
+      const t = TRACES.find((x) => x.id === id);
+      if (!t) return notFound("trace not found");
+      t.status = "removed";
+      return ok({ ok: true });
+    },
+  },
+  {
+    pattern: /\/api\/traces\/([^/]+)\/vote$/,
+    handler: ({ url, method, body, headers }) => {
+      const id = url.pathname.split("/")[3];
+      const t = TRACES.find((x) => x.id === id);
+      if (!t) return notFound("trace not found");
+      const token = bearerUser(headers);
+      if (method === "GET") {
+        const myVote = token
+          ? TRACE_VOTES.find((v) => v.user_id === token.id && v.trace_id === id)
+          : undefined;
+        return ok({
+          upvotes: t.upvotes,
+          downvotes: t.downvotes,
+          net: t.upvotes - t.downvotes,
+          hidden: t.status === "ignored",
+          my_vote: myVote ? (myVote.value === 1 ? 1 : -1) : 0,
+          karma_awarded: 0,
+        });
+      }
+      if (method === "POST") {
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        const b = body as { value?: 1 | -1 };
+        if (b.value !== 1 && b.value !== -1) {
+          return { status: 400, body: { error: "value must be 1 or -1" } };
+        }
+        const idx = TRACE_VOTES.findIndex(
+          (v) => v.user_id === token.id && v.trace_id === id,
+        );
+        if (idx >= 0) TRACE_VOTES.splice(idx, 1);
+        TRACE_VOTES.push({
+          id: `tvote-${TRACE_VOTES.length + 1}`,
+          trace_id: id,
+          user_id: token.id,
+          value: b.value,
+          created_at: new Date().toISOString(),
+        });
+        // Recompute counts from TRACE_VOTES so retracting + switching
+        // yields consistent state across the mock.
+        const ups = TRACE_VOTES.filter((v) => v.trace_id === id && v.value === 1).length;
+        const downs = TRACE_VOTES.filter((v) => v.trace_id === id && v.value === -1).length;
+        t.upvotes = ups;
+        t.downvotes = downs;
+        t.weight = traceWeight(ups, downs);
+        t.status = t.weight < 0.3 ? "ignored" : "active";
+        return ok({
+          upvotes: t.upvotes,
+          downvotes: t.downvotes,
+          net: t.upvotes - t.downvotes,
+          hidden: t.status === "ignored",
+          my_vote: b.value,
+          karma_awarded: 0,
+        });
+      }
+      if (method === "DELETE") {
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        const idx = TRACE_VOTES.findIndex(
+          (v) => v.user_id === token.id && v.trace_id === id,
+        );
+        if (idx < 0) {
+          return ok({
+            upvotes: t.upvotes,
+            downvotes: t.downvotes,
+            net: t.upvotes - t.downvotes,
+            hidden: t.status === "ignored",
+            my_vote: 0,
+            karma_awarded: 0,
+          });
+        }
+        TRACE_VOTES.splice(idx, 1);
+        const ups = TRACE_VOTES.filter((v) => v.trace_id === id && v.value === 1).length;
+        const downs = TRACE_VOTES.filter((v) => v.trace_id === id && v.value === -1).length;
+        t.upvotes = ups;
+        t.downvotes = downs;
+        t.weight = traceWeight(ups, downs);
+        t.status = t.weight < 0.3 ? "ignored" : "active";
+        return ok({
+          upvotes: t.upvotes,
+          downvotes: t.downvotes,
+          net: t.upvotes - t.downvotes,
+          hidden: t.status === "ignored",
+          my_vote: 0,
+          karma_awarded: 0,
+        });
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/traces\/([^/]+)\/segments$/,
+    handler: ({ url, method, body, headers }) => {
+      const traceId = url.pathname.split("/")[3];
+      const t = TRACES.find((x) => x.id === traceId);
+      if (!t) return notFound("trace not found");
+      if (method === "GET") {
+        const items = TRACE_SEGMENTS.filter((s) => s.trace_id === traceId);
+        return ok({ items, total: items.length });
+      }
+      if (method === "POST") {
+        const token = bearerUser(headers);
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        // Server-side segment cut. For the mock, just create one
+        // segment covering the whole trace.
+        const id = `seg-new-${nextTraceSegmentId++}`;
+        TRACE_SEGMENTS.push({
+          id,
+          trace_id: traceId,
+          geometry: t.geometry,
+          cluster_id: null,
+          proposed_trail_id: null,
+        });
+        t.derived_from_segments = TRACE_SEGMENTS.filter((s) => s.trace_id === traceId).length;
+        t.last_synthesized_at = new Date().toISOString();
+        return ok({ ok: true, segments: 1 });
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/trace-segments\/([^/]+)\/vote$/,
+    handler: ({ url, method, body, headers }) => {
+      const segmentId = url.pathname.split("/")[3];
+      const seg = TRACE_SEGMENTS.find((s) => s.id === segmentId);
+      if (!seg) return notFound("segment not found");
+      if (method !== "POST") return undefined;
+      const token = bearerUser(headers);
+      if (!token) return { status: 401, body: { error: "unauthorized" } };
+      const b = body as { trail_id?: string | null; contributor_name?: string };
+      const idx = TRACE_SEGMENT_VOTES.findIndex(
+        (v) => v.user_id === token.id && v.segment_id === segmentId,
+      );
+      if (idx >= 0) TRACE_SEGMENT_VOTES.splice(idx, 1);
+      if (b.trail_id !== null && b.trail_id !== undefined) {
+        TRACE_SEGMENT_VOTES.push({
+          id: `segvote-${TRACE_SEGMENT_VOTES.length + 1}`,
+          segment_id: segmentId,
+          user_id: token.id,
+          trail_id: b.trail_id,
+          vote: 1,
+          created_at: new Date().toISOString(),
+        });
+        seg.proposed_trail_id = b.trail_id;
+      }
+      return ok({ ok: true });
+    },
+  },
+  {
+    pattern: /\/api\/traces\/([^/]+)$/,
+    handler: ({ url, method }) => {
+      const id = url.pathname.split("/").pop()!;
+      const t = TRACES.find((x) => x.id === id);
+      if (!t) return notFound(`trace ${id} not found`);
+      if (method === "GET") return ok(t);
+      if (method === "DELETE") {
+        const idx = TRACES.findIndex((x) => x.id === id);
+        if (idx >= 0) TRACES.splice(idx, 1);
+        return ok({ ok: true });
+      }
+      return undefined;
+    },
+  },
+  {
+    pattern: /\/api\/traces$/,
+    handler: ({ method, body, query, headers }) => {
+      if (method === "GET") {
+        const systemId = query.system_id;
+        let items = TRACES.filter((t) => t.status !== "removed");
+        if (systemId) {
+          const traceIds = new Set(
+            TRACE_SYSTEMS.filter((m) => m.system_id === systemId).map((m) => m.trace_id),
+          );
+          items = items.filter((t) => traceIds.has(t.id));
+        }
+        return ok({ items, total: items.length, page: 1, pageSize: 50 });
+      }
+      if (method === "POST") {
+        const token = bearerUser(headers);
+        if (!token) return { status: 401, body: { error: "unauthorized" } };
+        const b = body as {
+          geometry?: { type: "LineString"; coordinates: Array<[number, number]> };
+          source?: "import" | "recorded";
+          recorded_at?: string;
+          contributor_name?: string;
+        };
+        if (!b?.geometry || b.geometry.type !== "LineString") {
+          return { status: 400, body: { error: "geometry LineString required" } };
+        }
+        const coords = b.geometry.coordinates;
+        if (coords.length < 2) {
+          return { status: 400, body: { error: "at least 2 points required" } };
+        }
+        const id = `trace-${nextTraceId++}`;
+        const now = new Date().toISOString();
+        const trace = {
+          id,
+          user_id: token.id,
+          contributor_name: b.contributor_name ?? MOCK_USERS[token.id]?.username ?? "anonymous",
+          geometry: { type: "LineString" as const, coordinates: coords },
+          source: b.source ?? "recorded",
+          weight: 1.0,
+          upvotes: 0,
+          downvotes: 0,
+          status: "active" as const,
+          recorded_at: b.recorded_at ?? now,
+          created_at: now,
+          derived_from_segments: 0,
+          last_synthesized_at: null,
+        };
+        TRACES.push(trace);
+        const matched = pickSystemForTrace(coords);
+        if (matched) TRACE_SYSTEMS.push({ trace_id: id, system_id: matched });
+        return ok({ trace, tagged_system_ids: matched ? [matched] : [] });
+      }
+      return undefined;
+    },
+  },
+  // ===========================================================================
+  // /api/users/:id — public profile (karma, tier, contribution counts)
+  // ===========================================================================
+  {
+    pattern: /\/api\/users\/([^/]+)$/,
+    handler: ({ url }) => {
+      const id = url.pathname.split("/").pop()!;
+      const user = MOCK_USERS[id];
+      if (!user) return notFound("user not found");
+      return ok({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        tier: tierFromKarma(user.trust_score),
+        karma: user.trust_score,
+        trust_score: user.trust_score,
+        joined_at: "2026-01-01T00:00:00.000Z",
+      });
+    },
+  },
+  {
+    pattern: /\/api\/users\/([^/]+)\/contributions$/,
+    handler: ({ url }) => {
+      const id = url.pathname.split("/")[3];
+      const user = MOCK_USERS[id];
+      if (!user) return notFound("user not found");
+      const featureCount = Object.values(FEATURES).filter(
+        (f) => (f as { created_by_user_id?: string }).created_by_user_id === id,
+      ).length;
+      const traceCount = TRACES.filter((t) => t.user_id === id).length;
+      const revisionCount = REVISIONS.filter((r) => r.author_id === id).length;
+      return ok({
+        features: Object.values(FEATURES).filter(
+          (f) => (f as { created_by_user_id?: string }).created_by_user_id === id,
+        ),
+        traces: TRACES.filter((t) => t.user_id === id),
+        revisions: REVISIONS.filter((r) => r.author_id === id),
+        counts: { features: featureCount, traces: traceCount, revisions: revisionCount },
+      });
+    },
+  },
 ];
 
 export function resetApiMock() {
@@ -2117,6 +2721,7 @@ export function resetApiMock() {
   seedHierarchyFixtures();
   seedPresetsFixtures();
   seedSynthesisFixtures();
+  seedTraceFixtures();
   nextWikiId = 100;
   nextRevId = 200;
   nextCitationId = 300;
@@ -2144,6 +2749,9 @@ export async function installApiMock(page: Page, opts: { failAll?: boolean } = {
   }
   if (SYNTHESIS_PROPOSALS.length === 0) {
     seedSynthesisFixtures();
+  }
+  if (TRACES.length === 0) {
+    seedTraceFixtures();
   }
   await page.route(`http://${MOCK_API_HOST}/**`, async (route: Route) => {
     if (opts.failAll) {

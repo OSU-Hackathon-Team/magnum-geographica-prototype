@@ -96,4 +96,38 @@ test.describe("System — Organize traces page (§21.6 phase 2)", () => {
     await expect(page.getByTestId("proposal-sheet-approve")).toBeVisible();
     await expect(page.getByTestId("proposal-sheet-reject")).toBeVisible();
   });
+
+  test("rejecting a proposal removes it from the list", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
+    await expect(page.getByTestId("proposal-prop-1")).toBeVisible();
+    await expect(page.getByTestId("proposal-prop-2")).toBeVisible();
+    await page.getByTestId("proposal-prop-1").click();
+    await page.getByTestId("proposal-sheet-reject").click();
+    // Modal closes; prop-1 disappears.
+    await expect(page.getByTestId("proposal-sheet")).not.toBeVisible();
+    await expect(page.getByTestId("proposal-prop-1")).not.toBeVisible();
+    await expect(page.getByTestId("proposal-prop-2")).toBeVisible();
+  });
+
+  test("approving with a new trail name creates a synthesized trail", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
+    await expect(page.getByTestId("proposal-prop-1")).toBeVisible();
+    await page.getByTestId("proposal-prop-1").click();
+    await page.getByTestId("proposal-sheet-name").fill("Ridge Runner");
+    await page.getByTestId("proposal-sheet-approve").click();
+    await expect(page.getByTestId("proposal-sheet")).not.toBeVisible();
+    await expect(page.getByTestId("proposal-prop-1")).not.toBeVisible();
+  });
+
+  test("moderator role is surfaced in the foot for admin users", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
+    // The foot is a stable indicator of role. The header's
+    // "Run synthesis" button is rendered by expo-router's header
+    // mechanism and doesn't show up on web builds, so we test the
+    // foot text instead.
+    await expect(page.getByTestId("organize-foot")).toContainText("moderator");
+  });
 });
