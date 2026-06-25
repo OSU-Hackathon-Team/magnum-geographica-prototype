@@ -699,437 +699,51 @@ packages/app/src/components/
 
 ## 11. Phased Plan — Detailed
 
-### Phase 0: Foundation (Weeks 1-2)
+### Phase 0: Foundation (Weeks 1-2) — Completed
 
-**Goal:** Green monorepo to working app skeleton with live DB.
-
-#### Tasks
-
-1. **Monorepo setup**
-   - Init root `package.json` with workspaces
-   - `turbo.json` with build/dev/lint/test pipelines
-   - `tsconfig.base.json` shared config
-   - ESLint + Prettier shared config
-
-2. **Docker environment**
-   - `docker-compose.yml`:
-     ```yaml
-     services:
-       postgres:
-         image: postgis/postgis:16-3.4
-         ports: ["5432:5432"]
-         environment: [POSTGRES_DB=magnum, POSTGRES_USER=magnum, POSTGRES_PASSWORD=magnum]
-         volumes: [pgdata:/var/lib/postgresql/data]
-       martin:
-         image: maplibre/martin:latest
-         ports: ["3001:3000"]
-         environment: [DATABASE_URL=postgres://magnum:magnum@postgres:5432/magnum]
-         depends_on: [postgres]
-       api:
-         build: docker/api.Dockerfile
-         ports: ["3000:3000"]
-         environment: [DATABASE_URL=postgres://magnum:magnum@postgres:5432/magnum]
-         depends_on: [postgres]
-         volumes: [./packages/api:/app]
-     volumes:
-       pgdata:
-     ```
-
-3. **API package** (`packages/api`)
-   - Init Bun + Hono
-   - Drizzle ORM setup with `drizzle.config.ts`
-   - Generate all migrations from DDL above
-   - `POST /api/seed` — insert test data (3 systems, ~15 trails in Ohio)
-   - Health endpoint
-   - CORS for dev
-
-4. **Shared package** (`packages/shared`)
-   - TypeScript types for all entities (mirrors DB schema)
-   - Zod validation schemas for API inputs
-   - API client (thin wrapper around fetch with types)
-   - Constants (feature type tags, difficulty levels, surface types)
-
-5. **App package** (`packages/app`)
-   - `npx create-expo-app@latest` with TypeScript template
-   - Add `react-native-web`, `@expo/vector-icons`, `zustand`, `expo-router`, `op-sqlite`
-   - Root layout with React Navigation tabs
-   - Four tabs: Explore (map placeholder), Systems (empty list), Trails (empty list), Profile (empty)
-   - Zustand store skeleton (auth, offline status, settings)
-
-6. **Map package** (`packages/map`)
-   - `MapContainer.web.tsx` — renders OpenLayers with OSM base layer
-   - `MapContainer.native.tsx` — renders WebView with blank page (no OL yet)
-   - Shared styles/config files (empty, to be filled in Phase 1)
-
-7. **Verify**
-   - `bun run dev` starts API on :3000
-   - `npx expo start --web` shows app with tabs
-   - Docker Compose brings up Postgres + Martin
-   - `POST /api/seed` populates test data
-   - `GET /api/systems` returns JSON
-
-#### Deliverables
-
-- Monorepo builds without errors
-- API serves test data from PostGIS
-- App skeleton renders on web with tab navigation
-- Docker Compose runs the full backend stack
+**Status:** Implemented. Monorepo with workspaces, Docker Compose stack (Postgres/Martin/API), Drizzle schema + migrations, seeded API skeleton, shared types/Zod package, and Expo app shell with tab navigation.
 
 ---
 
-### Phase 1: Map & Trail Browsing (Weeks 3-5)
+### Phase 1: Map & Trail Browsing (Weeks 3-5) — Completed
 
-**Goal:** Real map with trail overlays, System/Trail hierarchy browsing.
-
-#### Tasks
-
-1. **OSM extract ingestion**
-   - Script to download Ohio `.osm.pbf` from Geofabrik
-   - `osm2pgsql` import into PostGIS with custom style
-   - Filter: only `highway=path|footway|track|cycleway|bridleway` (non-motorized)
-   - Map OSM tags to our schema (surface, name, etc.)
-   - Run once, commit script for reproducibility
-
-2. **Martin tile configuration**
-   - `martin.conf` — SQL function for trail tiles, system boundaries
-   - Trail layer: `SELECT id, name, geometry, surface_type FROM trails WHERE geometry && ST_MakeEnvelope(...)`
-   - System layer: `SELECT id, name, boundary FROM systems WHERE boundary && ST_MakeEnvelope(...)`
-
-3. **OpenLayers integration — Web**
-   - `MapContainer.web.tsx`:
-     - Base layer: OpenMapTiles raster or self-hosted vector
-     - Vector tile layers: trails (colored by surface), systems (translucent fill)
-     - Feature click → navigate to detail
-     - Zoom, attribution, layer toggle controls
-   - `MapControls.tsx` — zoom buttons, layer picker, locate-me
-
-4. **OpenLayers integration — Mobile (WebView bridge)**
-   - `MapContainer.native.tsx`:
-     - WebView loads local HTML bundle with OpenLayers
-     - `olBridge` object: `setViewport(trails, systems)`, `flyTo(lon, lat, zoom)`
-     - Event listeners: `mapClick`, `featureSelect` sent to RN via postMessage
-   - Ensure touch interactions work (pinch zoom, tap)
-
-5. **Navigation & routing**
-   - `explore.tsx` — full-screen map, search bar overlay
-   - `systems.tsx` — FlatList of systems, searchable
-   - `system/[slug].tsx` — system detail: mini-map, description, trail list, wiki link
-   - `trails.tsx` — FlatList of trails, filterable by difficulty/system
-   - `trail/[slug].tsx` — trail detail: map with trail highlighted, stats, segments, features, wiki link
-   - `segment/[id].tsx` — segment detail (read-only for now): surface, hazards, photos
-
-6. **Search**
-   - API: full-text search across systems, trails, features (Postgres `ts_vector`)
-   - `SearchBar.tsx` — typeahead dropdown, results grouped by type
-   - Client-side debouncing, minimum 3 characters
-
-7. **Map ↔ Navigation integration**
-   - Tap trail on map → push `/trail/[slug]`
-   - Tap feature on map → push `/feature/[id]`
-   - "View on map" button from detail pages → fly to geometry
-   - Deep link support: `/map?lat=40.0&lon=-83.0&zoom=12`
-
-#### Deliverables
-
-- Ohio trails displayed on map with color-coded surface types
-- Complete System → Trail → Segment drill-down
-- Search working end-to-end
-- Map works on both web and Android (WebView bridge)
+**Status:** Implemented. OpenLayers web map plus native WebView bridge, Martin vector tiles for trails/systems, full System → Trail → Segment drill-down browsing, and Postgres full-text search end-to-end.
 
 ---
 
-### Phase 2: Wiki Pages (Weeks 6-7)
+### Phase 2: Wiki Pages (Weeks 6-7) — Completed
 
-**Goal:** Anonymous wiki editing and revision history.
-
-#### Tasks
-
-1. **Wiki page view**
-   - `WikiPageView.tsx` — rendered markdown, citations list, revision count, last edited
-   - Markdown renderer: use `react-native-markdown-display` (supports web + native)
-   - Citation display: link (tappable, opens browser) or image thumbnail
-
-2. **Wiki page editor**
-   - `WikiPageEditor.tsx` — markdown textarea with live preview toggle
-   - `CitationForm.tsx` — add URL citation or upload image
-   - Save → PUT `/api/wiki-pages/:id` with `contributor_name`
-   - Create → POST `/api/wiki-pages` (auto-creates for target)
-   - "Edit Summary" input (one-line description of change)
-
-3. **Revision history**
-   - `RevisionHistory.tsx` — chronological list of revisions
-   - Tap revision → view that version's content
-   - "Revert to this version" button → creates new revision with old content
-   - Contributor name displayed on each revision
-
-4. **Wiki integration in detail pages**
-   - System detail: wiki tab/toggle showing the System's wiki page
-   - Trail detail: wiki tab/toggle showing the Trail's wiki page
-   - Feature detail: wiki tab/toggle
-   - Each has an "Edit" button → wiki editor
-
-5. **Simple admin (dev secret)**
-   - `GET /api/revisions/recent` — last 50 revisions across all targets
-   - Admin secret in header (`x-admin-secret`) gates revert/delete
-   - Future migration path: replace with JWT auth in Phase 6
-
-#### Deliverables
-
-- Create, edit, view wiki pages on any target
-- Full revision history with revert
-- Citations (URL + image) working
+**Status:** Implemented. Markdown wiki view/edit with live preview, full revision history with revert, URL + image citations, and wiki tabs integrated into System/Trail/Feature detail pages.
 
 ---
 
-### Phase 3: Offline Mode (Weeks 8-11)
+### Phase 3: Offline Mode (Weeks 8-11) — Completed
 
-**Goal:** Complete offline experience on Android.
-
-#### Tasks
-
-1. **SQLite initialization**
-   - `packages/app/src/db/` — SQLite schema, migrations
-   - `op-sqlite` on Android, `expo-sqlite` on web (for dev/testing)
-   - Mirror tables: systems, trails, segments, features, wiki_pages, revisions, media
-   - WKB geometry stored as blobs (no spatial indexes in SQLite, use bounding box columns for spatial queries)
-   - FTS5 virtual table for offline search
-
-2. **Download system**
-   - `DownloadButton.tsx` on System detail page (appears when online)
-   - Shows estimated size before download (from `/api/offline-packs/:id/info`)
-   - Progress bar during download (multiple files: MBTiles, GeoJSON, Wiki JSON)
-   - Stores all data in SQLite
-   - MBTiles stored as file or blob, registered with OpenLayers
-
-3. **MBTiles integration**
-   - OpenLayers plugin/custom source that reads from SQLite MBTiles
-   - On Android: WebView bridge calls native SQLite → returns tile data
-   - On web (dev): fetches from local SQLite WASM or server
-   - Tile fallback: if no local tile for zoom/extent, show grey "not downloaded" overlay
-
-4. **Offline map rendering**
-   - Detect connectivity: `@react-native-community/netinfo` or `navigator.onLine`
-   - When offline → switch map source to local MBTiles
-   - When online → use Martin tile server
-   - Seamless transition (user shouldn't notice, except for status indicator)
-
-5. **Offline browsing**
-   - System list filtered to downloaded only (when offline)
-   - Trail detail reads from SQLite
-   - Wiki pages read from SQLite
-   - Feature markers from GeoJSON in SQLite
-   - Search uses FTS5
-
-6. **Offline editing (contribution queue)**
-   - When offline, wiki edits → write to `pending_contributions` table
-   - `PendingQueue.tsx` — list of pending changes, each with type, target, preview, delete button
-   - Feature creation/deletion queued similarly
-
-7. **Sync upload**
-   - On reconnect → auto-trigger sync (debounced, 5s after connectivity change)
-   - POST `/api/sync/contributions` with all pending changes
-   - Handle 409 Conflict → show conflict resolution UI
-   - On success → clear pending entries, update local copies with server-assigned IDs
-
-8. **Sync download (updates)**
-   - On reconnect → GET `/api/sync/updates?since=2024-01-01T00:00:00Z`
-   - Apply updates to local SQLite
-   - Update `last_synced` timestamp
-
-9. **Storage manager UI**
-   - `StorageManager.tsx` in Settings
-   - List of downloaded Systems: name, size, last synced, delete button
-   - Total usage bar: `[=========>    ] 320MB / 500MB`
-   - "Delete All" button with confirmation
-
-10. **Status indicator**
-    - `StatusIndicator.tsx` in tab bar header
-    - Reads Zustand `offlineStore` (online status, pending count, sync status)
-    - Updates reactively on connectivity change
-
-#### Deliverables
-
-- User downloads a System → goes offline → browses map, trails, wiki pages
-- User edits wiki page offline → reconnects → edit syncs successfully
-- Conflict resolution works (user sees diff, picks version)
-- Storage manager shows usage, allows deletion
+**Status:** Implemented. SQLite mirror with FTS5 search, offline pack download with MBTiles, connectivity-aware map rendering, offline browsing/editing with a pending contribution queue, sync upload/download with conflict resolution, a storage manager, and a reactive status indicator.
 
 ---
 
-### Phase 4: Features & Media (Weeks 12-13)
+### Phase 4: Features & Media (Weeks 12-13) — Completed
 
-**Goal:** Create and view landmarks on the map, attach photos.
-
-#### Tasks
-
-1. **Feature creation**
-   - Long-press on map → drop pin → "Add Feature" modal
-   - `FeatureForm.tsx` — name, type tag (picker), description, trail association (optional)
-   - Save → POST `/api/features`
-   - Offline: queued in `pending_contributions`
-
-2. **Feature display**
-   - `FeatureMarker.tsx` — icon per type_tag (trailhead = P, water = 💧, shelter = 🏠, etc. — use simple SVG icons, no emojis in production)
-   - Feature markers on explore map + system detail map + trail detail map
-   - Tap marker → bottom sheet or modal with name, type, description, photo thumbnail
-   - Tap through to full feature detail page
-
-3. **Media attachment**
-   - `MediaUploader.tsx` — "Take Photo" (camera) or "Choose from Gallery"
-   - EXIF orientation correction
-   - Resize to max 2048px before upload (bandwidth + storage)
-   - POST `/api/media` with base64 data
-   - Offline: store base64 in SQLite `pending_contributions`
-   - Progress indicator during upload
-
-4. **Media gallery**
-   - `MediaGallery.tsx` — horizontal scroll of photo thumbnails
-   - `ImageViewer.tsx` — full-screen image with pinch zoom
-   - Media on feature detail, trail detail, system detail pages
-
-5. **Feature editing**
-   - Update name, type, description, trail association
-   - Delete feature (with confirmation)
-   - All queued offline if needed
-
-#### Deliverables
-
-- Create features from map long-press
-- Attach photos to features/trails/systems
-- Feature icons on map
-- Works offline
+**Status:** Implemented. Feature CRUD via map long-press with typed markers, media upload (camera/gallery) with resize, full-screen image gallery, and offline-queued feature/media editing.
 
 ---
 
-### Phase 5: Segments & Advanced Trail Editing (Weeks 14-15)
+### Phase 5: Segments & Advanced Trail Editing (Weeks 14-15) — Completed
 
-**Goal:** First-class segment editing with metadata overrides.
-
-#### Tasks
-
-1. **Segment create/edit**
-   - On trail detail page: "Edit Segments" mode
-   - `SegmentEditor.tsx` — form: name, surface type (dropdown), hazards (multi-select), steep grade (toggle), one-way (toggle), is road connector (toggle), sort_order
-   - Create new segment: draw on map or select from existing trail geometry split
-   - Update segment metadata
-
-2. **Segment geometry tools**
-   - Split segment: tap point on trail → split into two segments
-   - Merge segments: select two adjacent → merge into one
-   - Reorder: drag-and-drop list (or up/down buttons)
-
-3. **Segment visualization**
-   - `SegmentOverlay.tsx` — segments on map with distinct styling:
-     - Natural = brown dashed
-     - Gravel = tan
-     - Paved = dark grey
-     - Boardwalk = light brown
-     - Road connector = grey with road icon markers
-   - Hazard icons on map (steep = warning triangle, water crossing = wave)
-   - Segment list on trail detail shows surface type badge, hazard badges
-   - Tap segment in list → fly to it on map
-
-4. **Metadata inheritance**
-   - Segment metadata **overrides** trail defaults
-   - Trail difficulty computed from segment difficulties (max of segments)
-   - Trail length computed from sum of segment lengths
-   - Trail elevation gain computed from sum of segment gains
-
-#### Deliverables
-
-- Create, edit, split, merge, reorder segments
-- Segments visually distinct on map
-- Hazard/road-connector flags visible
+**Status:** Implemented. First-class segment create/edit with surface/hazard metadata, geometry split/merge/reorder tools, distinct segment visualization with hazard icons, and segment-overrides-trail metadata inheritance.
 
 ---
 
-### Phase 6: User Accounts & Moderation (Weeks 16-18)
+### Phase 6: User Accounts & Moderation (Weeks 16-18) — Completed
 
-**Goal:** Full auth, admin panel, spam prevention.
-
-#### Tasks
-
-1. **Auth backend**
-   - `users` table migration
-   - `POST /api/auth/register` — email + password → bcrypt hash
-   - `POST /api/auth/login` → JWT (access + refresh tokens)
-   - Middleware: `authRequired`, `adminRequired`
-   - Anonymous edits still allowed (no auth header) but flagged
-
-2. **Auth frontend**
-   - Register / Login screens
-   - Zustand `authStore`: token, user, isAuthenticated
-   - JWT stored in SecureStore (expo-secure-store)
-   - Auto-attach token to API requests
-   - Profile screen: username, join date, contribution count
-
-3. **Author tracking**
-   - `author_id` now populated on revisions when authenticated
-   - `contributor_name` used for anonymous edits
-   - User profile shows their revisions
-
-4. **Admin panel**
-   - `admin/dashboard.tsx` — stats: recent edits, new users, flagged content
-   - `admin/revisions.tsx` — revision feed with filters (by user, by target type, by date range)
-   - Diff view: side-by-side markdown comparison (old vs new)
-   - Revert button with "reason" input
-   - Delete wiki page / feature with confirmation
-   - `admin/users.tsx` — user list, search, role toggle, ban/unban
-
-5. **Spam prevention (basic)**
-   - Rate limiting on API (per-IP, per-token): 10 edits/minute
-   - Flag suspicious patterns (no auth, rapid edits, all-links content)
-   - Admin can "flag" revisions → flagged feed
-
-#### Deliverables
-
-- User registration and login
-- Admin dashboard with revision feed, revert, ban
-- Anonymous editing still works
-- Rate limiting
+**Status:** Implemented. JWT auth (register/login with refresh tokens, SecureStore), author tracking on revisions, admin dashboard with revision feed/diff/revert and user management/ban, and API rate limiting.
 
 ---
 
-### Phase 7: Web Parity & Polish (Weeks 19-20)
+### Phase 7: Web Parity & Polish (Weeks 19-20) — Completed
 
-**Goal:** Web app caught up, admin polished, general polish.
-
-#### Tasks
-
-1. **Web verification pass**
-   - Test every screen on web (Chrome, Firefox)
-   - Fix any RNW-specific bugs (touch events, gestures, responsiveness)
-   - Map interaction: ensure click/tap works identically
-   - Responsive layout: desktop sidebar + map vs mobile stack
-   - Verify PWA behavior (optional: add manifest, service worker)
-
-2. **Admin polish**
-   - Stats dashboard with charts (revisions per day, new users, etc.)
-   - Batch operations (revert multiple, delete multiple)
-   - Export data as GeoJSON / CSV
-
-3. **Performance**
-   - Lazy load routes (expo-router async imports)
-   - Virtualize long lists (FlatList)
-   - Image caching (expo-image for thumbnails)
-   - Map tile caching headers
-   - Bundle size audit (avoid shipping unused OpenLayers plugins)
-
-4. **Accessibility**
-   - Screen reader labels for map (announce feature names on focus)
-   - Color-blind friendly trail colors (use patterns in addition to color)
-   - Minimum touch target sizes (44px)
-
-5. **Analytics setup** (optional, FOSS-friendly)
-   - Plausible or Umami for basic page views
-   - No user tracking, no PII
-
-#### Deliverables
-
-- Web app fully functional
-- Admin polished
-- Performance acceptable (map loads <2s, list scroll 60fps)
-- Accessibility baseline met
+**Status:** Implemented. Web build exports all routes with responsive layouts, base-layer switcher, admin polish, lazy-loaded routes, and accessibility/performance pass.
 
 ---
 
@@ -1154,52 +768,9 @@ packages/app/src/components/
 
 ---
 
-### Phase 9: Attestation System (Weeks 22-24)
+### Phase 9: Attestation System — Superseded
 
-**Goal:** GPS verification, trust scores, reputation.
-
-#### Tasks
-
-1. **GPS tracking (strong attestation)**
-   - "Record Hike" button on trail detail
-   - Background location tracking (expo-location, expo-task-manager)
-   - GPX export format
-   - Upload track → `/api/attestations/strong`
-   - Server validates: track must overlap trail geometry by >80%
-
-2. **Quorum-based verification**
-   - N distinct users (N=3 initially, configurable) submit valid strong attestations
-   - Trail automatically marked `verified = true`
-   - "Verified" badge on trail detail and map
-   - Admin can override verification
-
-3. **Thumbs up/down (weak attestation)**
-   - "Was this trail accurate?" thumbs up/down on trail detail
-   - POST `/api/attestations/weak`
-   - Display ratio (e.g., "87% found this accurate (42 votes)")
-
-4. **Trust scores**
-   - Each user has `trust_score` (0.0–1.0)
-   - Score decays:
-     - Valid strong attestation: +0.05
-     - False strong attestation (off-path, impossible speed): -0.20
-     - Weak attestation that matches majority: +0.01
-     - Weak attestation against majority: -0.02
-   - Users below 0.3: edits require admin approval
-   - Users below 0.0: cannot submit attestations
-
-5. **Track playback**
-   - On trail detail: "View GPS tracks" overlay
-   - Multiple user tracks shown on map (different colors)
-   - Toggle individual tracks on/off
-   - Opacity indicates trust score of submitter
-
-#### Deliverables
-
-- Record and submit GPS tracks
-- Verified trail badges
-- Trust score system
-- Track playback visualization
+**Status:** Superseded by the UI Redux (see §21). The original "GPS verifies a trail" attestation model is replaced by a tiered trail-trust model: GPS traces now _create and maintain_ synthesized trails (with wiki-style segment→trail marking and downvote-weighting), and karma/voting drives trust rather than attestation quorums. The existing `users.trust_score` field is reused as the karma total. The `ATTESTATION_*` constants in `packages/shared/src/constants.ts` are retained only until §21 lands.
 
 ---
 
@@ -1962,15 +1533,19 @@ Each phase must pass the following before being considered "done":
 
 ## 16. Open Questions (To Be Resolved)
 
-- [ ] License: MIT vs AGPL vs GPLv3?
+- [x] License: AGPL-3.0 (resolved — see README).
 - [ ] Name: "Magnum" final? (conflicts with .44 Magnum, Python package, ice cream brand)
 - [ ] Production tile hosting: public OpenMapTiles instance or require self-hosting?
 - [ ] iOS WebView restrictions (WKWebView limits SQLite access)? Need research.
-- [ ] Mapbox/MapLibre comparison: is OpenLayers the right choice or should we use MapLibre GL JS?
+- [x] Mapbox/MapLibre comparison: is OpenLayers the right choice or should we use MapLibre GL JS?
   - **Decision:** Start with OpenLayers. Re-evaluate if performance issues arise. MapLibre is also FOSS.
 - [ ] Offline satellite imagery? Large files. Probably leave for post-MVP.
 - [ ] International OSM extracts: Geofabrik covers most regions. Prioritize after US.
 - [ ] Mobile app stores (Google Play, App Store): self-hosted backend means users configure server URL in app settings.
+- [ ] Preset sync: ship inside the existing offline pack or via a dedicated lightweight sync endpoint? (Lean dedicated — presets change often and are small.)
+- [ ] Centerline algorithm parameters (buffer distance, snap tolerance) — tune against real Ohio trace data during §21 step 5.
+- [ ] Exact karma thresholds (50 / 500) and hide threshold (−3) — calibrate after early usage data.
+- [ ] OSM upstreaming: OAuth 2.0 flow, dedup bbox check, and "verify schema" review UI — designed in (§21.16), built in a future phase.
 
 ---
 
@@ -2413,7 +1988,7 @@ magnum/
 
 ---
 
-_Last updated: 2026-06-21_
+_Last updated: 2026-06-24_
 _Phase 0 starts with: monorepo scaffold, Docker Compose, DB schema, API skeleton, RN app shell._
 
 ---
@@ -2590,3 +2165,455 @@ adb shell ps | grep magnum
 # Force stop app
 adb shell am force-stop org.magnum.app
 ```
+
+---
+
+## 21. UI Redux — Presets, Hierarchy, Trails & Social
+
+A redesign of the contributor experience across four axes: (1) a preset-based feature system modeled on OSM, (2) system-hierarchy creation/editing, (3) a GPS-trace-driven trail synthesis with tiered trail trust, and (4) a karma/reputation engine with Wikipedia-style moderation. This supersedes the old Phase 9 attestation model (§11).
+
+### 21.1 Design Principles
+
+- **OSM-shaped, not OSM-typed.** Hikers tap icons and answer ≤5 tiny questions; moderators define presets backed by OSM tags. Upstreaming to OSM is _designed in now_ (presets carry OSM tag maps) but the OAuth + review UI is built later.
+- **Wiki-style everywhere.** Any logged-in contributor can create/edit systems and reorganize the hierarchy. Every mutation is revision-logged so moderators (and even other users) can revert.
+- **Tiered trail trust.** `premium` (official import, frozen) → `elevated` (promoted, frozen) → `synthesized` (built/maintained from GPS trace segments). Only `synthesized` trails are touched by GPS data.
+- **Karma is the core currency.** Upvotes on traces and features are the primary way users earn points. Karma → trust tier → privileges.
+
+### 21.2 Information Architecture (by frequency)
+
+Surfaces are weighted by how often the flow is used. Common actions are prominent; infrequent ones are reachable but not primary.
+
+| Frequency | Flows | Surface |
+| --- | --- | --- |
+| Primary (common) | Add Feature, Upload/Record Trace, Organize Trails | Explore FABs; System "Trails & Traces" tab |
+| Secondary (reachable) | Create/Edit System, draw boundary, hierarchy tree | "+" in Systems tab header; System detail Edit |
+| Moderator (gated) | Preset editor, premium import, promote trail, synthesis review, patrol feed | `admin/*` routes |
+
+Explore FAB column becomes: `[Upload Trace]` above `[Add Feature]` (the download-area control moves into a menu or appears context-only).
+
+### 21.3 Core User Flows
+
+#### 21.3.1 Add Feature (bottom sheet, hiker-optimized)
+
+Replaces navigation to `/feature/create`. The dedicated create route is retained only as the full-feature editor / edit-from-detail entry point.
+
+1. Explore → **Add Feature FAB** → banner "Tap map to place" (reuse existing placing mode).
+2. Tap map → pin drops at `[lon,lat]` → **bottom sheet rises** in place (swipe-down cancels).
+3. **Sheet step 1 — Preset grid:** icon tiles grouped by category (top chips to jump sections, or sectioned vertical scroll). Collapsible search for power users.
+4. Tap a preset → **Sheet step 2 — Questions + Photo:**
+   - 0–N questions rendered as large controls (boolean = big toggle; select = segmented control, ≤5 options).
+   - **System auto-detected** from the pin point via a point-in-polygon query → shown as a chip "📍 Mountains Park" with a "change" affordance. Trail = optional picker of that system's trails.
+   - Name optional (auto-fills `"{PresetLabel}"` if blank).
+   - **Photo: big "📷 Add photo" button — always encouraged, skippable.**
+   - Save → online POST, or offline queue via `pending_contributions`.
+
+#### 21.3.2 Upload / Record Trace
+
+1. Explore → **Upload Trace FAB** → bottom sheet with two options.
+2. **Import path:** file picker (GPX/GeoJSON) → parse → preview LineString on mini-map → Save.
+3. **Record path:** full-screen recorder — big Start/Stop, live distance + duration + current track; background location via `expo-location` + `expo-task-manager` with a persistent notification. Stop → preview → Save.
+4. On Save (both): `gps_traces` row, `status=active`, `weight=1.0`, `source=import|recorded`. **The user does NOT pick a system** — traces are auto-tagged by geometry ∩ system boundaries (see §21.9 jobs).
+5. Offline record/import → queue in `pending_contributions`; server runs segmentation + tagging after sync.
+
+#### 21.3.3 Organize Trails (segment → trail assignment)
+
+The common "organizing trails" flow.
+
+1. System detail → **"Trails & Traces"** tab → **Organize** → full-screen map (`system/[slug]/organize`).
+2. Map shows existing trails (solid, tier-colored), trace segments (semi-transparent, colored per trace), unassigned segments highlighted.
+3. Tap a segment → bottom sheet:
+   - Algorithm proposal: "Suggests: **Old Log Trail** (conf. 0.82, 3 agree / 1 disagree)".
+   - Actions: **Assign to trail** (picker) / **Propose new trail** / **Downvote trace** / **Agree with proposal**.
+   - Feeds `trace_segment_votes`; consumed by the next synthesis run.
+4. Toolbar toggles: filter by trace, show/hide proposals, "only unassigned".
+
+#### 21.3.4 Create / Edit System & Hierarchy
+
+1. **Systems tab → "+" in header** (not on the home screen — infrequent flow).
+2. **New System screen:** Name (slug auto); **Draw boundary** (full-screen map, polygon draw — tap vertices, "✓ close" to finish; reuses the draw interaction pattern from Explore's offline-area draw); **Provenance** (ownership source, source date, external URL — required per `outline.md`); optional super-system picker.
+3. Save → revision-logged → **triggers trace re-tag job** for the new boundary.
+4. System detail → **Edit** (same form prefilled; redraw boundary); **"Move to…" action sheet** (Move to super-system / Promote to system / Demote to sub-system / Merge into another); **Add sub-system**; **Assign trails** (multi-select, auto-suggested by boundary intersection).
+5. **Hierarchy tree** (`systems/tree`): collapsible Super→System→Sub; tap = detail; "⋯" = Move-to sheet.
+
+### 21.4 Preset System
+
+Replaces the hardcoded `FEATURE_TYPES` enum (`packages/shared/src/constants.ts`) and `features.type_tag`. Presets live in the DB, are synced to the device and cached (a few MB; first app open requires network).
+
+#### Data model
+
+```sql
+presets(
+  id UUID PRIMARY KEY,
+  key TEXT UNIQUE,            -- stable slug, e.g. 'bench'
+  label TEXT,                 -- 'Bench'
+  icon_name TEXT,             -- Ionicons glyph name
+  icon_color TEXT,
+  category TEXT,              -- grouping for the picker grid
+  osm_tags JSONB,             -- {"amenity":"bench"} — future upstream mapping
+  questions JSONB,            -- [{key,type:"boolean"|"select",label,options?[<=5]}]
+  upstreamable BOOLEAN,       -- shown in the future OSM review queue
+  sort_order INTEGER,
+  created_by UUID,
+  updated_at TIMESTAMPTZ
+)
+
+-- features migration
+--   DROP type_tag
+--   ADD preset_id UUID REFERENCES presets(id)
+--   ADD answers JSONB          -- the user's answers to that preset's questions
+```
+
+#### Bundled default presets (~20 across 5 categories)
+
+| Category | Presets |
+| --- | --- |
+| Rest & Shelter | bench, picnic table, shelter, campsite |
+| Water & Sanitation | drinking water, spring, restroom, waste basket |
+| Navigation | trailhead, map board, guidepost, sign, intersection |
+| Hazards & Obstacles | fallen tree, washout, steep section, road connector |
+| Landmarks | viewpoint, notable tree, waterfall, cave entrance, bridge, tunnel |
+
+Shipped as a seed migration (one row per old enum value, with OSM tag maps). Existing features migrate by mapping `type_tag → preset.key`.
+
+#### Sample question schemas
+
+- `bench` → `material`[wood/stone/metal/plastic], `backrest`[yes/no], `seats`[1/2/3+]
+- `drinking_water` → `potable`[yes/no/seasonal], `covered`[yes/no]
+- `shelter` → `type`[lean-to/cabin/ruin], `sleeps`[1-2/3-4/5+]
+- `viewpoint` → `panoramic`[yes/no], `covered`[yes/no]
+
+#### UI surfaces
+
+- **Hiker flow:** preset icon-grid + quick questions + photo (§21.3.1). `FeatureTypeIcon` becomes DB-driven.
+- **Feature detail:** preset icon + answer badges (`Material: Wood`, `Backrest: Yes`); ↑/↓ vote + score + contributor chip; "Edit" opens the sheet prefilled.
+- **Moderator preset editor** (`admin/presets`, `admin/presets/[id]`): icon picker, OSM tag key/value editor, question builder (add question; boolean or select with ≤5 options), upstreamable toggle. Revision-logged.
+
+### 21.5 System Hierarchy Management
+
+The DB already has `super_systems`, `systems`, `sub_systems` + join tables (`packages/api/src/db/schema.ts`). This phase adds CRUD, drawn boundaries, the Move-to organizer, and revision logging.
+
+- **API:** CRUD for `super_systems` and `sub_systems` (mirror existing `POST /systems`); join management (assign/remove super, trail↔sub); boundary via draw or GeoJSON; provenance fields required.
+- **Boundaries are drawn** on the map (polygon tool), reusing Explore's draw-interaction pattern. Provenance (`ownership_source` + `source_date`) is required per `outline.md`.
+- **Permissions:** any logged-in contributor can create/edit; all actions revision-logged and revertable (see §21.8).
+- **Hierarchy tree** with **"Move to…" action sheet** (tap node → action sheet; no drag-drop needed on mobile).
+
+### 21.6 Trail Tiers & GPS Synthesis
+
+Adds a `tier` to trails and a GPS-trace pipeline that creates/maintains `synthesized` trails.
+
+#### Trail tiers
+
+```sql
+-- trails migration
+ALTER TABLE trails ADD COLUMN tier TEXT
+  CHECK (tier IN ('premium','elevated','synthesized'))
+  DEFAULT 'synthesized';
+```
+
+- **Premium** — moderator-only import of official GeoJSON/shapefile. Geometry authoritative; never re-derived.
+- **Elevated** — a synthesized trail promoted by a moderator. Geometry frozen (snapshot of the current derived geometry).
+- **Synthesized** — geometry derived and re-derivable from trace segments.
+
+Existing rows default to `synthesized` (already-`verified=true` rows may seed as `elevated`).
+
+#### New tables
+
+```sql
+gps_traces(
+  id UUID PRIMARY KEY,
+  user_id UUID, contributor_name TEXT,
+  geometry GEOMETRY(LineString,4326),
+  source TEXT,            -- 'import' | 'recorded'
+  weight FLOAT DEFAULT 1.0,
+  upvotes INT DEFAULT 0, downvotes INT DEFAULT 0,
+  status TEXT DEFAULT 'active',   -- active | ignored | removed
+  recorded_at TIMESTAMPTZ, created_at TIMESTAMPTZ
+)
+
+trace_systems(            -- auto-tagged by geometry ∩ boundary (many-to-many)
+  trace_id UUID, system_id UUID, PRIMARY KEY(trace_id,system_id)
+)
+
+gps_trace_segments(       -- server-cut pieces of a trace
+  id UUID PRIMARY KEY,
+  trace_id UUID REFERENCES gps_traces(id) ON DELETE CASCADE,
+  geometry GEOMETRY(LineString,4326),
+  cluster_id INT,                 -- assigned by synthesis run
+  proposed_trail_id UUID          -- algorithm's best guess
+)
+
+trace_segment_votes(      -- wiki-style user marking (segment → trail)
+  id UUID PRIMARY KEY,
+  segment_id UUID, user_id UUID, trail_id UUID,
+  vote INT CHECK (vote IN (-1,1)),
+  UNIQUE(segment_id,user_id)
+)
+
+synthesis_runs(           -- audit/history of regeneration
+  id UUID PRIMARY KEY,
+  system_id UUID, started_at TIMESTAMPTZ, finished_at TIMESTAMPTZ,
+  trails_updated INT, trails_proposed INT, status TEXT
+)
+```
+
+#### Synthesis algorithm (per-system, server-side PostGIS batch)
+
+1. **Cut** each active trace into segments (Douglas-Peucker simplify → split at significant vertices).
+2. **Cluster** by spatial density: buffer each segment ~5–10 m, union overlapping buffers → clusters; singletons stay single.
+3. **Assign/propose:** for each cluster, find the nearest existing `synthesized` trail within tolerance → propose assignment; else flag as a **possible new trail** for moderator review.
+4. **Weighted centerline:** for each trail, take all assigned segments; `weight = trace.weight × vote_confidence`; compute the centerline (iterative snap / median axis) and write to `trails.geometry`.
+5. **Run log** in `synthesis_runs`; proposals queue in the moderator review list.
+
+Algorithm parameters (buffer distance, snap tolerance) are tuned against real Ohio trace data during implementation.
+
+#### Trace lifecycle & moderation
+
+- Upload against (auto-detected) system. `weight` starts at 1.0.
+- **Downvote** (any user): `downvotes++`; recompute `weight = (upvotes+1 − downvotes) / (upvotes+downvotes+2)` (Wilson-style). Below **0.3** → `status='ignored'` (excluded from synthesis).
+- **Moderator remove:** `status='removed'` (soft delete, kept for audit).
+- **Trace → trail marking:** users tap a segment and pick a trail or "propose new"; votes accumulate; synthesis uses weighted majority.
+
+#### UI surfaces
+
+- **System detail — "Trails & Traces" tab:** trace list (contributor, date, weight, status), upload button, per-trace ↑/↓, moderator remove, toggle on map, **Organize** button.
+- **Trail detail — tier badge** (Premium / Elevated / Synthesized) beside the existing `verified` badge. Synthesized shows "Derived from N segments / M traces · regen {date}". Geometry-edit tools hidden for premium/elevated (metadata edits still allowed).
+- **Organize view** (`system/[slug]/organize`): full-screen segment map + tap-sheet (assign / propose / downvote / agree).
+- **Moderator synthesis queue** (`admin/synthesis`): "possible new trail" proposals → approve (create `synthesized` trail) / reject; **promote** action `synthesized → elevated`.
+- **Premium import** (`admin/import`): moderator-only GeoJSON/shapefile upload → creates `premium` trails (skips synthesis).
+
+### 21.7 Karma & Reputation Engine
+
+`users.trust_score` (existing column) becomes the **karma total** — lifetime-cumulative, kept current via incremental updates on each vote (no batch recompute).
+
+#### Earning
+
+- An upvote on your **trace** or **feature** adds `tierWeight(voter)` points.
+  - `tierWeight`: New = 1, Established = 2, Trusted = 3, Moderator = 3.
+- A downvote subtracts `tierWeight(voter)` (display floors at 0; raw value tracked for flagging).
+- Upvote point value is scaled by the voter's tier to resist sockpuppet farming.
+
+#### Trust tiers (lifetime karma thresholds)
+
+| Tier | Karma | Can do |
+| --- | --- | --- |
+| New | 0–49 | add features, upload traces, edit wikis, vote |
+| Established | 50–499 | + create/edit systems, draw boundaries, organize trails, revert others (within protection) |
+| Trusted | 500+ | + propose presets, approve new-trail proposals, promote synthesized→elevated; reverts not auto-flagged |
+| Moderator | appointed | + remove traces, delete within protection, premium import, ban, rollback, override protection |
+
+#### Votes table (generic, the karma source)
+
+```sql
+votes(
+  id UUID PRIMARY KEY,
+  target_type TEXT,        -- 'feature' | 'trace' | 'preset' | 'system'
+  target_id UUID,
+  user_id UUID,
+  value INT CHECK (value IN (-1,1)),
+  created_at TIMESTAMPTZ,
+  UNIQUE(target_type,target_id,user_id)
+)
+```
+
+#### Thresholds
+
+- **Feature hide/queue:** net score (↑ − ↓) ≤ **−3** → `hidden`, moderator-removal queue.
+- **Trace weight:** `w = (↑+1 − ↓) / (↑+↓+2)`; `w < 0.3` → `ignored`.
+
+#### Social UI
+
+- Compact **↑/↓ + score** control on Feature cards, Trace rows, and System/Preset pages.
+- **Profile page:** karma total, tier badge, tabs (Traces / Features / Edits), upvotes-received summary. Optional leaderboard (low priority).
+
+### 21.8 Moderation & Protection (Wikipedia-style)
+
+#### Revision logging
+
+The existing `revisions` table is generalized: `target_type` expands to cover `system | super_system | sub_system | preset | feature | trace` (in addition to wiki pages). Every create/update/delete/reassign writes a revision with contributor + before/after payload. **Any logged-in user can revert** any revision, subject to protection.
+
+#### Auto-protection tiers (per entity)
+
+| Level | Trigger | Who can edit / move / revert |
+| --- | --- | --- |
+| Normal | default | any logged-in user |
+| Semi-protected | ↑ ≥ 10 **or** children ≥ 3 | Established+ |
+| Full-protected | moderator-set **or** ↑ ≥ 100 | Moderator only |
+
+**Hard rule (always enforced server-side):** a delete is blocked if the system has ≥ 2 trails AND the creator ≠ actor AND the actor is not a moderator.
+
+#### Behavior flagging (automated, anti-vandalism)
+
+Low-trust actions are flagged into a moderator **patrol feed** (`admin/patrol`):
+
+- New-tier user edits/reverts a semi-protected or fuller entity.
+- New-tier user performing > 5 reversions in 10 minutes.
+- Raw-negative-karma user doing any delete/revert.
+- Mass reversion of a popular system.
+
+Patrol feed actions: **Revert** (single revision) and **Rollback** (revert an actor's consecutive edits to one entity).
+
+### 21.9 Data Model Changes (consolidated)
+
+Summary of all schema additions/changes introduced by this redux (see §21.4, §21.6, §21.7):
+
+- `presets` table; `features` drops `type_tag`, adds `preset_id` + `answers JSONB`.
+- `trails` adds `tier`.
+- `votes` (generic, ±1) — karma source.
+- `gps_traces`, `trace_systems`, `gps_trace_segments`, `trace_segment_votes`, `synthesis_runs`.
+- `revisions.target_type` expanded to cover system-hierarchy entities, presets, features, traces.
+- `users.trust_score` repurposed as the cached karma total.
+
+### 21.10 Background Jobs
+
+1. **Trace re-tagging** — on system create / boundary edit, plus a daily cron. Recomputes `trace_systems` via `ST_Intersects(trace.geometry, system.boundary)`. Handles traces recorded before a system existed.
+2. **Trace segmentation** — async on upload; simplify → split → `gps_trace_segments`.
+3. **Synthesis run** — per-system, nightly + on-demand (moderator). Cluster → assign/propose → weighted centerline → write `trails.geometry` for synthesized; proposals → mod queue.
+4. **Karma** — incremental on each vote (DB trigger); no scheduled job.
+
+### 21.11 Offline Notes
+
+- Presets sync to device and cache (few MB). First app open requires network.
+- Traces recorded/imported offline queue in `pending_contributions` (existing pattern); the server runs segmentation + tagging after sync.
+- Voting offline queues the same way.
+
+### 21.12 Build Order
+
+1. **Karma + votes + trust tiers + protection + patrol feed** — everything else depends on trust.
+2. **Presets** — schema migration, ~20 bundled defaults, device sync+cache, Add-Feature bottom sheet, preset editor.
+3. **System hierarchy** — drawn boundaries, Move-to sheet, tree, generalized revisions, re-tag job.
+4. **Trace ingestion** — import + live record, auto-tag, segmentation, Trails & Traces tab, voting/weighting.
+5. **Synthesis** — assignment/organize view first (manual), then auto-synthesis algorithm + proposal queue + promote/import.
+
+Karma is sequenced first because privileges, protection, and the downvote/hide logic all depend on trust tiers being live.
+
+### 21.13 Open Details (resolve during implementation)
+
+- Centerline algorithm parameters (buffer distance, snap tolerance) — tune against real Ohio trace data in step 5.
+- Whether the preset list ships inside the existing offline pack or via a dedicated lightweight sync endpoint (lean dedicated — it changes often and is small).
+- Exact karma thresholds (50 / 500) and hide threshold (−3) — calibrate after early usage data.
+
+### 21.14 Screen-by-Screen Layout Reference
+
+Consolidated reference for every screen touched by the redux. Individual flow details are in §21.3.
+
+| Screen | Route | Key elements |
+| --- | --- | --- |
+| **Explore** | `(tabs)/explore` | Search bar + status dot (top). Map. **FAB column bottom-right: `[Upload Trace]` above `[Add Feature]`** (download-area control moves into a menu). Base-layer switcher (existing). |
+| **Add Feature sheet** | (bottom sheet on Explore) | Step 1: preset icon-grid (category chips + icon tiles). Step 2: questions + auto-system chip + photo + save. Swipe-down cancels. |
+| **Upload Trace sheet** | (bottom sheet on Explore) | Import / Record toggle → file picker (GPX/GeoJSON) or full-screen recorder. |
+| **Feature detail** | `feature/[id]` | Preset icon + answer badges (`Material: Wood`, `Backrest: Yes`), description, photos, wiki, **↑/↓ vote + score + contributor chip**, "Edit" (opens sheet prefilled). |
+| **System detail** | `system/[slug]` | Map preview, meta, trails list, **"Trails & Traces" tab**, wiki, Edit / Move-to / Add-sub / Assign-trails actions, ↑/↓ vote. |
+| **Trails & Traces tab** | (within system detail) | Trace list (contributor, date, weight, status, ↑/↓, mod-remove), toggle-on-map, **Organize** button. |
+| **Organize view** | `system/[slug]/organize` | Full-screen segment map + tap-sheet (assign to trail / propose new / downvote trace / agree with proposal). Toolbar: filter by trace, show/hide proposals, only-unassigned. |
+| **Trail detail** | `trail/[slug]` | **Tier badge** (Premium / Elevated / Synthesized) beside existing `verified` badge. Synthesized: "Derived from N segments / M traces · regen {date}". Geometry-edit tools hidden for premium/elevated. |
+| **Systems tree** | `systems/tree` | Collapsible Super→System→Sub. Tap = detail. "⋯" = Move-to action sheet. |
+| **Profile** | `profile` (enhanced) | Karma total, **tier badge**, tabs (Traces / Features / Edits), upvotes-received summary. Optional leaderboard (low priority). |
+| **Admin: Patrol** | `admin/patrol` | Recent-changes feed across all entity types. Filters (by user, by type, flagged-only). **Revert** (single revision) + **Rollback** (revert user's consecutive edits to an entity). |
+| **Admin: Presets** | `admin/presets`, `admin/presets/[id]` | Preset list + editor: icon picker, OSM tag key/value editor, question builder (boolean or select ≤5 options), upstreamable toggle. Revision-logged. |
+| **Admin: Synthesis** | `admin/synthesis` | New-trail proposal queue from `synthesis_runs` → approve (create `synthesized` trail) / reject. **Promote** action: `synthesized → elevated`. |
+| **Admin: Import** | `admin/import` | Moderator-only GeoJSON/shapefile upload → creates `premium` trails (skips synthesis). |
+
+**Vote control:** compact ↑/↓ arrows + score, on Feature cards, Trace rows, and System/Preset pages.
+
+### 21.15 New API Endpoints
+
+Endpoints introduced by the redux, grouped by area. These augment the existing §9 API.
+
+**Presets**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/presets` | List all presets (for device sync + cache) |
+| `POST` | `/api/presets` | Create preset (moderator+) |
+| `PUT` | `/api/presets/:id` | Update preset (moderator+) |
+| `DELETE` | `/api/presets/:id` | Delete preset (moderator+) |
+
+**Votes (karma)**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/votes` | Cast upvote/downvote `{target_type, target_id, value}` |
+| `DELETE` | `/api/votes` | Remove user's vote (same unique key) |
+| `GET` | `/api/entities/:type/:id/score` | Vote tally for an entity |
+
+**Features (updated)**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/features` | Now accepts `preset_id` + `answers` (not `type_tag`) |
+| `PUT` | `/api/features/:id` | Same shape |
+| `GET` | `/api/systems/contains?lon=&lat=` | Point-in-polygon: which system contains this point (auto-detect for feature placement) |
+
+**System hierarchy**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/super-systems` | Create super-system |
+| `PUT` | `/api/super-systems/:id` | Update (incl. boundary) |
+| `DELETE` | `/api/super-systems/:id` | Delete (protection-gated) |
+| `POST` | `/api/sub-systems` | Create sub-system |
+| `PUT` | `/api/sub-systems/:id` | Update |
+| `DELETE` | `/api/sub-systems/:id` | Delete (protection-gated) |
+| `POST` | `/api/systems/:id/super-systems` | Assign super-system |
+| `DELETE` | `/api/systems/:id/super-systems/:superId` | Remove assignment |
+| `POST` | `/api/systems/:id/trails` | Assign trails (multi) |
+| `DELETE` | `/api/systems/:id/trails/:trailId` | Remove trail from system |
+| `POST` | `/api/systems/:id/move` | Move-to action (promote/demote/merge) |
+
+**GPS traces**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/traces` | Upload trace (GPX/GeoJSON geometry; auto-tagged to systems) |
+| `GET` | `/api/systems/:id/traces` | List traces in a system |
+| `GET` | `/api/traces/:id` | Trace detail |
+| `DELETE` | `/api/traces/:id` | Moderator remove (soft) |
+| `GET` | `/api/traces/:id/segments` | Server-cut segments for a trace |
+| `POST` | `/api/trace-segments/:id/vote` | Assign segment → trail / vote |
+| `POST` | `/api/traces/:id/vote` | Upvote/downvote trace (affects weight) |
+
+**Synthesis**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/systems/:id/synthesize` | Trigger synthesis run (moderator) |
+| `GET` | `/api/synthesis-runs/:id` | Run status + results |
+| `GET` | `/api/admin/synthesis-proposals` | New-trail proposal queue |
+| `POST` | `/api/admin/synthesis-proposals/:id/approve` | Approve → create `synthesized` trail |
+| `POST` | `/api/admin/synthesis-proposals/:id/reject` | Reject proposal |
+| `POST` | `/api/admin/trails/:id/promote` | Promote `synthesized → elevated` |
+| `POST` | `/api/admin/trails/import` | Premium import (GeoJSON → `premium` trail) |
+
+**Revisions (generalized)**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/revisions?target_type=&target_id=` | Revision history for any entity type |
+| `POST` | `/api/revisions/:id/revert` | Revert any revision (protection-gated; any logged-in user within tier) |
+
+**Patrol & moderation**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/admin/patrol` | Flagged actions feed (filters: user, type, flagged-only) |
+| `POST` | `/api/admin/patrol/rollback` | Rollback: revert actor's consecutive edits to one entity |
+
+**Profile & karma**
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/users/:id` | Profile: karma total, tier, contribution counts |
+| `GET` | `/api/users/:id/contributions` | User's traces, features, edits (paginated) |
+
+### 21.16 Future: OSM Upstreaming (Designed-In, Built Later)
+
+Presets already carry `osm_tags` and an `upstreamable` flag so the data model is ready. The actual push-to-OSM flow is a future phase. Design when built:
+
+1. **OAuth 2.0 login** — moderator logs in with their personal OpenStreetMap account. Edits are tied to their OSM reputation and they agree to the OSM Contributor Terms.
+2. **Verify Schema UI** — admin sees a feature's photo + preset-derived OSM tags, confirms or edits before push. Example: "This is a **Bench**. Uploading as `amenity=bench`. [Edit Tags] [Submit to OSM]".
+3. **Dedup check** — before creating, query OSM via bounding-box API for existing features of the same tag within 5–10 m. Warn: "A bench already exists here in OSM. Update instead of create?"
+4. **`source` tag** — all pushed data includes `source=magnum_user_submission` so other OSM mappers know provenance.
+5. **Manual review only** — no automated/bot uploads. Every push goes through a moderator.
+6. **Eligibility** — only `upstreamable=true` presets with a photo are queued. Features with net-negative votes are excluded.
+
+The admin review queue (`admin/upstream`) surfaces eligible features, grouped by preset, with photo + proposed tags + dedup status.

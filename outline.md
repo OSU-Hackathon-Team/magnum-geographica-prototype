@@ -79,21 +79,38 @@ _ If it grows large enough to feel standalone, promote it to a System.
    - Examples: Shelter, Scenic Point, Trailhead, Water Source.
    - Should include:
      - Coordinates
-     - Type tag
+     - A preset (see below)
      - Optional description or media
    - Rules:
      - Must be observable / publicly accessible
      - No personal residences or private markers
 
-# Attestations
+## Features & Presets
 
-- Types:
-  - Strong — Device recorded GPS track that directly follows the mapped trail.
-  - Weak — Manual confirmation or vote stating that the mapped trail is correct/useful.
-- Rules:
-  - Strong attestations should automatically verify the geometry when a quorum of distinct users confirm it.
-  - Weak attestations influence visibility and reputation but cannot verify geometry alone.
-  - False attestations (impossible movement speed, off-path traces) reduce a user's trust score.
+- Features are added via _presets_, not raw OSM tags.
+  - A preset is an icon-oriented type (bench, water source, viewpoint…) with a few simple questions (booleans or small dropdowns of 5 items or fewer).
+  - The hiker flow is icon-first and tap-driven; no typing is required to choose a type.
+  - A photo is always encouraged but skippable.
+- Moderators create and edit presets, and each preset is backed by OSM tags so features can eventually be upstreamed to OSM.
+- Presets live in the database and are synced to the user's device.
+
+# Trails, Traces & Tiers
+
+- Trails have three tiers:
+  - **Premium** — imported from an official source. Geometry is authoritative and never changed by GPS data.
+  - **Elevated** — promoted from a synthesized trail and then frozen (no longer changed by user traces).
+  - **Synthesized** — built and maintained from segments of user GPS traces.
+- Only **synthesized** trails are affected by GPS data. Premium and elevated are immune.
+- GPS traces are raw input that _create and maintain_ synthesized trails (not just verify them).
+  - Traces are organized by system, auto-tagged by where their geometry intersects system boundaries.
+  - Trail paths are synthesized from _segments_ of many traces, since people take multiple routes — never from a single trace.
+- Trace weighting:
+  - Users can downvote a trace, which reduces its weight.
+  - A trace whose weight drops below a low ratio is ignored by synthesis.
+  - Moderators can remove traces.
+- Trace-segment → trail assignment is marked by users (Wikipedia style).
+  - An algorithm proposes which segments belong to which trail, or flags a possible new trail.
+  - Votes on assignments feed the synthesis run.
 
 # Rules
 
@@ -112,3 +129,18 @@ _ If it grows large enough to feel standalone, promote it to a System.
   - Allowed only if the new boundary aligns with verifiable evidence.
   - Combined parcels must have consistent access permissions.
 - Each System or Sub‑System should include a boundary polygon if applicable.
+
+# Karma & Moderation
+
+- Modeled closely on Wikipedia moderation.
+- Karma is the core currency and is lifetime-cumulative.
+  - Getting upvoted for things (especially traces and features) is the number one way users earn points.
+  - Upvote value is weighted by the voter's trust tier.
+- Karma determines a user's trust tier, which gates privileges (creating systems, reverting, promoting trails, etc.).
+- Any logged-in user can revert changes (subject to protection rules).
+- All hierarchy and entity mutations are revision-logged for revert.
+- Protection:
+  - Popular entities (many upvotes or many children) are auto semi-protected; only established users can edit/revert them.
+  - A user cannot delete a system with multiple trails they did not create.
+  - Moderators can fully protect an entity.
+- Low-quality users (few upvotes, few traces) performing sensitive actions (reverting, deleting popular systems) are auto-flagged for moderator review.
