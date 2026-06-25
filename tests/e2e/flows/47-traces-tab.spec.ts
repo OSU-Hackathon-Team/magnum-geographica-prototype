@@ -52,12 +52,12 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
 
   test("each seeded trace renders as a row with vote controls", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1")).toBeVisible();
-    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace2")).toBeVisible();
+    await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}`)).toBeVisible();
+    await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace2}`)).toBeVisible();
     // Per-row vote controls (§21.7 vote control on trace rows).
-    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-up")).toBeVisible();
-    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-score")).toBeVisible();
-    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-down")).toBeVisible();
+    await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-up`)).toBeVisible();
+    await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-score`)).toBeVisible();
+    await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-down`)).toBeVisible();
   });
 
   test("organize button navigates to the organize page", async ({ page }) => {
@@ -81,8 +81,8 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
   test("upvote increments the trace score", async ({ page }) => {
     await registerAndLogin(page, "tracevoter", "tracevoter@example.com");
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    const up = page.getByTestId("traces-row-FIXTURE_IDS.trace1-up");
-    const score = page.getByTestId("traces-row-FIXTURE_IDS.trace1-score");
+    const up = page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-up`);
+    const score = page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-score`);
     // Read the initial numeric portion (text is "3score" or "3votes"
     // depending on TraceRow's labels).
     const beforeText = ((await score.textContent()) ?? "0").trim();
@@ -101,13 +101,13 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     // row for users with role=admin. The mock's getAllDownloadedSystems
     // path may not surface it for unauthenticated visitors, so we
     // assert the button renders for admin only.
-    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-remove")).toBeVisible();
+    await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-remove`)).toBeVisible();
   });
 
-  test("GET /api/traces?system_id=FIXTURE_IDS.sys1 returns the seeded traces", async ({ page }) => {
+  test(`GET /api/traces?system_id=${FIXTURE_IDS.sys1} returns the seeded traces`, async ({ page }) => {
     await page.goto(`${BASE}/explore`);
     const res = await page.evaluate(async () => {
-      const r = await fetch("/api/traces?system_id=FIXTURE_IDS.sys1");
+      const r = await fetch(`/api/traces?system_id=${FIXTURE_IDS.sys1}`);
       return r.json();
     });
     const body = res as { items: Array<{ id: string; source: string }>; total: number };
@@ -122,7 +122,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     const token = await getToken(page);
     const res = await page.evaluate(
       async ({ token }) => {
-        const r = await fetch("/api/traces/FIXTURE_IDS.trace1/vote", {
+        const r = await fetch(`/api/traces/${FIXTURE_IDS.trace1}/vote`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -171,7 +171,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     for (const t of tokens) {
       await page.evaluate(
         async (t) => {
-          await fetch("/api/traces/FIXTURE_IDS.trace1/vote", {
+          await fetch(`/api/traces/${FIXTURE_IDS.trace1}/vote`, {
             method: "POST",
             headers: {
               "content-type": "application/json",
@@ -184,7 +184,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
       );
     }
     const res = await page.evaluate(async () => {
-      const r = await fetch("/api/traces/FIXTURE_IDS.trace1");
+      const r = await fetch(`/api/traces/${FIXTURE_IDS.trace1}`);
       return r.json();
     });
     const t = res as { status: string; weight: number; downvotes: number };

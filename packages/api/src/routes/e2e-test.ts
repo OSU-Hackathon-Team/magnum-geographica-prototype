@@ -122,6 +122,14 @@ e2eTestRoute.post("/seed", async (c) => {
   if (process.env.MAGNUM_E2E !== "1") {
     return c.json({ error: "not_found" }, 404);
   }
+  // Serialize seed calls per-database with a Postgres advisory
+  // lock. Without this, two parallel tests in the same worker
+  // both call `installApi()` in their `beforeEach`, both POST
+  // `/api/__test/seed`, and race on the INSERT of the seed
+  // users. The advisory lock makes one wait for the other; the
+  // second then finds an empty database (the first truncated and
+  // re-seeded) and proceeds cleanly.
+  await db.execute(sql.raw(`SELECT pg_advisory_xact_lock(727272)`));
   // Truncate first so the seed is idempotent.
   await db.execute(
     sql.raw(
