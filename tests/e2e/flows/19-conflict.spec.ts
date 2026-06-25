@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 test.beforeEach(async ({ page }) => {
-  resetApiMock();
-  await installApiMock(page);
+  resetApi();
+  await installApi(page);
 });
 
 test("conflict page loads for a conflict ID", async ({ page }) => {
@@ -20,7 +21,7 @@ test("conflict page loads for a conflict ID", async ({ page }) => {
 });
 
 test("media gallery section visible on feature detail", async ({ page }) => {
-  await page.goto("/feature/f-1");
+  await page.goto("/feature/FIXTURE_IDS.f1");
   await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId("feature-media")).toBeVisible();
   await expect(page.getByTestId("feature-media-gallery")).toBeVisible();

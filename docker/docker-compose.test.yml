@@ -1,0 +1,43 @@
+# Throwaway PostgreSQL+PostGIS container for unit tests.
+#
+# Run with:  docker compose -f docker/docker-compose.test.yml up -d
+# Stop with: docker compose -f docker/docker-compose.test.yml down
+#
+# This container is intentionally separate from docker-compose.yml so:
+#   - It uses a different host port (54329) so it can't collide with dev
+#   - It has its own container name (magnum-test-postgres) so the dev
+#     database is never touched
+#   - The data lives in tmpfs (RAM only) — the test database is
+#     throwaway and is wiped on `down`
+#
+# Connection details (consumed by packages/api/test/helpers/db.ts):
+#   host: localhost
+#   port: 54329
+#   db:   magnum_test
+#   user: magnum_test
+#   pass: magnum_test
+#
+# The init script is mounted from docker/init-db.sql so the test
+# database has postgis, postgis_topology, uuid-ossp, and pg_trgm
+# extensions enabled, matching the dev database.
+services:
+  postgres-test:
+    image: postgis/postgis:16-3.4
+    container_name: magnum-test-postgres
+    environment:
+      POSTGRES_DB: magnum_test
+      POSTGRES_USER: magnum_test
+      POSTGRES_PASSWORD: magnum_test
+    # tmpfs keeps the test DB in RAM, which makes per-test resets cheap
+    # and ensures nothing persists between test runs.
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "127.0.0.1:54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U magnum_test -d magnum_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 10

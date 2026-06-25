@@ -1,14 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
 /** Login as the seeded admin. */
@@ -20,33 +20,6 @@ async function loginAsAdmin(page: Page) {
   await expect(page).toHaveURL(/\/explore$/);
 }
 
-/** Make a fetch call inside the browser so the page.route mock intercepts it. */
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("Admin presets list (§21.4)", () => {
   test("admin can open the presets index", async ({ page }) => {
@@ -79,12 +52,12 @@ test.describe("Admin presets list (§21.4)", () => {
 
   test("category filter via query param", async ({ page }) => {
     // Verify the unfiltered list has the expected count first.
-    const all = await browserFetch(page, "/api/presets");
+    const all = await apiFetch(page, "/api/presets");
     expect(all.status).toBe(200);
     const allBody = all.body as { items: unknown[]; total: number };
     expect(allBody.total).toBe(23);
 
-    const res = await browserFetch(page, "/api/presets?category=landmarks");
+    const res = await apiFetch(page, "/api/presets?category=landmarks");
     expect(res.status).toBe(200);
     const body = res.body as { items: Array<{ key: string; category: string }>; total: number };
     // The fixture seeds 6 landmark presets (viewpoint, notable_tree,

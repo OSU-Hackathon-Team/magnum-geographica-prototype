@@ -617,9 +617,30 @@ export function createMockDb(): { db: Database; state: MockState } {
           : raw && typeof raw === "object"
             ? [raw as Record<string, unknown>]
             : [];
+        // `apply()` already merged defaults into the row that was
+        // pushed to `state`, so we re-derive the same defaults here to
+        // include them in `.returning()`. Without this, callers that
+        // rely on the returned row (e.g. auth.ts serializing a freshly
+        // inserted user) see a row missing `role`, `createdAt`, etc.
+        // We use camelCase keys (Drizzle's JS-side naming) to match
+        // what the real database returns; the snake_case versions in
+        // `apply()` cover tests that read state directly.
+        const defaults: Record<string, unknown> = {};
+        if (tableName === "users") {
+          defaults.role = "contributor";
+          defaults.trustScore = 0;
+          defaults.displayName = null;
+          defaults.createdAt = "2026-01-01T00:00:00.000Z";
+          defaults.updatedAt = "2026-01-01T00:00:00.000Z";
+        }
+        if (tableName === "wiki_pages") {
+          defaults.renderedHtml = "";
+          defaults.createdAt = "2026-01-01T00:00:00.000Z";
+          defaults.updatedAt = "2026-01-01T00:00:00.000Z";
+        }
         const returned = rows.length > 0
-          ? rows.map((v) => ({ id: "00000000-0000-0000-0000-000000000001", ...v }))
-          : [{ id: "00000000-0000-0000-0000-000000000001" }];
+          ? rows.map((v) => ({ id: "00000000-0000-0000-0000-000000000001", ...defaults, ...v }))
+          : [{ id: "00000000-0000-0000-0000-000000000001", ...defaults }];
         return Promise.resolve(returned);
       };
       chain.onConflictDoNothing = () => {

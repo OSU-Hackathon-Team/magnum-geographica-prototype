@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock } from "../helpers/api-mock.js";
+import { installApi } from "../helpers/api.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test("user opens Profile and sees status sections", async ({ page }) => {

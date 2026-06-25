@@ -1,14 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
 /** Login as a regular user via the form. */

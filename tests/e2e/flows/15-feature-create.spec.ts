@@ -1,11 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  resetApiMock();
-  await installApiMock(page);
+  resetApi();
+  await installApi(page);
 });
 
 test("feature creation form loads with type selector grid", async ({ page }) => {
@@ -63,7 +64,7 @@ test("user can select other feature types", async ({ page }) => {
 });
 
 test("create-feature URL accepts preset and system_id query params", async ({ page }) => {
-  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54&preset_id=preset-1&system_id=sys-1`);
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54&preset_id=FIXTURE_IDS.preset1&system_id=FIXTURE_IDS.sys1`);
   await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
   // The form should still render even with the extra params.
   await expect(page.getByTestId("feature-form-name")).toBeVisible();

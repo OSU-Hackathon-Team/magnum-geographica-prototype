@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock } from "../helpers/api-mock.js";
+import { installApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test("typing in the explore search returns grouped results", async ({ page }) => {
@@ -37,9 +38,9 @@ test("tapping a feature result navigates to that feature's detail page", async (
   await page.goto("/explore");
 
   await page.getByTestId("explore-search").fill("cave");
-  await page.getByTestId("search-result-feature-f-1").click();
+  await page.getByTestId(`search-result-feature-${FIXTURE_IDS.f1}`).click();
 
-  await expect(page).toHaveURL(/\/feature\/f-1$/);
+  await expect(page).toHaveURL(/\/feature\/FIXTURE_IDS.f1$/);
   await expect(page.getByTestId("feature-detail-screen")).toBeVisible();
 });
 

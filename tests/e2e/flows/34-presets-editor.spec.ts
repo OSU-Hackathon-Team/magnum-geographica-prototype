@@ -1,14 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
 async function loginAsAdmin(page: Page) {
@@ -19,52 +20,26 @@ async function loginAsAdmin(page: Page) {
   await expect(page).toHaveURL(/\/explore$/);
 }
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("Admin preset editor (§21.4)", () => {
   test("editor opens for an existing preset", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${BASE}/admin/presets/preset-1`);
+    await page.goto(`${BASE}/admin/presets/FIXTURE_IDS.preset1`);
     await expect(page.getByTestId("admin-preset-editor")).toBeVisible();
-    // preset-1 (bench) is loaded with its key non-editable.
+    // FIXTURE_IDS.preset1 (bench) is loaded with its key non-editable.
     await expect(page.getByTestId("preset-key")).toHaveValue("bench");
   });
 
   test("editor shows the label, sort order, and upstreamable switch", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${BASE}/admin/presets/preset-1`);
+    await page.goto(`${BASE}/admin/presets/FIXTURE_IDS.preset1`);
     await expect(page.getByTestId("preset-label")).toHaveValue("Bench");
     await expect(page.getByTestId("preset-sort-order")).toHaveValue("10");
   });
 
   test("category chips render and clicking one changes selection", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${BASE}/admin/presets/preset-1`);
+    await page.goto(`${BASE}/admin/presets/FIXTURE_IDS.preset1`);
     // Categories are rest_shelter, water_sanitation, navigation,
     // hazards_obstacles, landmarks.
     await expect(page.getByTestId("preset-category-rest_shelter")).toBeVisible();
@@ -75,16 +50,16 @@ test.describe("Admin preset editor (§21.4)", () => {
 
   test("questions block shows existing questions for a preset", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${BASE}/admin/presets/preset-1`);
-    // preset-1 (bench) has 2 questions: material (select) and backrest (boolean).
+    await page.goto(`${BASE}/admin/presets/FIXTURE_IDS.preset1`);
+    // FIXTURE_IDS.preset1 (bench) has 2 questions: material (select) and backrest (boolean).
     await expect(page.getByTestId("preset-q-0-label")).toBeVisible();
     await expect(page.getByTestId("preset-q-1-label")).toBeVisible();
   });
 
   test("add a question adds a new card", async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${BASE}/admin/presets/preset-3`);
-    // preset-3 (shelter) has 1 question. Add another.
+    await page.goto(`${BASE}/admin/presets/FIXTURE_IDS.preset3`);
+    // FIXTURE_IDS.preset3 (shelter) has 1 question. Add another.
     const before = await page.locator('[data-testid^="preset-q-"]').count();
     await page.getByTestId("preset-add-question").click();
     const after = await page.locator('[data-testid^="preset-q-"]').count();
@@ -96,7 +71,7 @@ test.describe("Admin preset editor (§21.4)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/presets/preset-1", {
+    const res = await apiFetch(page, "/api/presets/FIXTURE_IDS.preset1", {
       method: "PUT",
       token,
       body: { label: "Bench (renamed)" },
@@ -111,7 +86,7 @@ test.describe("Admin preset editor (§21.4)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/presets", {
+    const res = await apiFetch(page, "/api/presets", {
       method: "POST",
       token,
       body: {
@@ -143,7 +118,7 @@ test.describe("Admin preset editor (§21.4)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/presets/preset-1", {
+    const res = await apiFetch(page, "/api/presets/FIXTURE_IDS.preset1", {
       method: "PUT",
       token,
       body: { label: "Hacked" },

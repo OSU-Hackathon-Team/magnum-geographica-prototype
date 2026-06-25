@@ -1,42 +1,16 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("New system form (§21.5)", () => {
   test("new-system page is reachable", async ({ page }) => {
@@ -124,7 +98,7 @@ test.describe("New system form (§21.5)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/systems", {
+    const res = await apiFetch(page, "/api/systems", {
       method: "POST",
       token,
       body: {
@@ -152,7 +126,7 @@ test.describe("New system form (§21.5)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/systems", {
+    const res = await apiFetch(page, "/api/systems", {
       method: "POST",
       token,
       body: { slug: "missing-name" },

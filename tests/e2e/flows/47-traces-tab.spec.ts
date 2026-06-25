@@ -1,14 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
 async function registerAndLogin(page: Page, username: string, email: string) {
@@ -45,18 +46,18 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
 
   test("tab heading shows the count of seeded traces", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    // The mock seeds 2 traces into sys-1 (trace-1, trace-2).
+    // The mock seeds 2 traces into FIXTURE_IDS.sys1 (FIXTURE_IDS.trace1, FIXTURE_IDS.trace2).
     await expect(page.getByTestId("system-traces-tab-content")).toContainText("Traces (2)");
   });
 
   test("each seeded trace renders as a row with vote controls", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await expect(page.getByTestId("traces-row-trace-1")).toBeVisible();
-    await expect(page.getByTestId("traces-row-trace-2")).toBeVisible();
+    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1")).toBeVisible();
+    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace2")).toBeVisible();
     // Per-row vote controls (§21.7 vote control on trace rows).
-    await expect(page.getByTestId("traces-row-trace-1-up")).toBeVisible();
-    await expect(page.getByTestId("traces-row-trace-1-score")).toBeVisible();
-    await expect(page.getByTestId("traces-row-trace-1-down")).toBeVisible();
+    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-up")).toBeVisible();
+    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-score")).toBeVisible();
+    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-down")).toBeVisible();
   });
 
   test("organize button navigates to the organize page", async ({ page }) => {
@@ -64,8 +65,8 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     const button = page.getByTestId("traces-organize");
     await button.scrollIntoViewIfNeeded();
     await button.click();
-    // The button uses the system id (sys-1), not the slug.
-    await expect(page).toHaveURL(/\/system\/sys-1\/organize/);
+    // The button uses the system id (FIXTURE_IDS.sys1), not the slug.
+    await expect(page).toHaveURL(/\/system\/FIXTURE_IDS.sys1\/organize/);
   });
 
   test("upload button navigates to the upload sheet", async ({ page }) => {
@@ -73,15 +74,15 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     const button = page.getByTestId("traces-upload");
     await button.scrollIntoViewIfNeeded();
     await button.click();
-    await expect(page).toHaveURL(/\/system\/sys-1\/traces\/upload/);
+    await expect(page).toHaveURL(/\/system\/FIXTURE_IDS.sys1\/traces\/upload/);
     await expect(page.getByTestId("system-upload-trace-sheet")).toBeVisible();
   });
 
   test("upvote increments the trace score", async ({ page }) => {
     await registerAndLogin(page, "tracevoter", "tracevoter@example.com");
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    const up = page.getByTestId("traces-row-trace-1-up");
-    const score = page.getByTestId("traces-row-trace-1-score");
+    const up = page.getByTestId("traces-row-FIXTURE_IDS.trace1-up");
+    const score = page.getByTestId("traces-row-FIXTURE_IDS.trace1-score");
     // Read the initial numeric portion (text is "3score" or "3votes"
     // depending on TraceRow's labels).
     const beforeText = ((await score.textContent()) ?? "0").trim();
@@ -100,18 +101,18 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     // row for users with role=admin. The mock's getAllDownloadedSystems
     // path may not surface it for unauthenticated visitors, so we
     // assert the button renders for admin only.
-    await expect(page.getByTestId("traces-row-trace-1-remove")).toBeVisible();
+    await expect(page.getByTestId("traces-row-FIXTURE_IDS.trace1-remove")).toBeVisible();
   });
 
-  test("GET /api/traces?system_id=sys-1 returns the seeded traces", async ({ page }) => {
+  test("GET /api/traces?system_id=FIXTURE_IDS.sys1 returns the seeded traces", async ({ page }) => {
     await page.goto(`${BASE}/explore`);
     const res = await page.evaluate(async () => {
-      const r = await fetch("http://localhost:9999/api/traces?system_id=sys-1");
+      const r = await fetch("/api/traces?system_id=FIXTURE_IDS.sys1");
       return r.json();
     });
     const body = res as { items: Array<{ id: string; source: string }>; total: number };
     expect(body.total).toBe(2);
-    expect(body.items.map((t) => t.id).sort()).toEqual(["trace-1", "trace-2"]);
+    expect(body.items.map((t) => t.id).sort()).toEqual([`${FIXTURE_IDS.trace1}`, `${FIXTURE_IDS.trace2}`]);
     expect(body.items.some((t) => t.source === "recorded")).toBe(true);
     expect(body.items.some((t) => t.source === "import")).toBe(true);
   });
@@ -121,7 +122,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     const token = await getToken(page);
     const res = await page.evaluate(
       async ({ token }) => {
-        const r = await fetch("http://localhost:9999/api/traces/trace-1/vote", {
+        const r = await fetch("/api/traces/FIXTURE_IDS.trace1/vote", {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -135,7 +136,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     );
     const body = res as { upvotes: number; downvotes: number; net: number; my_vote: number };
     expect(body.my_vote).toBe(-1);
-    // trace-1 starts at ups=3, downs=0. The new -1 flips net from 3 to 2.
+    // FIXTURE_IDS.trace1 starts at ups=3, downs=0. The new -1 flips net from 3 to 2.
     expect(body.net).toBe(2);
     expect(body.upvotes).toBe(3);
     expect(body.downvotes).toBe(1);
@@ -144,14 +145,14 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
   test("downvote weight below 0.3 flips status to 'ignored'", async ({ page }) => {
     // Build enough downvotes to push weight under 0.3.
     // We use the mock's trust-score-weighted logic: each distinct
-    // voter adds a -1. trace-1 starts with weight 1.0, upvotes=3,
+    // voter adds a -1. FIXTURE_IDS.trace1 starts with weight 1.0, upvotes=3,
     // downvotes=0. Adding 4 distinct downvoters: up=3, down=4 →
     // w = (3+1-4) / (3+4+2) = 0/9 = 0 (well under 0.3).
     const tokens: string[] = [];
     for (let i = 0; i < 4; i++) {
       const reg = await page.evaluate(
         async (i) => {
-          const r = await fetch("http://localhost:9999/api/auth/register", {
+          const r = await fetch("/api/auth/register", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
@@ -170,7 +171,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     for (const t of tokens) {
       await page.evaluate(
         async (t) => {
-          await fetch("http://localhost:9999/api/traces/trace-1/vote", {
+          await fetch("/api/traces/FIXTURE_IDS.trace1/vote", {
             method: "POST",
             headers: {
               "content-type": "application/json",
@@ -183,7 +184,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
       );
     }
     const res = await page.evaluate(async () => {
-      const r = await fetch("http://localhost:9999/api/traces/trace-1");
+      const r = await fetch("/api/traces/FIXTURE_IDS.trace1");
       return r.json();
     });
     const t = res as { status: string; weight: number; downvotes: number };

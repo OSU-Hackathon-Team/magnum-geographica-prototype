@@ -1,14 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
 /** Register a user via the form. */
@@ -22,33 +23,6 @@ async function registerUser(page: Page, username: string, email: string) {
   await expect(page).toHaveURL(/\/explore$/);
 }
 
-/** Make a fetch call inside the browser so the page.route mock intercepts it. */
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("Trust tier thresholds (§21.7)", () => {
   test("karma 0 → tier 'New'", async ({ page }) => {
@@ -58,13 +32,13 @@ test.describe("Trust tier thresholds (§21.7)", () => {
   });
 
   test("karma endpoint reflects tier based on trust_score", async ({ page }) => {
-    const adminKarma = await browserFetch(page, "/api/votes/users/admin-1/karma");
+    const adminKarma = await apiFetch(page, "/api/votes/users/FIXTURE_IDS.userAdmin/karma");
     expect(adminKarma.status).toBe(200);
     const body = adminKarma.body as { tier: string; karma: number };
     expect(body.tier).toBe("trusted");
     expect(body.karma).toBe(999);
 
-    const missing = await browserFetch(page, "/api/votes/users/does-not-exist/karma");
+    const missing = await apiFetch(page, "/api/votes/users/does-not-exist/karma");
     expect(missing.status).toBe(404);
   });
 
@@ -81,17 +55,17 @@ test.describe("Trust tier thresholds (§21.7)", () => {
     });
     const token = auth.replace(/"/g, "");
 
-    const moveRes = await browserFetch(page, "/api/systems/sys-1/move", {
+    const moveRes = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/move", {
       method: "POST",
       token,
-      body: { action: "move_to_super", target_super_id: "super-1" },
+      body: { action: "move_to_super", target_super_id: `${FIXTURE_IDS.super1}` },
     });
     expect(moveRes.status).toBe(403);
   });
 
   test("Established tier (karma 50) → move_to_super succeeds", async ({ page }) => {
     // Register a high-trust user via the API directly, then move.
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "high_trust_user",
@@ -103,10 +77,10 @@ test.describe("Trust tier thresholds (§21.7)", () => {
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
 
-    const moveRes = await browserFetch(page, "/api/systems/sys-1/move", {
+    const moveRes = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/move", {
       method: "POST",
       token: access_token,
-      body: { action: "move_to_super", target_super_id: "super-1" },
+      body: { action: "move_to_super", target_super_id: `${FIXTURE_IDS.super1}` },
     });
     expect(moveRes.status).toBe(200);
   });

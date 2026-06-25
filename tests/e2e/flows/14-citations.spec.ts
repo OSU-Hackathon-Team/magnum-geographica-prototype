@@ -1,13 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 test.beforeEach(async ({ page }) => {
-  resetApiMock();
-  await installApiMock(page);
+  resetApi();
+  await installApi(page);
 });
 
 test("citations tab is accessible from wiki editor", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15000 });
     await page.getByTestId("wiki-tab-citations").click();
@@ -22,7 +23,7 @@ test("citations tab is accessible from wiki editor", async ({ page }) => {
 });
 
 test("citation form renders empty state initially", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15000 });
     await page.getByTestId("wiki-tab-citations").click();

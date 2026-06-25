@@ -1,14 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
 async function registerAndLogin(page: Page, username: string, email: string) {
@@ -27,32 +28,6 @@ async function getToken(page: Page): Promise<string> {
   });
 }
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("Upload Trace bottom sheet (§21.3.2)", () => {
   test("FAB is visible on the explore tab", async ({ page }) => {
@@ -177,7 +152,7 @@ test.describe("Upload Trace bottom sheet (§21.3.2)", () => {
         [-82.5398, 39.4368],
       ],
     };
-    const res = await browserFetch(page, "/api/traces/import", {
+    const res = await apiFetch(page, "/api/traces/import", {
       method: "POST",
       token,
       body: {
@@ -196,13 +171,13 @@ test.describe("Upload Trace bottom sheet (§21.3.2)", () => {
     expect(body.points).toBe(3);
     // The trace is auto-tagged into the bounding box of a seeded system.
     expect(body.tagged_system_ids.length).toBeGreaterThanOrEqual(1);
-    expect(body.tagged_system_ids).toContain("sys-1");
+    expect(body.tagged_system_ids).toContain(`${FIXTURE_IDS.sys1}`);
   });
 
   test("POST /api/traces/import rejects a 1-point payload", async ({ page }) => {
     await registerAndLogin(page, "upload12", "upload12@example.com");
     const token = await getToken(page);
-    const res = await browserFetch(page, "/api/traces/import", {
+    const res = await apiFetch(page, "/api/traces/import", {
       method: "POST",
       token,
       body: {
@@ -215,7 +190,7 @@ test.describe("Upload Trace bottom sheet (§21.3.2)", () => {
 
   test("POST /api/traces/import requires authentication", async ({ page }) => {
     await page.goto(`${BASE}/explore`);
-    const res = await browserFetch(page, "/api/traces/import", {
+    const res = await apiFetch(page, "/api/traces/import", {
       method: "POST",
       body: {
         format: "geojson",

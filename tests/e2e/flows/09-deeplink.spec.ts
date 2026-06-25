@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock } from "../helpers/api-mock.js";
+import { installApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test("/explore?lat&lon&zoom deep link shows coords badge and centers the map", async ({ page }) => {
@@ -48,7 +49,7 @@ test("system detail 'View on map' opens the explore map with deep-link coords", 
 test("feature detail 'View on map' opens the explore map with deep-link coords", async ({
   page,
 }) => {
-  await page.goto("/feature/f-1");
+  await page.goto("/feature/FIXTURE_IDS.f1");
 
   await expect(page.getByTestId("feature-view-on-map")).toBeVisible();
   await page.getByTestId("feature-view-on-map").click();

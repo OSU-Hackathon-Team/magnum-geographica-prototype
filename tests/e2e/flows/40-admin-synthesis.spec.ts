@@ -1,42 +1,17 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/auth/login`);
@@ -62,7 +37,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
   test("entering a system id and clicking Load shows seeded proposals", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/admin/synthesis`);
-    await page.getByTestId("synthesis-system-input").fill("sys-1");
+    await page.getByTestId("synthesis-system-input").fill(`${FIXTURE_IDS.sys1}`);
     await page.getByTestId("synthesis-system-set").click();
     // Two seeded proposals (prop-1, prop-2) should appear.
     await expect(page.getByTestId("synthesis-row-prop-1")).toBeVisible();
@@ -72,7 +47,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
   test("tapping a proposal opens the approve/reject modal", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/admin/synthesis`);
-    await page.getByTestId("synthesis-system-input").fill("sys-1");
+    await page.getByTestId("synthesis-system-input").fill(`${FIXTURE_IDS.sys1}`);
     await page.getByTestId("synthesis-system-set").click();
     await page.getByTestId("synthesis-row-prop-1").click();
     // The modal's name input and approve/reject buttons appear.
@@ -84,7 +59,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
   test("approving a proposal removes it from the list", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/admin/synthesis`);
-    await page.getByTestId("synthesis-system-input").fill("sys-1");
+    await page.getByTestId("synthesis-system-input").fill(`${FIXTURE_IDS.sys1}`);
     await page.getByTestId("synthesis-system-set").click();
     // Verify both seeded proposals are visible.
     await expect(page.getByTestId("synthesis-row-prop-1")).toBeVisible();
@@ -101,7 +76,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
   test("rejecting a proposal removes it from the list", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/admin/synthesis`);
-    await page.getByTestId("synthesis-system-input").fill("sys-1");
+    await page.getByTestId("synthesis-system-input").fill(`${FIXTURE_IDS.sys1}`);
     await page.getByTestId("synthesis-system-set").click();
     await expect(page.getByTestId("synthesis-row-prop-1")).toBeVisible();
     await page.getByTestId("synthesis-row-prop-1").click();
@@ -123,7 +98,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/admin/synthesis-proposals?system_id=sys-1", {
+    const res = await apiFetch(page, "/api/admin/synthesis-proposals?system_id=FIXTURE_IDS.sys1", {
       token,
     });
     expect(res.status).toBe(403);
@@ -131,7 +106,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
 
   test("moderator (high trust) can list synthesis proposals", async ({ page }) => {
     // Register with high trust_score to bypass the moderator gate.
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "highmod",
@@ -142,7 +117,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    const res = await browserFetch(page, "/api/admin/synthesis-proposals?system_id=sys-1", {
+    const res = await apiFetch(page, "/api/admin/synthesis-proposals?system_id=FIXTURE_IDS.sys1", {
       token: access_token,
     });
     expect(res.status).toBe(200);

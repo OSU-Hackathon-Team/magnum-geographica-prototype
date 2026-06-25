@@ -1,13 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 test.beforeEach(async ({ page }) => {
-  resetApiMock();
-  await installApiMock(page);
+  resetApi();
+  await installApi(page);
 });
 
 test("wiki editor loads for a trail target", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   const visible = await page
     .locator("[testid='wiki-editor'], [testid='wiki-edit-loading']")
     .first()
@@ -17,7 +18,7 @@ test("wiki editor loads for a trail target", async ({ page }) => {
 });
 
 test("wiki editor has tabs: Edit, Revisions, Citations (when loaded)", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 10000 });
     await expect(page.getByTestId("wiki-tab-edit")).toBeVisible();
@@ -30,7 +31,7 @@ test("wiki editor has tabs: Edit, Revisions, Citations (when loaded)", async ({ 
 });
 
 test("wiki editor for system target loads", async ({ page }) => {
-  await page.goto("/wiki/edit/system/sys-1");
+  await page.goto("/wiki/edit/system/FIXTURE_IDS.sys1");
   const visible = await page
     .locator("[testid='wiki-editor'], [testid='wiki-edit-loading']")
     .first()

@@ -1,0 +1,10 @@
+# Preload the real-database test helper before any test file
+# imports. This is required because `db/index.ts` reads
+# `DATABASE_URL` at module-load time, so the env var must be set
+# before any test file's `import { db } from "../db/index.js"` runs.
+#
+# The preload only sets the env var; it does not connect. The
+# connection is established lazily on the first call to
+# `setupRealDb()` or `resetTestDb()`.
+[test]
+preload = ["./test/helpers/db.ts"]

@@ -9,7 +9,7 @@
     "build": "bun build src/index.ts --target=bun --outdir=dist --external pg --external postgres",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "bun test",
+    "test": "bun test --isolate",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "bun run src/migrate.ts",

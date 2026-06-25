@@ -1,49 +1,24 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("Moderator tier gating (§21.6 phase 2)", () => {
   test("POST /api/systems/:id/synthesize rejects unauthenticated callers with 401", async ({
     page,
   }) => {
     await page.goto(`${BASE}/explore`);
-    const res = await browserFetch(page, "/api/systems/sys-1/synthesize", {
+    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
       method: "POST",
     });
     expect(res.status).toBe(401);
@@ -63,7 +38,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/systems/sys-1/synthesize", {
+    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
       method: "POST",
       token,
     });
@@ -74,7 +49,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     page,
   }) => {
     // Register with role=admin which the mock treats as moderator-tier.
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "modadmin",
@@ -86,7 +61,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    const res = await browserFetch(page, "/api/systems/sys-1/synthesize", {
+    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
       method: "POST",
       token: access_token,
     });
@@ -100,7 +75,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
   }) => {
     // Register with role=contributor but trust_score=600 — the mock
     // grants moderator access based on trust_score.
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "trustymod",
@@ -112,7 +87,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    const res = await browserFetch(page, "/api/systems/sys-1/synthesize", {
+    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
       method: "POST",
       token: access_token,
     });
@@ -133,7 +108,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/admin/trails/trail-1/promote", {
+    const res = await apiFetch(page, "/api/admin/trails/FIXTURE_IDS.trail1/promote", {
       method: "POST",
       token,
       body: { to: "elevated" },

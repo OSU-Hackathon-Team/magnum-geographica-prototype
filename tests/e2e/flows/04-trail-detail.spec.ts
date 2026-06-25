@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock } from "../helpers/api-mock.js";
+import { installApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test("user opens a trail and sees the name, stats, and verified badge", async ({ page }) => {
@@ -19,18 +20,21 @@ test("user opens a trail and sees the name, stats, and verified badge", async ({
 test("user sees the trail's segments with surface types and hazard flags", async ({ page }) => {
   await page.goto("/trail/buckeye-trail");
 
-  await expect(page.getByTestId("trail-segment-seg-1")).toBeVisible();
-  await expect(page.getByTestId("trail-segment-seg-2")).toBeVisible();
-  await expect(page.getByTestId("trail-segment-length-seg-1")).toBeVisible();
-  await expect(page.getByTestId("trail-segment-hazards-seg-1")).toBeVisible();
+  await expect(page.getByTestId(`trail-segment-${FIXTURE_IDS.seg1}`)).toBeVisible();
+  await expect(page.getByTestId(`trail-segment-${FIXTURE_IDS.seg2}`)).toBeVisible();
+  await expect(page.getByTestId(`trail-segment-length-${FIXTURE_IDS.seg1}`)).toBeVisible();
+  await expect(page.getByTestId(`trail-segment-hazards-${FIXTURE_IDS.seg1}`)).toBeVisible();
 });
 
 test("user sees the trail's features with type tags", async ({ page }) => {
   await page.goto("/trail/buckeye-trail");
-  await expect(page.getByTestId("trail-feature-f-1")).toBeVisible();
-  // FeatureTypeIcon renders a single-letter abbreviation (e.g., "V" for scenic_point)
-  await expect(page.getByTestId("trail-feature-type-f-1")).toBeVisible();
-  await expect(page.getByTestId("trail-feature-type-f-1")).toContainText("V");
+  await expect(page.getByTestId(`trail-feature-${FIXTURE_IDS.f1}`)).toBeVisible();
+  // FeatureTypeIcon renders the full type tag (e.g., "scenic point")
+  // rather than a single-letter abbreviation.
+  await expect(page.getByTestId(`trail-feature-type-${FIXTURE_IDS.f1}`)).toBeVisible();
+  await expect(page.getByTestId(`trail-feature-type-${FIXTURE_IDS.f1}`)).toContainText(
+    "scenic point",
+  );
 });
 
 test("user sees an empty state for trails without features", async ({ page }) => {

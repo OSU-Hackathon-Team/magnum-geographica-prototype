@@ -1,42 +1,17 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("System Move-To sheet (§21.5)", () => {
   test("Move-To button is on the system detail page", async ({ page }) => {
@@ -59,11 +34,11 @@ test.describe("System Move-To sheet (§21.5)", () => {
   test("sheet lists super-systems (move-to-super-*)", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
     await page.getByTestId("system-move-to").click();
-    // Move-to-super options for each super system. We're moving sys-1
-    // (Hocking Hills) which is already in super-1 — but the sheet
+    // Move-to-super options for each super system. We're moving FIXTURE_IDS.sys1
+    // (Hocking Hills) which is already in FIXTURE_IDS.super1 — but the sheet
     // still shows the list.
     await expect(page.getByTestId("move-to-super-us-bike-route-50")).toBeVisible();
-    // The other super (ohio-erie-trail) is what sys-1 is already in —
+    // The other super (ohio-erie-trail) is what FIXTURE_IDS.sys1 is already in —
     // it should still appear in the list.
     await expect(page.getByTestId("move-to-super-ohio-erie-trail")).toBeVisible();
   });
@@ -106,10 +81,10 @@ test.describe("System Move-To sheet (§21.5)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/systems/sys-1/move", {
+    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/move", {
       method: "POST",
       token,
-      body: { action: "move_to_super", target_super_id: "super-1" },
+      body: { action: "move_to_super", target_super_id: `${FIXTURE_IDS.super1}` },
     });
     expect(res.status).toBe(403);
   });
@@ -127,10 +102,10 @@ test.describe("System Move-To sheet (§21.5)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/systems/sys-3/move", {
+    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys3/move", {
       method: "POST",
       token,
-      body: { action: "merge_into", target_system_id: "sys-1" },
+      body: { action: "merge_into", target_system_id: `${FIXTURE_IDS.sys1}` },
     });
     expect(res.status).toBe(200);
   });

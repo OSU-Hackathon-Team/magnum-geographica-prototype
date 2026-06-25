@@ -1,14 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
 async function registerAndLogin(page: Page, username: string, email: string) {
@@ -27,32 +28,6 @@ async function getToken(page: Page): Promise<string> {
   });
 }
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("Record Trace screen (§21.3.2 step 2)", () => {
   test("record screen renders with all controls", async ({ page }) => {
@@ -142,7 +117,7 @@ test.describe("Record Trace screen (§21.3.2 step 2)", () => {
   test("POST /api/traces creates a recorded trace and auto-tags it", async ({ page }) => {
     await registerAndLogin(page, "rec7", "rec7@example.com");
     const token = await getToken(page);
-    const res = await browserFetch(page, "/api/traces", {
+    const res = await apiFetch(page, "/api/traces", {
       method: "POST",
       token,
       body: {
@@ -165,13 +140,13 @@ test.describe("Record Trace screen (§21.3.2 step 2)", () => {
     };
     expect(body.trace.source).toBe("recorded");
     expect(body.trace.status).toBe("active");
-    expect(body.tagged_system_ids).toContain("sys-1");
+    expect(body.tagged_system_ids).toContain(`${FIXTURE_IDS.sys1}`);
   });
 
   test("POST /api/traces rejects payloads with no geometry", async ({ page }) => {
     await registerAndLogin(page, "rec8", "rec8@example.com");
     const token = await getToken(page);
-    const res = await browserFetch(page, "/api/traces", {
+    const res = await apiFetch(page, "/api/traces", {
       method: "POST",
       token,
       body: { source: "recorded" },
@@ -182,8 +157,8 @@ test.describe("Record Trace screen (§21.3.2 step 2)", () => {
   test("POST /api/traces/:id/segments records the server-side cut", async ({ page }) => {
     await registerAndLogin(page, "rec9", "rec9@example.com");
     const token = await getToken(page);
-    // Use the seeded trace-1 fixture.
-    const cut = await browserFetch(page, "/api/traces/trace-1/segments", {
+    // Use the seeded FIXTURE_IDS.trace1 fixture.
+    const cut = await apiFetch(page, "/api/traces/FIXTURE_IDS.trace1/segments", {
       method: "POST",
       token,
     });
@@ -192,9 +167,9 @@ test.describe("Record Trace screen (§21.3.2 step 2)", () => {
     expect(body.ok).toBe(true);
     expect(body.segments).toBeGreaterThanOrEqual(1);
     // GET returns the new segment in the list.
-    const list = await browserFetch(page, "/api/traces/trace-1/segments");
+    const list = await apiFetch(page, "/api/traces/FIXTURE_IDS.trace1/segments");
     expect(list.status).toBe(200);
     const listBody = list.body as { items: Array<{ trace_id: string }> };
-    expect(listBody.items.some((s) => s.trace_id === "trace-1")).toBe(true);
+    expect(listBody.items.some((s) => s.trace_id === `${FIXTURE_IDS.trace1}`)).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 /**
  * Citation CRUD end-to-end flow.
@@ -15,12 +16,12 @@ import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
  *   7. Verify the empty state reappears.
  */
 test.beforeEach(async ({ page }) => {
-  resetApiMock();
-  await installApiMock(page);
+  resetApi();
+  await installApi(page);
 });
 
 test("user can add a citation to a wiki page and then delete it", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
 
   // 1. Wait for the editor.
   try {
@@ -37,10 +38,10 @@ test("user can add a citation to a wiki page and then delete it", async ({ page 
   await page.getByTestId("wiki-editor-save").click();
 
   // After save, the editor calls router.back() — we're on the trail detail now.
-  await expect(page).toHaveURL(/\/trail\/trail-1|\/trail\/buckeye-trail/);
+  await expect(page).toHaveURL(/\/trail\/FIXTURE_IDS.trail1|\/trail\/buckeye-trail/);
 
   // 3. Re-open the editor and switch to Citations.
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
   await page.getByTestId("wiki-tab-citations").click();
   await expect(page.getByTestId("citation-form")).toBeVisible();
@@ -51,7 +52,7 @@ test("user can add a citation to a wiki page and then delete it", async ({ page 
   await page.getByTestId("citation-add-button").click();
 
   // 5. The new citation row should appear. The mock assigns ids starting at
-  //    "300" and the counter is reset by `resetApiMock()` in beforeEach.
+  //    "300" and the counter is reset by `resetApi()` in beforeEach.
   const citationRow = page.getByTestId("citation-300");
   await expect(citationRow).toBeVisible({ timeout: 10_000 });
   await expect(citationRow).toContainText("ODNR official site");
@@ -64,7 +65,7 @@ test("user can add a citation to a wiki page and then delete it", async ({ page 
 });
 
 test("adding a citation with only a title (no URL) is accepted", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
 
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
@@ -77,7 +78,7 @@ test("adding a citation with only a title (no URL) is accepted", async ({ page }
   await page.getByTestId("wiki-editor-title").fill("Test page");
   await page.getByTestId("wiki-editor-save").click();
 
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
   await page.getByTestId("wiki-tab-citations").click();
   await page.getByTestId("citation-input-title").fill("Trail sign photo");
@@ -90,7 +91,7 @@ test("adding a citation with only a title (no URL) is accepted", async ({ page }
 });
 
 test("citation form keeps the empty state until the first citation is added", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
 
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
@@ -103,7 +104,7 @@ test("citation form keeps the empty state until the first citation is added", as
   await page.getByTestId("wiki-editor-title").fill("Empty citations test");
   await page.getByTestId("wiki-editor-save").click();
 
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
   await page.getByTestId("wiki-tab-citations").click();
   await expect(page.getByTestId("citation-form")).toBeVisible();

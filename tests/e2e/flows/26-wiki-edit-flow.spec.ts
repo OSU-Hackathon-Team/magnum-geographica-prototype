@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 /**
  * Wiki edit & save end-to-end flow.
@@ -12,13 +13,13 @@ import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
  *   5. Edit again — a new revision should be created.
  */
 test.beforeEach(async ({ page }) => {
-  resetApiMock();
-  await installApiMock(page);
+  resetApi();
+  await installApi(page);
 });
 
 test("user can create a wiki page and view its content", async ({ page }) => {
   // 1. Open the editor.
-  await page.goto("/wiki/edit/trail/trail-1");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail1");
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
   } catch {
@@ -38,7 +39,7 @@ test("user can create a wiki page and view its content", async ({ page }) => {
   await page.getByTestId("wiki-editor-save").click();
 
   // 3. Navigate to the wiki view for the same target.
-  await page.goto("/wiki/trail/trail-1");
+  await page.goto("/wiki/trail/FIXTURE_IDS.trail1");
   await page.getByTestId("wiki-page-screen").waitFor({ state: "visible", timeout: 15_000 });
   await expect(page.getByTestId("wiki-page-title")).toHaveText("Buckeye Trail reference");
   await expect(page.getByTestId("wiki-page-content")).toContainText("Mostly dirt");
@@ -47,7 +48,7 @@ test("user can create a wiki page and view its content", async ({ page }) => {
 
 test("wiki revision history grows each time the page is saved", async ({ page }) => {
   // First save: creates the page (id "100") and 1 revision.
-  await page.goto("/wiki/edit/trail/trail-2");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail2");
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
   } catch {
@@ -63,7 +64,7 @@ test("wiki revision history grows each time the page is saved", async ({ page })
   // directly. Wait briefly for the API call to settle, then navigate
   // explicitly to the wiki view.
   await page.waitForTimeout(500);
-  await page.goto("/wiki/trail/trail-2");
+  await page.goto("/wiki/trail/FIXTURE_IDS.trail2");
   await page.getByTestId("wiki-page-screen").waitFor({ state: "visible", timeout: 15_000 });
 
   // Second save: opens the editor, modifies content, saves.
@@ -78,7 +79,7 @@ test("wiki revision history grows each time the page is saved", async ({ page })
   // Same: `router.back()` from a hard-loaded editor doesn't navigate, so
   // wait briefly and re-enter the editor via the view's Edit button.
   await page.waitForTimeout(500);
-  await page.goto("/wiki/trail/trail-2");
+  await page.goto("/wiki/trail/FIXTURE_IDS.trail2");
   await page.getByTestId("wiki-page-screen").waitFor({ state: "visible", timeout: 15_000 });
   await page.getByTestId("wiki-edit-button").click();
   await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
@@ -92,7 +93,7 @@ test("wiki revision history grows each time the page is saved", async ({ page })
 });
 
 test("wiki editor shows the preview tab and renders markdown", async ({ page }) => {
-  await page.goto("/wiki/edit/trail/trail-3");
+  await page.goto("/wiki/edit/trail/FIXTURE_IDS.trail3");
   try {
     await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
   } catch {

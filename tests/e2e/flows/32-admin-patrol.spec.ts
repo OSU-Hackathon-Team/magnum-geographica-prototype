@@ -1,43 +1,16 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
-/** Make a fetch call inside the browser so the page.route mock intercepts it. */
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 /** Get the bearer token from the auth store. */
 async function getToken(page: Page): Promise<string> {
@@ -97,7 +70,7 @@ test.describe("Admin patrol feed (§21.8)", () => {
     // /api/admin/patrol/act handler supports a "seed" sub-action in
     // test mode. We dispatch an event that the mock recognizes.
     const token = await getToken(page);
-    const seedRes = await browserFetch(page, "/api/admin/patrol/act", {
+    const seedRes = await apiFetch(page, "/api/admin/patrol/act", {
       method: "POST",
       token,
       body: { action: "seed", revision_id: "rev-1", reason: "new_tier_semi_edit" },

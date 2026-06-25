@@ -1,42 +1,17 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 async function loginAsAdmin(page: Page) {
   await page.goto(`${BASE}/auth/login`);
@@ -86,7 +61,7 @@ test.describe("Admin — Premium import page (§21.6 phase 2)", () => {
     await page.goto(`${BASE}/admin/import`);
     await page.getByTestId("import-name").fill("Bear Creek");
     await page.getByTestId("import-slug").fill("bear-creek");
-    await page.getByTestId("import-system").fill("sys-1");
+    await page.getByTestId("import-system").fill(`${FIXTURE_IDS.sys1}`);
     await page.getByTestId("import-geojson").fill(SAMPLE_LINE);
     await page.getByTestId("import-submit").click();
     // Success banner shows the trail name + tier.
@@ -98,7 +73,7 @@ test.describe("Admin — Premium import page (§21.6 phase 2)", () => {
     page,
   }) => {
     await page.goto(`${BASE}/explore`);
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "adminimp",
@@ -110,13 +85,13 @@ test.describe("Admin — Premium import page (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    const res = await browserFetch(page, "/api/admin/trails/import", {
+    const res = await apiFetch(page, "/api/admin/trails/import", {
       method: "POST",
       token: access_token,
       body: {
         name: "Eagle Ridge",
         slug: "eagle-ridge",
-        system_id: "sys-2",
+        system_id: `${FIXTURE_IDS.sys2}`,
         difficulty: "hard",
         geometry: JSON.parse(SAMPLE_LINE),
       },
@@ -139,13 +114,13 @@ test.describe("Admin — Premium import page (§21.6 phase 2)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await browserFetch(page, "/api/admin/trails/import", {
+    const res = await apiFetch(page, "/api/admin/trails/import", {
       method: "POST",
       token,
       body: {
         name: "Bad",
         slug: "bad-trail",
-        system_id: "sys-1",
+        system_id: `${FIXTURE_IDS.sys1}`,
         geometry: JSON.parse(SAMPLE_LINE),
       },
     });

@@ -1,42 +1,17 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+import { installApi, resetApi, apiFetch } from "../helpers/api.js";
+import { FIXTURE_IDS } from "../fixtures/ids.js";
 
 const BASE = "http://localhost:4173";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test.afterEach(() => {
-  resetApiMock();
+  resetApi();
 });
 
-async function browserFetch(
-  page: Page,
-  path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
-): Promise<{ status: number; body: unknown }> {
-  return page.evaluate(
-    async ({ path, method, body, token }) => {
-      const res = await fetch(`http://localhost:9999${path}`, {
-        method: method ?? "GET",
-        headers: {
-          "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let json: unknown = null;
-      try {
-        json = await res.json();
-      } catch {
-        // ignore
-      }
-      return { status: res.status, body: json };
-    },
-    { path, method: init.method, body: init.body, token: init.token },
-  );
-}
 
 test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
   test("trail detail page renders the TrailTierBadge with a default tier", async ({
@@ -53,7 +28,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     // Promote a real trail to synthesized via the admin endpoint.
     await page.goto(`${BASE}/explore`);
     // First, log in as admin to get a moderator-tier token.
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "mod_tier",
@@ -65,8 +40,8 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    // Promote trail-1 to synthesized via the API directly.
-    const promote = await browserFetch(page, "/api/admin/trails/trail-1/promote", {
+    // Promote FIXTURE_IDS.trail1 to synthesized via the API directly.
+    const promote = await apiFetch(page, "/api/admin/trails/FIXTURE_IDS.trail1/promote", {
       method: "POST",
       token: access_token,
       body: { to: "elevated" },
@@ -82,7 +57,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
   }) => {
     // Approve a synthesis proposal — that creates a synthesized trail
     // with derived_from_segments. Use the admin token to call the API.
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "mod_derive",
@@ -95,25 +70,25 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
     // Approve proposal prop-1 to create a synthetic trail.
-    const approve = await browserFetch(
+    const approve = await apiFetch(
       page,
       "/api/admin/synthesis-proposals/seg-prop-1/approve",
       {
         method: "POST",
         token: access_token,
-        body: { system_id: "sys-1", name: "Ridge Runner" },
+        body: { system_id: `${FIXTURE_IDS.sys1}`, name: "Ridge Runner" },
       },
     );
     expect(approve.status).toBe(200);
     const body = approve.body as { id: string; slug: string; tier: string };
     expect(body.tier).toBe("synthesized");
     // The mock returns the synthetic trail; the page can be opened.
-    const synthDetail = await browserFetch(page, `/api/trails/${body.id}`);
+    const synthDetail = await apiFetch(page, `/api/trails/${body.id}`);
     expect(synthDetail.status).toBe(200);
   });
 
   test("promoting a synthesized trail to elevated swaps the badge", async ({ page }) => {
-    const reg = await browserFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/auth/register", {
       method: "POST",
       body: {
         username: "mod_promote",
@@ -126,13 +101,13 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
     // First create a synthetic trail via approve.
-    const approve = await browserFetch(
+    const approve = await apiFetch(
       page,
       "/api/admin/synthesis-proposals/seg-prop-2/approve",
       {
         method: "POST",
         token: access_token,
-        body: { system_id: "sys-1", name: "Eagle Ridge" },
+        body: { system_id: `${FIXTURE_IDS.sys1}`, name: "Eagle Ridge" },
       },
     );
     expect(approve.status).toBe(200);
@@ -141,7 +116,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     await page.goto(`${BASE}/trail/eagle-ridge`);
     await expect(page.getByTestId("trail-tier-badge-synthesized")).toBeVisible();
     // Promote via API.
-    const promote = await browserFetch(page, `/api/admin/trails/${newId}/promote`, {
+    const promote = await apiFetch(page, `/api/admin/trails/${newId}/promote`, {
       method: "POST",
       token: access_token,
       body: { to: "elevated" },

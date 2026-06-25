@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { installApiMock } from "../helpers/api-mock.js";
+import { installApi } from "../helpers/api.js";
 
 test.beforeEach(async ({ page }) => {
-  await installApiMock(page);
+  await installApi(page);
 });
 
 test("basemap switcher is visible on the explore screen", async ({ page }) => {
