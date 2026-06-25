@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
 
+const BASE = "http://localhost:4173";
+
 test.beforeEach(async ({ page }) => {
   resetApiMock();
   await installApiMock(page);
 });
 
 test("feature creation form loads with type selector grid", async ({ page }) => {
-  await page.goto("/feature/create?lat=39.43&lon=-82.54");
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54`);
   await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
 
   await expect(page.getByTestId("feature-type-trailhead")).toBeVisible();
@@ -16,7 +18,7 @@ test("feature creation form loads with type selector grid", async ({ page }) => 
 });
 
 test("feature form has name, description, and save button", async ({ page }) => {
-  await page.goto("/feature/create?lat=39.43&lon=-82.54");
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54`);
   await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
 
   await expect(page.getByTestId("feature-form-name")).toBeVisible();
@@ -25,7 +27,7 @@ test("feature form has name, description, and save button", async ({ page }) => 
 });
 
 test("user can fill the feature form and submit", async ({ page }) => {
-  await page.goto("/feature/create?lat=39.43&lon=-82.54");
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54`);
   await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
 
   await page.getByTestId("feature-type-trailhead").click();
@@ -51,7 +53,7 @@ test("user can fill the feature form and submit", async ({ page }) => {
 });
 
 test("user can select other feature types", async ({ page }) => {
-  await page.goto("/feature/create?lat=39.43&lon=-82.54");
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54`);
   await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
 
   await page.getByTestId("feature-type-shelter").click();
@@ -59,3 +61,26 @@ test("user can select other feature types", async ({ page }) => {
   await page.getByTestId("feature-type-restroom").click();
   // All type buttons should be clickable
 });
+
+test("create-feature URL accepts preset and system_id query params", async ({ page }) => {
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54&preset_id=preset-1&system_id=sys-1`);
+  await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
+  // The form should still render even with the extra params.
+  await expect(page.getByTestId("feature-form-name")).toBeVisible();
+});
+
+test("anonymous user cannot submit a feature (no auth → no token)", async ({ page }) => {
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54`);
+  await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
+  await page.getByTestId("feature-type-trailhead").click();
+  await page.getByTestId("feature-form-name").fill("Anon Trailhead");
+  await page.getByTestId("feature-form-save").click();
+  // Anonymous create: the mock requires auth and returns 401. The form
+  // may stay visible with an error or navigate. We just check that
+  // the form/feature-detail either stays or shows an error.
+  await page.waitForTimeout(2000);
+  const hasForm = await page.getByTestId("create-feature-form").isVisible().catch(() => false);
+  const hasError = await page.getByTestId("create-feature-error").isVisible().catch(() => false);
+  expect(hasForm || hasError).toBe(true);
+});
+

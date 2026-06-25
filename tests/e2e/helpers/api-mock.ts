@@ -39,6 +39,26 @@ function bearerUser(headers: Record<string, string>): { id: string } | null {
   return { id };
 }
 
+/**
+ * Gate the moderator-tier routes (§21.6 phase 2 — synthesis, premium
+ * import, trail promotion). The real impl checks `user.tier`, but the
+ * mock maps "admin" and "moderator" roles to the moderator tier; high
+ * trust_score (>= 500) also unlocks it for test users seeded via the
+ * register form.
+ */
+function requireModerator(
+  headers: Record<string, string>,
+): { status: number; body: unknown } | null {
+  const token = bearerUser(headers);
+  if (!token) return { status: 401, body: { error: "unauthorized" } };
+  const u = MOCK_USERS[token.id];
+  if (!u) return { status: 401, body: { error: "unauthorized" } };
+  if (u.role !== "admin" && u.role !== "moderator" && u.trust_score < 500) {
+    return { status: 403, body: { error: "forbidden", message: "moderator tier required" } };
+  }
+  return null;
+}
+
 function ok(body: Json, status = 200) {
   return { status, body };
 }
@@ -227,6 +247,56 @@ const PATROL_FLAGS: Array<{
   details: Record<string, unknown> | null;
 }> = [];
 let nextPatrolId = 1;
+
+// --- §21.6 phase 2 — synthesis + premium import --------------------
+const SYNTHESIS_PROPOSALS: Array<{
+  id: string;
+  trace_id: string;
+  segment_id: string;
+  cluster_id: number | null;
+  reason: "no_nearby_trail";
+}> = [];
+let nextProposalId = 1;
+const SYNTHETIC_TRAILS: Array<{
+  id: string;
+  name: string;
+  slug: string;
+  tier: "synthesized" | "elevated" | "premium";
+  system_id: string | null;
+  difficulty: string | null;
+}> = [];
+let nextSyntheticTrailId = 1;
+
+function seedSynthesisFixtures() {
+  SYNTHESIS_PROPOSALS.length = 0;
+  SYNTHESIS_PROPOSALS.push(
+    {
+      id: "prop-1",
+      trace_id: "trace-1",
+      segment_id: "seg-prop-1",
+      cluster_id: 1,
+      reason: "no_nearby_trail",
+    },
+    {
+      id: "prop-2",
+      trace_id: "trace-1",
+      segment_id: "seg-prop-2",
+      cluster_id: 1,
+      reason: "no_nearby_trail",
+    },
+  );
+  nextProposalId = 3;
+  SYNTHETIC_TRAILS.length = 0;
+  SYNTHETIC_TRAILS.push({
+    id: "trail-synth-1",
+    name: "Old Man's Loop",
+    slug: "old-mans-loop",
+    tier: "synthesized",
+    system_id: "sys-1",
+    difficulty: "easy",
+  });
+  nextSyntheticTrailId = 2;
+}
 
 // --- Fixture seeders (called from resetApiMock) -------------------------
 //
@@ -459,9 +529,13 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     },
   },
   {
-    pattern: /\/api\/systems\/([^/]+)$/,
+    // Match /api/systems/<id> but skip reserved path segments like
+    // "tree", "contains", "by-slug" that have their own handlers.
+    pattern: /\/api\/systems\/([^/?]+)$/,
     handler: ({ url }) => {
       const id = url.pathname.split("/").pop();
+      // Reserved words are handled by other routes; skip here.
+      if (!id || id === "tree" || id === "contains" || id === "by-slug") return undefined;
       const system = SYSTEMS.find((s) => s.id === id);
       return system ? ok(system) : notFound(`system ${id} not found`);
     },
@@ -483,7 +557,15 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     handler: ({ url }) => {
       const slug = url.pathname.split("/").pop();
       const trail = TRAILS.find((t) => t.slug === slug);
-      return trail ? ok(trail) : notFound(`trail '${slug}' not found`);
+      if (!trail) return notFound(`trail '${slug}' not found`);
+      // Enrich with tier info from SYNTHETIC_TRAILS if the id matches.
+      // Default to "synthesized" so the badge renders (the real DB
+      // tags every trail with a tier; the test fixtures don't).
+      const synth = SYNTHETIC_TRAILS.find((t) => t.id === trail.id);
+      return ok({
+        ...trail,
+        tier: (trail as { tier?: string }).tier ?? synth?.tier ?? "synthesized",
+      });
     },
   },
   {
@@ -491,7 +573,29 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     handler: ({ url }) => {
       const id = url.pathname.split("/").pop();
       const trail = TRAILS.find((t) => t.id === id);
-      return trail ? ok(trail) : notFound(`trail ${id} not found`);
+      if (trail) {
+        const synth = SYNTHETIC_TRAILS.find((t) => t.id === trail.id);
+        return ok({
+          ...trail,
+          tier: (trail as { tier?: string }).tier ?? synth?.tier ?? "synthesized",
+        });
+      }
+      // Synthesized trails (created via the approval flow) live in
+      // SYNTHETIC_TRAILS rather than the TRAILS fixture.
+      const synth = SYNTHETIC_TRAILS.find((t) => t.id === id);
+      if (synth) {
+        return ok({
+          id: synth.id,
+          name: synth.name,
+          slug: synth.slug,
+          tier: synth.tier,
+          system_id: synth.system_id,
+          difficulty: synth.difficulty,
+          derived_from_segments: 1,
+          last_synthesized_at: "2026-06-21T00:00:00.000Z",
+        });
+      }
+      return notFound(`trail ${id} not found`);
     },
   },
   {
@@ -522,8 +626,20 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
     pattern: /\/api\/features\/([^/]+)$/,
     handler: ({ url }) => {
       const id = url.pathname.split("/").pop();
-      const feature = id ? FEATURES[id] : undefined;
-      return feature ? ok(feature) : notFound(`feature ${id} not found`);
+      const feature = id ? (FEATURES[id] as Record<string, unknown> | undefined) : undefined;
+      if (!feature) return notFound(`feature ${id} not found`);
+      // Enrich with preset_questions from the linked preset so the
+      // feature detail screen can render answer badges (§21.4.4).
+      const presetId = feature.preset_id as string | undefined;
+      const preset = presetId ? PRESETS.find((p) => p.id === presetId) : undefined;
+      return ok({
+        ...feature,
+        preset_questions: preset?.questions ?? null,
+        preset_label: preset?.label ?? feature.preset_label ?? null,
+        preset_key: preset?.key ?? feature.preset_key ?? null,
+        preset_icon_name: preset?.icon_name ?? feature.preset_icon_name ?? null,
+        preset_icon_color: preset?.icon_color ?? feature.preset_icon_color ?? null,
+      });
     },
   },
   // --- Wiki pages: GET by target_type + target_id ---
@@ -786,26 +902,43 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
         const b = body as {
           name?: string;
           type_tag?: string;
+          preset_id?: string;
           lat?: number;
           lon?: number;
+          point?: { type: string; coordinates: [number, number] };
           description?: string;
           trail_id?: string;
           system_id?: string;
           contributor_name?: string;
+          answers?: Record<string, unknown>;
         };
-        if (!b?.name || !b?.type_tag)
-          return { status: 400, body: { error: "missing name/type_tag" } };
+        if (!b?.name) return { status: 400, body: { error: "missing name" } };
+        // Either preset_id or type_tag is required.
+        if (!b.preset_id && !b.type_tag) {
+          return { status: 400, body: { error: "missing type_tag" } };
+        }
+        // Resolve type_tag from preset_id if needed.
+        let typeTag = b.type_tag;
+        if (!typeTag && b.preset_id) {
+          const preset = PRESETS.find((p) => p.id === b.preset_id);
+          typeTag = preset?.key ?? "feature";
+        }
         const id = `f-${nextFeatureId++}`;
+        // Extract lat/lon from point if present.
+        const point = b.point?.coordinates ?? null;
+        const lon = point ? point[0] : (b.lon ?? -83.0);
+        const lat = point ? point[1] : (b.lat ?? 39.0);
         const feature = {
           id,
           name: b.name,
-          type_tag: b.type_tag,
+          type_tag: typeTag,
+          preset_id: b.preset_id ?? null,
           description: b.description ?? null,
           trail_id: b.trail_id ?? null,
           system_id: b.system_id ?? null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          center: { lat: b.lat ?? 39.0, lon: b.lon ?? -83.0 },
+          center: { lat, lon },
         };
         (FEATURES as Record<string, unknown>)[id] = feature;
         const trailId = b.trail_id ?? "trail-1";
@@ -1791,13 +1924,161 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
       return ok({
         systems: SYSTEMS.filter((s) => s.name.toLowerCase().includes(q)),
         trails: TRAILS.filter((t) => t.name.toLowerCase().includes(q)),
-        features: q
+          features: q
           ? allFeatures.filter((f) => {
               const name = String((f as { name?: string }).name ?? "").toLowerCase();
               return name.includes(q);
             })
           : [],
       });
+    },
+  },
+  // ===========================================================================
+  // §21.6 phase 2 — synthesis + premium import (moderator tier)
+  // ===========================================================================
+  {
+    pattern: /\/api\/systems\/([^/]+)\/synthesize$/,
+    handler: ({ url, method, headers }) => {
+      const err = requireModerator(headers);
+      if (err) return err;
+      if (method !== "POST") return undefined;
+      const systemId = url.pathname.split("/")[3];
+      const system = SYSTEMS.find((s) => s.id === systemId);
+      if (!system) return notFound("system not found");
+      // Mock: pretend 0 segments were cut and 1 proposal was queued.
+      const newProp = {
+        id: `prop-${nextProposalId++}`,
+        trace_id: "trace-1",
+        segment_id: `seg-new-${Date.now().toString(36)}`,
+        cluster_id: 1,
+        reason: "no_nearby_trail" as const,
+      };
+      SYNTHESIS_PROPOSALS.push(newProp);
+      return ok({
+        run: {
+          id: `run-${Date.now().toString(36)}`,
+          status: "completed",
+          trails_updated: 0,
+          trails_proposed: 1,
+        },
+        clusters: 1,
+        assigned: 0,
+        proposed: 1,
+        trails_updated: 0,
+      });
+    },
+  },
+  {
+    pattern: /\/api\/admin\/synthesis-proposals$/,
+    handler: ({ query, method, headers }) => {
+      const err = requireModerator(headers);
+      if (err) return err;
+      if (method !== "GET") return undefined;
+      const systemId = query.system_id;
+      if (!systemId) return { status: 400, body: { error: "system_id is required" } };
+      return ok({ proposals: SYNTHESIS_PROPOSALS });
+    },
+  },
+  {
+    pattern: /\/api\/admin\/synthesis-proposals\/([^/]+)\/approve$/,
+    handler: ({ url, method, body, headers }) => {
+      const err = requireModerator(headers);
+      if (err) return err;
+      if (method !== "POST") return undefined;
+      const segmentId = url.pathname.split("/")[4];
+      const b = body as { system_id?: string; name?: string };
+      if (!b?.system_id || !b?.name) {
+        return { status: 400, body: { error: "system_id and name are required" } };
+      }
+      const idx = SYNTHESIS_PROPOSALS.findIndex((p) => p.segment_id === segmentId);
+      if (idx >= 0) SYNTHESIS_PROPOSALS.splice(idx, 1);
+      const slug = b.name
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const trail = {
+        id: `trail-synth-${nextSyntheticTrailId++}`,
+        name: b.name,
+        slug,
+        tier: "synthesized" as const,
+        system_id: b.system_id,
+        difficulty: null,
+      };
+      SYNTHETIC_TRAILS.push(trail);
+      return ok(trail);
+    },
+  },
+  {
+    pattern: /\/api\/admin\/synthesis-proposals\/([^/]+)\/reject$/,
+    handler: ({ url, method, body, headers }) => {
+      const err = requireModerator(headers);
+      if (err) return err;
+      if (method !== "POST") return undefined;
+      const segmentId = url.pathname.split("/")[4];
+      const b = body as { system_id?: string };
+      if (!b?.system_id) return { status: 400, body: { error: "system_id is required" } };
+      const idx = SYNTHESIS_PROPOSALS.findIndex((p) => p.segment_id === segmentId);
+      if (idx >= 0) SYNTHESIS_PROPOSALS.splice(idx, 1);
+      return ok({ ok: true });
+    },
+  },
+  {
+    pattern: /\/api\/admin\/trails\/([^/]+)\/promote$/,
+    handler: ({ url, method, body, headers }) => {
+      const err = requireModerator(headers);
+      if (err) return err;
+      if (method !== "POST") return undefined;
+      const trailId = url.pathname.split("/")[4];
+      const b = body as { to?: "elevated" | "premium" };
+      if (!b?.to || (b.to !== "elevated" && b.to !== "premium")) {
+        return { status: 400, body: { error: "to must be 'elevated' or 'premium'" } };
+      }
+      const synth = SYNTHETIC_TRAILS.find((t) => t.id === trailId);
+      if (synth) {
+        synth.tier = b.to;
+        return ok({ id: synth.id, tier: synth.tier });
+      }
+      const t = (TRAILS as Array<{ id: string; tier?: string }>).find((x) => x.id === trailId);
+      if (t) {
+        t.tier = b.to;
+        return ok({ id: t.id, tier: t.tier });
+      }
+      return notFound("trail not found");
+    },
+  },
+  {
+    pattern: /\/api\/admin\/trails\/import$/,
+    handler: ({ method, body, headers }) => {
+      const err = requireModerator(headers);
+      if (err) return err;
+      if (method !== "POST") return undefined;
+      const b = body as {
+        name?: string;
+        slug?: string;
+        system_id?: string;
+        difficulty?: string;
+        external_url?: string;
+        geometry?: unknown;
+      };
+      if (!b?.name || !b?.slug || !b?.system_id || !b?.geometry) {
+        return {
+          status: 400,
+          body: { error: "name, slug, system_id, and geometry are required" },
+        };
+      }
+      if (!/^[a-z0-9-]+$/.test(b.slug)) {
+        return { status: 400, body: { error: "slug must be kebab-case" } };
+      }
+      const trail = {
+        id: `trail-prem-${Date.now().toString(36)}`,
+        name: b.name,
+        slug: b.slug,
+        tier: "premium" as const,
+        system_id: b.system_id,
+        difficulty: b.difficulty ?? null,
+      };
+      SYNTHETIC_TRAILS.push(trail);
+      return ok(trail, 201);
     },
   },
 ];
@@ -1835,6 +2116,7 @@ export function resetApiMock() {
   REVISIONS.length = 0;
   seedHierarchyFixtures();
   seedPresetsFixtures();
+  seedSynthesisFixtures();
   nextWikiId = 100;
   nextRevId = 200;
   nextCitationId = 300;
@@ -1850,6 +2132,19 @@ export function resetApiMock() {
 }
 
 export async function installApiMock(page: Page, opts: { failAll?: boolean } = {}) {
+  // Lazy-seed: if the test file's beforeEach didn't call resetApiMock
+  // (e.g. when a spec runs standalone), make sure the redux §21
+  // fixtures are present so the first test in the file has a valid
+  // baseline. Idempotent.
+  ensureAdminSeeded();
+  ensureFixtureUsersSeeded();
+  if (PRESETS.length === 0 || SUPER_SYSTEMS.length === 0) {
+    seedPresetsFixtures();
+    seedHierarchyFixtures();
+  }
+  if (SYNTHESIS_PROPOSALS.length === 0) {
+    seedSynthesisFixtures();
+  }
   await page.route(`http://${MOCK_API_HOST}/**`, async (route: Route) => {
     if (opts.failAll) {
       await route.fulfill({ status: 500, body: JSON.stringify({ error: "boom" }) });

@@ -13,6 +13,7 @@ import {
 } from "@magnum/shared";
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
+import { TrailTierBadge } from "../../src/components/ui/TrailTierBadge";
 import { SegmentTypeBadge } from "../../src/components/ui/SegmentTypeBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
@@ -501,6 +502,7 @@ export default function TrailDetail() {
               {trail.name}
             </Text>
             {trail.difficulty ? <DifficultyBadge difficulty={trail.difficulty} /> : null}
+            {trail.tier ? <TrailTierBadge tier={trail.tier} /> : null}
           </View>
           <View style={styles.statsRow} testID="trail-stats">
             {trail.length_meters ? (
@@ -519,6 +521,18 @@ export default function TrailDetail() {
               </Text>
             ) : null}
           </View>
+          {trail.tier === "synthesized" && trail.derived_from_segments != null ? (
+            <Text style={styles.body} testID="trail-derived-from">
+              Derived from {trail.derived_from_segments} segment
+              {trail.derived_from_segments === 1 ? "" : "s"}
+              {trail.derived_from_traces != null
+                ? ` / ${trail.derived_from_traces} trace${trail.derived_from_traces === 1 ? "" : "s"}`
+                : ""}
+              {trail.last_synthesized_at
+                ? ` · regen ${new Date(trail.last_synthesized_at).toLocaleDateString()}`
+                : ""}
+            </Text>
+          ) : null}
           {trail.description ? <Text style={styles.body}>{trail.description}</Text> : null}
           <ViewOnMapButton center={trail.center ?? null} zoom={11} testID="trail-view-on-map" />
         </View>

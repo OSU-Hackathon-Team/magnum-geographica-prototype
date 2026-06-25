@@ -676,10 +676,10 @@ export function createMockDb(): { db: Database; state: MockState } {
         const target = pickTableArray(state, tableName);
         const fn = compileWhere(whereFilter);
         if (!target || !fn) {
-          return Promise.resolve([{ id: "00000000-0000-0000-0000-000000000001" }]);
+          return Promise.resolve([]);
         }
         const rows = target.filter((r) => fn(r as Record<string, unknown>));
-        return Promise.resolve(rows.length > 0 ? rows : [{ id: "00000000-0000-0000-0000-000000000001" }]);
+        return Promise.resolve(rows);
       };
       return chain;
     },

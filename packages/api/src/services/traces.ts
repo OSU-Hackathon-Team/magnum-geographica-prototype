@@ -41,6 +41,13 @@ import {
 } from "@magnum/shared/constants";
 import { castVote, retractVote } from "./votes.js";
 
+/**
+ * Weight floor (§21.6 trace lifecycle). A trace whose Wilson weight
+ * drops below this is auto-set to status='ignored' and excluded from
+ * future synthesis runs. The vote history is preserved.
+ */
+export const TRACE_WEIGHT_IGNORED_FLOOR = 0.3;
+
 export interface CreateTraceInput {
   coordinates: Array<[number, number]>;
   source: TraceSource;
@@ -290,10 +297,19 @@ export async function voteOnTrace(
     contributorName: actor.contributorName,
   });
   // Mirror the tally on the trace row so list views don't need to
-  // join the votes table on every query.
+  // join the votes table on every query. Also recompute the Wilson-
+  // style weight and auto-flip the status to "ignored" when the
+  // weight drops below 0.3 — that excludes the trace from future
+  // synthesis passes without losing the vote history.
+  const weight = computeTraceWeight(result.upvotes, result.downvotes);
   await db
     .update(gpsTraces)
-    .set({ upvotes: result.upvotes, downvotes: result.downvotes })
+    .set({
+      upvotes: result.upvotes,
+      downvotes: result.downvotes,
+      weight,
+      status: weight < TRACE_WEIGHT_IGNORED_FLOOR ? "ignored" : "active",
+    })
     .where(eq(gpsTraces.id, traceId));
   return result;
 }
@@ -303,11 +319,27 @@ export async function retractTraceVote(
   userId: string,
 ): Promise<TraceVoteResult> {
   const result = await retractVote("trace", traceId, userId);
+  const weight = computeTraceWeight(result.upvotes, result.downvotes);
   await db
     .update(gpsTraces)
-    .set({ upvotes: result.upvotes, downvotes: result.downvotes })
+    .set({
+      upvotes: result.upvotes,
+      downvotes: result.downvotes,
+      weight,
+      status: weight < TRACE_WEIGHT_IGNORED_FLOOR ? "ignored" : "active",
+    })
     .where(eq(gpsTraces.id, traceId));
   return result;
+}
+
+/**
+ * Wilson-style confidence weight for a single trace's votes:
+ *   (u + 1 − d) / (u + d + 2)
+ * Smoothly penalises low-vote traces so a single early downvote
+ * can already demote a trace out of synthesis.
+ */
+export function computeTraceWeight(upvotes: number, downvotes: number): number {
+  return (upvotes + 1 - downvotes) / (upvotes + downvotes + 2);
 }
 
 /* ------------------------------------------------------------------ */

@@ -322,6 +322,22 @@ export const TRACE_MAX_DURATION_HOURS = 24;
 // number smooths aggressively. The default is tuned for foot-traces.
 export const TRACE_SIMPLIFY_TOLERANCE_M = 5;
 
+/**
+ * Wilson-style weight floor (§21.6 trace lifecycle). A trace whose
+ * weight drops below this gets `status='ignored'` and is excluded
+ * from future synthesis runs; the vote history is preserved.
+ */
+export const TRACE_WEIGHT_IGNORED_FLOOR = 0.3;
+
+/**
+ * Wilson-style confidence weight for a single trace's votes:
+ *   (u + 1 − d) / (u + d + 2)
+ * Bounded to [0, 1] — single early downvotes already demote.
+ */
+export function computeTraceWeight(upvotes: number, downvotes: number): number {
+  return Math.max(0, Math.min(1, (upvotes + 1 - downvotes) / (upvotes + downvotes + 2)));
+}
+
 /** Polyline simplification (Ramer–Douglas–Peucker) on a list of
  * `[lon, lat]` vertices. Distance is approximated in meters via the
  * equirectangular projection at the centroid latitude. This is good

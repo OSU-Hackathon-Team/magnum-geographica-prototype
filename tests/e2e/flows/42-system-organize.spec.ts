@@ -1,0 +1,99 @@
+import { test, expect, type Page } from "@playwright/test";
+import { installApiMock, resetApiMock } from "../helpers/api-mock.js";
+
+const BASE = "http://localhost:4173";
+
+test.beforeEach(async ({ page }) => {
+  await installApiMock(page);
+});
+
+test.afterEach(() => {
+  resetApiMock();
+});
+
+async function browserFetch(
+  page: Page,
+  path: string,
+  init: { method?: string; body?: unknown; token?: string } = {},
+): Promise<{ status: number; body: unknown }> {
+  return page.evaluate(
+    async ({ path, method, body, token }) => {
+      const res = await fetch(`http://localhost:9999${path}`, {
+        method: method ?? "GET",
+        headers: {
+          "content-type": "application/json",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let json: unknown = null;
+      try {
+        json = await res.json();
+      } catch {
+        // ignore
+      }
+      return { status: res.status, body: json };
+    },
+    { path, method: init.method, body: init.body, token: init.token },
+  );
+}
+
+async function loginAsAdmin(page: Page) {
+  await page.goto(`${BASE}/auth/login`);
+  await page.getByTestId("login-email").fill("admin@example.com");
+  await page.getByTestId("login-password").fill("adminpass");
+  await page.getByTestId("login-submit").click();
+  await expect(page).toHaveURL(/\/explore$/);
+}
+
+test.describe("System — Organize traces page (§21.6 phase 2)", () => {
+  test("system detail page has the Organize traces button", async ({ page }) => {
+    await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await expect(page.getByTestId("system-organize")).toBeVisible();
+  });
+
+  test("clicking Organize traces navigates to the organize page", async ({ page }) => {
+    await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    // The buttons sit below the map preview; scroll the button into view
+    // before clicking so the map canvas doesn't absorb the click.
+    const button = page.getByTestId("system-organize");
+    await button.scrollIntoViewIfNeeded();
+    await button.click();
+    await expect(page).toHaveURL(/\/system\/hocking-hills-state-park\/organize/);
+  });
+
+  test("organize page renders the map, summary, and proposals list", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
+    await expect(page.getByTestId("organize-map")).toBeVisible();
+    await expect(page.getByTestId("organize-summary")).toBeVisible();
+    await expect(page.getByTestId("organize-proposals")).toBeVisible();
+    await expect(page.getByTestId("organize-foot")).toBeVisible();
+  });
+
+  test("organize page foot shows the moderator role for an admin", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
+    // The foot text identifies the current role. Admins are moderators.
+    await expect(page.getByTestId("organize-foot")).toContainText("moderator");
+  });
+
+  test("proposals list shows seeded rows when the system is loaded", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
+    // Wait for the proposals to load. The list is keyed on proposal.id.
+    await expect(page.getByTestId("proposal-prop-1")).toBeVisible();
+  });
+
+  test("tapping a proposal opens the bottom sheet with the trail list", async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
+    await expect(page.getByTestId("proposal-prop-1")).toBeVisible();
+    await page.getByTestId("proposal-prop-1").click();
+    await expect(page.getByTestId("proposal-sheet")).toBeVisible();
+    await expect(page.getByTestId("proposal-sheet-trails")).toBeVisible();
+    await expect(page.getByTestId("proposal-sheet-name")).toBeVisible();
+    await expect(page.getByTestId("proposal-sheet-approve")).toBeVisible();
+    await expect(page.getByTestId("proposal-sheet-reject")).toBeVisible();
+  });
+});

@@ -169,6 +169,14 @@ export default function SystemDetail() {
           >
             Move to…
           </Button>
+          <Button
+            variant="ghost"
+            size="small"
+            onPress={() => router.push(`/system/${system.slug}/organize` as never)}
+            testID="system-organize"
+          >
+            Organize traces
+          </Button>
           {isOfflineAvailable ? (
             <Text style={styles.meta} testID="system-offline-ready">
               Available offline

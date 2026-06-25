@@ -127,7 +127,7 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
 }
 
 /**
- * Per-cluster: pick the nearest synthesized trail within the
+ * Per-segment: pick the nearest synthesized trail within the
  * tolerance, or write a proposal. We use a simple sequential loop
  * here for the mock-friendly path; a real implementation does a
  * spatial join.
@@ -136,19 +136,21 @@ async function assignOrPropose(
   systemId: string,
   candidates: Trail[],
 ): Promise<{ assigned: number; proposed: number }> {
-  // Pull all segments that haven't been voted on yet. In the real
-  // impl this is bounded by the cluster step; here we just
-  // enumerate unassigned segments and let assignNearest decide.
+  // 1. Find traces in this system.
+  const systemTraceRows = await db
+    .select({ traceId: traceSystems.traceId })
+    .from(traceSystems)
+    .where(eq(traceSystems.systemId, systemId));
+  const systemTraceIds = new Set(systemTraceRows.map((r) => r.traceId));
+
+  // 2. Pull all segments and unvoted set.
   const segRows = await db
     .select({
       id: gpsTraceSegments.id,
       clusterId: gpsTraceSegments.clusterId,
+      traceId: gpsTraceSegments.traceId,
     })
-    .from(gpsTraceSegments)
-    .innerJoin(traceSystems, eq(traceSystems.traceId, gpsTraceSegments.traceId))
-    .where(eq(traceSystems.systemId, systemId));
-
-  // Existing votes for these segments.
+    .from(gpsTraceSegments);
   const existingVotes = await db
     .select({ segmentId: traceSegmentVotes.segmentId })
     .from(traceSegmentVotes);
@@ -159,6 +161,7 @@ async function assignOrPropose(
 
   for (const seg of segRows) {
     if (voted.has(seg.id)) continue;
+    if (!systemTraceIds.has(seg.traceId)) continue;
     // In a real impl we'd query the PostGIS distance. The mock
     // can return rows from executeRouter if needed; for the default
     // we accept the first candidate trail as the nearest.
@@ -269,9 +272,11 @@ export async function importPremiumTrail(input: PremiumImportInput): Promise<Tra
 }
 
 /**
- * List "possible new trail" proposals. The mock-friendly version
- * returns any unassigned segments as proposals; the real version
- * reads from a `synthesis_proposals` table.
+ * List "possible new trail" proposals — segments that have been
+ * cut but aren't yet attached to any trail. We pull the candidate
+ * rows from `gps_trace_segments` directly and filter by the system
+ * id and "no vote" predicates in JS; the real version would do a
+ * left-join + ST_Intersects in PostGIS.
  */
 export interface SynthesisProposal {
   id: string;
@@ -282,47 +287,38 @@ export interface SynthesisProposal {
 }
 
 export async function listProposals(systemId: string): Promise<SynthesisProposal[]> {
+  // 1. Find traces in this system.
+  const systemTraceRows = await db
+    .select({ traceId: traceSystems.traceId })
+    .from(traceSystems)
+    .where(eq(traceSystems.systemId, systemId));
+  const systemTraceIds = new Set(systemTraceRows.map((r) => r.traceId));
+
+  // 2. Pull every segment in those traces.
   const segRows = await db
     .select({
       id: gpsTraceSegments.id,
       traceId: gpsTraceSegments.traceId,
       clusterId: gpsTraceSegments.clusterId,
     })
-    .from(gpsTraceSegments)
-    .innerJoin(traceSystems, eq(traceSystems.traceId, gpsTraceSegments.traceId))
-    .leftJoin(traceSegmentVotes, eq(traceSegmentVotes.segmentId, gpsTraceSegments.id))
-    .where(
-      and(
-        eq(traceSystems.systemId, systemId),
-        sql`${traceSegmentVotes.id} IS NULL`,
-        eq(gpsTraces.status, "active"),
-      ),
-    );
-  // Re-add the join: the where above referenced the original (no
-  // join) — fix the join shape by re-running with the join.
-  void segRows;
-  const all = await db
-    .select({
-      id: gpsTraceSegments.id,
-      traceId: gpsTraceSegments.traceId,
-      clusterId: gpsTraceSegments.clusterId,
-    })
-    .from(gpsTraceSegments)
-    .innerJoin(traceSystems, eq(traceSystems.traceId, gpsTraceSegments.traceId))
-    .leftJoin(traceSegmentVotes, eq(traceSegmentVotes.segmentId, gpsTraceSegments.id))
-    .where(
-      and(
-        eq(traceSystems.systemId, systemId),
-        sql`${traceSegmentVotes.id} IS NULL`,
-      ),
-    );
-  return all.map((s) => ({
-    id: s.id,
-    trace_id: s.traceId,
-    segment_id: s.id,
-    cluster_id: s.clusterId,
-    reason: "no_nearby_trail" as const,
-  }));
+    .from(gpsTraceSegments);
+
+  // 3. Find segments with no votes yet.
+  const voteRows = await db
+    .select({ segmentId: traceSegmentVotes.segmentId })
+    .from(traceSegmentVotes);
+  const votedSet = new Set(voteRows.map((v) => v.segmentId));
+
+  return segRows
+    .filter((s) => systemTraceIds.has(s.traceId))
+    .filter((s) => !votedSet.has(s.id))
+    .map((s) => ({
+      id: s.id,
+      trace_id: s.traceId,
+      segment_id: s.id,
+      cluster_id: s.clusterId,
+      reason: "no_nearby_trail" as const,
+    }));
 }
 
 /**

@@ -90,6 +90,16 @@ export default function AdminDashboard() {
             Manage Presets
           </Button>
         </Link>
+        <Link href="/admin/synthesis" asChild>
+          <Button variant="secondary" testID="admin-link-synthesis">
+            Synthesis Proposals
+          </Button>
+        </Link>
+        <Link href="/admin/import" asChild>
+          <Button variant="secondary" testID="admin-link-import">
+            Premium Import
+          </Button>
+        </Link>
       </View>
     </ScrollView>
   );

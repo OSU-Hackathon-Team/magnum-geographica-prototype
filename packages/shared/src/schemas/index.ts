@@ -1,4 +1,10 @@
 import { z } from "zod";
+
+// ========== Trail tiers §21.6 ==========
+// (defined up top so trailSchema can reference it without a TDZ)
+const TRAIL_TIERS_VALUES = ["premium", "elevated", "synthesized"] as const;
+const trailTierSchema = z.enum(TRAIL_TIERS_VALUES);
+
 import {
   DIFFICULTIES,
   SURFACE_TYPES,
@@ -86,6 +92,14 @@ export const trailSchema = z.object({
   length_meters: z.number().nonnegative().nullable().optional(),
   elevation_gain_meters: z.number().nonnegative().nullable().optional(),
   verified: z.boolean().optional(),
+  // §21.6 — trail tier (premium / elevated / synthesized). Older
+  // clients may not send this; default to "synthesized".
+  tier: trailTierSchema.optional(),
+  // §21.6 — metadata about the last synthesis: how many segments
+  // and traces contributed, when it ran.
+  derived_from_segments: z.number().int().nonnegative().nullable().optional(),
+  derived_from_traces: z.number().int().nonnegative().nullable().optional(),
+  last_synthesized_at: isoDateSchema.nullable().optional(),
   created_at: isoDateSchema,
   updated_at: isoDateSchema,
   center: centerSchema,
@@ -699,8 +713,9 @@ export function validateAnswers(
 }
 
 // ========== Trail tiers §21.6 ==========
+// (defined up top — see top-of-file comment)
 
-export const trailTierSchema = z.enum(TRAIL_TIERS);
+export { trailTierSchema };
 
 // ========== Hierarchy actions (§21.5) ==========
 

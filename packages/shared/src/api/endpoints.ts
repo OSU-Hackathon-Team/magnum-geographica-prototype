@@ -363,6 +363,49 @@ export function createMagnumClient(
       body: { trail_id?: string | null; contributor_name?: string },
     ) =>
       client.post<{ ok: boolean }>(`/api/trace-segments/${segmentId}/vote`, body),
+    // §21.6 phase 2 — synthesis
+    synthesize: (systemId: string) =>
+      client.post<{
+        run: { id: string; status: string; trails_updated: number; trails_proposed: number };
+        clusters: number;
+        assigned: number;
+        proposed: number;
+        trails_updated: number;
+      }>(`/api/systems/${systemId}/synthesize`),
+    listSynthesisProposals: (systemId: string) =>
+      client.get<{
+        proposals: Array<{
+          id: string;
+          trace_id: string;
+          segment_id: string;
+          cluster_id: number | null;
+          reason: "no_nearby_trail";
+        }>;
+      }>(`/api/admin/synthesis-proposals?system_id=${encodeURIComponent(systemId)}`),
+    approveSynthesisProposal: (segmentId: string, body: { system_id: string; name: string }) =>
+      client.post<{ id: string; name: string; tier: string; slug: string }>(
+        `/api/admin/synthesis-proposals/${segmentId}/approve`,
+        body,
+      ),
+    rejectSynthesisProposal: (segmentId: string, body: { system_id: string }) =>
+      client.post<{ ok: boolean }>(
+        `/api/admin/synthesis-proposals/${segmentId}/reject`,
+        body,
+      ),
+    promoteTrail: (trailId: string, to: "elevated" | "premium") =>
+      client.post<{ id: string; tier: string }>(`/api/admin/trails/${trailId}/promote`, { to }),
+    importPremiumTrail: (body: {
+      name: string;
+      slug: string;
+      system_id: string;
+      difficulty?: "easy" | "moderate" | "hard" | "expert";
+      external_url?: string;
+      geometry: unknown;
+    }) =>
+      client.post<{ id: string; name: string; tier: string; slug: string }>(
+        `/api/admin/trails/import`,
+        body,
+      ),
   };
 }
 

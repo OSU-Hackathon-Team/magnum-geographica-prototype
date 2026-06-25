@@ -67,6 +67,8 @@ authRoute.post("/register", async (c) => {
     username: user.username,
     email: user.email,
     role: user.role ?? "contributor",
+    karma: Number(user.trustScore ?? 0),
+    tier: ((user as { tier?: "new" | "established" | "trusted" | "moderator" }).tier ?? "new"),
   });
   const refreshToken = await signRefreshToken(user.id);
 
@@ -110,6 +112,8 @@ authRoute.post("/login", async (c) => {
     username: user.username,
     email: user.email,
     role: user.role ?? "contributor",
+    karma: Number(user.trustScore ?? 0),
+    tier: ((user as { tier?: "new" | "established" | "trusted" | "moderator" }).tier ?? "new"),
   });
   const refreshToken = await signRefreshToken(user.id);
 
@@ -153,6 +157,8 @@ authRoute.post("/refresh", async (c) => {
       username: user.username,
       email: user.email,
       role: user.role ?? "contributor",
+      karma: Number((user as { trustScore?: number }).trustScore ?? 0),
+      tier: ((user as { tier?: "new" | "established" | "trusted" | "moderator" }).tier ?? "new"),
     });
     return c.json({ access_token: accessToken, expires_in: 900 });
   } catch {
