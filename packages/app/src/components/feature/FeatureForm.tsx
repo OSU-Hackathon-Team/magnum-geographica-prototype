@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { FEATURE_TYPES, createMagnumClient, type System, type Trail } from "@magnum/shared";
+import {
+  FEATURE_TYPES,
+  createMagnumClient,
+  type System,
+  type Trail,
+  type Preset,
+} from "@magnum/shared";
 import { Button } from "../ui/Button";
 import { FeatureTypeIcon } from "./FeatureTypeIcon";
 
@@ -8,7 +14,9 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export interface FeatureFormData {
   name: string;
-  type_tag: string;
+  type_tag?: string;
+  preset_id?: string;
+  answers?: Record<string, string | boolean>;
   description: string;
   lon: number;
   lat: number;
@@ -44,14 +52,21 @@ export function FeatureForm({
   testID,
 }: FeatureFormProps) {
   const [name, setName] = useState(initialName);
+  // New code path: pick a preset and we'll derive the legacy type_tag
+  // from the preset's key for backwards compat. Fall back to FEATURE_TYPES
+  // when no presets have loaded (e.g. offline before first sync).
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
   const [typeTag, setTypeTag] = useState(initialTypeTag);
   const [description, setDescription] = useState(initialDescription);
   const [systemId, setSystemId] = useState<string | null>(initialSystemId);
   const [trailId, setTrailId] = useState<string | null>(initialTrailId);
   const [systems, setSystems] = useState<System[]>([]);
   const [trails, setTrails] = useState<Trail[]>([]);
+  const [presets, setPresets] = useState<Preset[]>([]);
   const [loadingSystems, setLoadingSystems] = useState(false);
   const [loadingTrails, setLoadingTrails] = useState(false);
+  const [loadingPresets, setLoadingPresets] = useState(false);
 
   const canSave = name.trim().length > 0 && !saving && (systemId !== null || trailId !== null);
 
@@ -63,6 +78,16 @@ export function FeatureForm({
       .then((res) => setSystems(res.items))
       .catch(() => setSystems([]))
       .finally(() => setLoadingSystems(false));
+  }, []);
+
+  useEffect(() => {
+    setLoadingPresets(true);
+    const client = createMagnumClient(API_URL);
+    client.raw
+      .request<{ items: Preset[] }>("GET", "/api/presets")
+      .then((res) => setPresets(res.items))
+      .catch(() => setPresets([]))
+      .finally(() => setLoadingPresets(false));
   }, []);
 
   useEffect(() => {
@@ -83,7 +108,9 @@ export function FeatureForm({
     if (!canSave) return;
     onSave({
       name: name.trim(),
-      type_tag: typeTag,
+      ...(presetId
+        ? { preset_id: presetId, answers }
+        : { type_tag: typeTag }),
       description: description.trim(),
       lon: initialLon,
       lat: initialLat,
@@ -95,14 +122,48 @@ export function FeatureForm({
   return (
     <ScrollView style={styles.container} testID={testID}>
       <View style={styles.section}>
-        <Text style={styles.label}>Feature Type</Text>
+        <Text style={styles.label}>Feature Preset</Text>
+        {loadingPresets ? (
+          <ActivityIndicator size="small" />
+        ) : presets.length === 0 ? (
+          <Text style={styles.hint}>No presets available — pick a legacy type below.</Text>
+        ) : (
+          <View style={styles.typeGrid}>
+            {presets.slice(0, 12).map((p) => (
+              <Button
+                key={p.id}
+                variant={presetId === p.id ? "primary" : "secondary"}
+                size="small"
+                onPress={() => {
+                  setPresetId(p.id);
+                  setTypeTag(p.key);
+                }}
+                testID={`feature-form-preset-${p.key}`}
+              >
+                <FeatureTypeIcon
+                  type={p.key}
+                  preset={{ iconName: p.icon_name, iconColor: p.icon_color, presetKey: p.key }}
+                  label={p.label}
+                  size={12}
+                />
+              </Button>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Or pick a legacy type</Text>
         <View style={styles.typeGrid}>
           {FEATURE_TYPES.map((t) => (
             <Button
               key={t}
               variant={typeTag === t ? "primary" : "secondary"}
               size="small"
-              onPress={() => setTypeTag(t)}
+              onPress={() => {
+                setTypeTag(t);
+                setPresetId(null);
+              }}
               testID={`feature-type-${t}`}
             >
               <FeatureTypeIcon type={t} size={12} />

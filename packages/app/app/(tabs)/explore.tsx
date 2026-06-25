@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MapContainer, resolveBaseLayers } from "@magnum/map";
 import {
@@ -15,10 +15,18 @@ import {
 } from "../../src/components/ui/SearchResultsDropdown";
 import { BaseLayerSwitcher } from "../../src/components/map/BaseLayerSwitcher";
 import { DownloadAreaSheet } from "../../src/components/offline/DownloadAreaSheet";
+import { AddFeatureSheet } from "../../src/components/feature/AddFeatureSheet";
 import { useMapStore } from "../../src/stores/mapStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useBaseLayerStore } from "../../src/stores/baseLayerStore";
-import { loadOfflineMapData, getDownloadedRegionIds } from "../../src/services/offlineDataService";
+import { useAuthStore } from "../../src/stores/authStore";
+import { usePresetStore } from "../../src/stores/presetStore";
+import {
+  loadOfflineMapData,
+  getDownloadedRegionIds,
+  addPendingContribution,
+  getPendingCount,
+} from "../../src/services/offlineDataService";
 import type { OfflineMapData } from "../../src/services/offlineDataService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -75,7 +83,12 @@ export default function ExploreScreen() {
     maxLat: number;
   } | null>(null);
   const [showDownloadSheet, setShowDownloadSheet] = useState(false);
+  const [addFeatureAt, setAddFeatureAt] = useState<{ lon: number; lat: number } | null>(null);
+  const [addFeatureSubmitting, setAddFeatureSubmitting] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setPendingCount = useOfflineStore((s) => s.setPendingCount);
+  const contributorName = useAuthStore((s) => s.contributorName);
+  const fetchPresets = usePresetStore((s) => s.fetchPresets);
   // Web is always online, so the offline-download FAB is irrelevant there.
   // Hiding it also lets the add-feature FAB sit lower (closer to the tab bar).
   const isWeb = Platform.OS === "web";
@@ -267,10 +280,78 @@ export default function ExploreScreen() {
     (lon: number, lat: number) => {
       if (isPlacing) {
         setIsPlacing(false);
-        router.push(`/feature/create?lon=${lon.toFixed(6)}&lat=${lat.toFixed(6)}` as never);
+        // §21.3.1 — drop a pin and open the Add-Feature bottom sheet
+        // in place. The full /feature/create route is still available
+        // for "Edit from detail" flows.
+        setAddFeatureAt({ lon, lat });
+        void fetchPresets();
       }
     },
-    [isPlacing, router],
+    [fetchPresets, isPlacing],
+  );
+
+  const handleAddFeatureSubmit = useCallback(
+    async (result: {
+      preset_id: string;
+      name: string;
+      answers: Record<string, string | boolean>;
+      description?: string;
+    }) => {
+      if (!addFeatureAt) return;
+      setAddFeatureSubmitting(true);
+      const payload: Record<string, unknown> = {
+        name: result.name,
+        preset_id: result.preset_id,
+        answers: result.answers,
+        point: {
+          type: "Point",
+          coordinates: [addFeatureAt.lon, addFeatureAt.lat],
+        },
+        description: result.description,
+      };
+      const offline = !useOfflineStore.getState().isOnline;
+      try {
+        if (offline) {
+          await addPendingContribution(
+            "feature",
+            "create",
+            payload,
+            contributorName || "anonymous",
+          );
+          const newCount = await getPendingCount();
+          setPendingCount(newCount);
+          setAddFeatureAt(null);
+          Alert.alert("Queued", "Feature saved offline — will sync when online.");
+          return;
+        }
+        const client = createMagnumClient(API_URL);
+        await client.createFeature(payload as Parameters<typeof client.createFeature>[0]);
+        setAddFeatureAt(null);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to create feature";
+        if (!offline && /network|fetch|timeout/i.test(msg)) {
+          try {
+            await addPendingContribution(
+              "feature",
+              "create",
+              payload,
+              contributorName || "anonymous",
+            );
+            const newCount = await getPendingCount();
+            setPendingCount(newCount);
+            setAddFeatureAt(null);
+            Alert.alert("Queued", "Feature queued — will sync when back online.");
+            return;
+          } catch {
+            // fall through to error
+          }
+        }
+        Alert.alert("Error", msg);
+      } finally {
+        setAddFeatureSubmitting(false);
+      }
+    },
+    [addFeatureAt, contributorName, setPendingCount],
   );
 
   const handleStartPlacing = useCallback(() => {
@@ -480,6 +561,14 @@ export default function ExploreScreen() {
           testID="explore-download-sheet"
         />
       ) : null}
+
+      <AddFeatureSheet
+        visible={addFeatureAt !== null}
+        onClose={() => setAddFeatureAt(null)}
+        onSubmit={handleAddFeatureSubmit}
+        submitting={addFeatureSubmitting}
+        testID="explore-add-feature-sheet"
+      />
     </View>
   );
 }

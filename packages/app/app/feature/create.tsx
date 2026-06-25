@@ -30,14 +30,19 @@ export default function CreateFeatureScreen() {
     setSaving(true);
     setError(null);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       name: data.name,
-      type_tag: data.type_tag,
       description: data.description,
       point: { type: "Point", coordinates: [data.lon, data.lat] },
       system_id: data.system_id,
       trail_id: data.trail_id,
     };
+    if (data.preset_id) {
+      payload.preset_id = data.preset_id;
+      if (data.answers) payload.answers = data.answers;
+    } else if (data.type_tag) {
+      payload.type_tag = data.type_tag;
+    }
 
     if (!isOnline) {
       try {

@@ -1,7 +1,7 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { createMagnumClient, type Feature, type WikiPage } from "@magnum/shared";
+import { createMagnumClient, type Feature, type Preset, type WikiPage } from "@magnum/shared";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
 import { WikiPageView } from "../../src/components/wiki/WikiPageView";
@@ -9,8 +9,10 @@ import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
 import { MediaGallery, type MediaItem } from "../../src/components/media/MediaGallery";
 import { MediaUploader } from "../../src/components/media/MediaUploader";
 import { ImageViewer } from "../../src/components/media/ImageViewer";
+import { VoteControl } from "../../src/components/vote/VoteControl";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useAuthStore } from "../../src/stores/authStore";
+import { usePresetStore } from "../../src/stores/presetStore";
 import {
   addPendingContribution,
   getFeatureById,
@@ -20,10 +22,20 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
+interface FeatureWithPreset extends Feature {
+  preset_id?: string | null;
+  preset_key?: string | null;
+  preset_label?: string | null;
+  preset_icon_name?: string | null;
+  preset_icon_color?: string | null;
+  preset_questions?: Array<{ key: string; type: "boolean" | "select"; label: string; options?: { value: string; label: string }[] }>;
+  answers?: Record<string, unknown> | null;
+}
+
 export default function FeatureDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [feature, setFeature] = useState<Feature | null>(null);
+  const [feature, setFeature] = useState<FeatureWithPreset | null>(null);
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
@@ -34,6 +46,8 @@ export default function FeatureDetail() {
   const isOnline = useOfflineStore((s) => s.isOnline);
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
+  const fetchPresets = usePresetStore((s) => s.fetchPresets);
+  const loadPresetsFromCache = usePresetStore((s) => s.loadFromCache);
 
   useFocusEffect(
     useCallback(() => {
@@ -49,7 +63,9 @@ export default function FeatureDetail() {
           setFeature({
             id: String(local.id),
             name: String(local.name),
-            type_tag: String(local.type_tag) as Feature["type_tag"],
+            type_tag: local.type_tag ? (String(local.type_tag) as Feature["type_tag"]) : null,
+            preset_id: local.preset_id ? String(local.preset_id) : null,
+            answers: null,
             point:
               local.lon != null && local.lat != null
                 ? { type: "Point", coordinates: [Number(local.lon), Number(local.lat)] }
@@ -75,6 +91,7 @@ export default function FeatureDetail() {
           }
         };
         void loadOffline();
+        void loadPresetsFromCache();
         return;
       }
 
@@ -82,18 +99,39 @@ export default function FeatureDetail() {
       client
         .getFeature(id)
         .then(async (f) => {
-          setFeature(f);
-          const [w, mediaRes] = await Promise.all([
+          setFeature(f as FeatureWithPreset);
+          const [w, mediaRes, preset] = await Promise.all([
             client.getWikiPage("feature", f.id).catch(() => null),
             client.raw
               .request<{ items: MediaItem[] }>("GET", `/api/media?feature_id=${f.id}`)
               .catch(() => ({ items: [] as MediaItem[] })),
+            f.preset_id
+              ? client.raw.request<Preset>("GET", `/api/presets/${f.preset_id}`).catch(() => null)
+              : Promise.resolve(null),
           ]);
           if (w) setWikiPage(w as WikiPage);
           setMediaItems(mediaRes.items);
+          if (preset) {
+            // Hydrate the local preset cache so the Add-Feature sheet can
+            // render this preset's icon even when offline.
+            setFeature((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    preset_questions: preset.questions,
+                    preset_icon_name: preset.icon_name,
+                    preset_icon_color: preset.icon_color,
+                    preset_label: preset.label,
+                    preset_key: preset.key,
+                  }
+                : prev,
+            );
+          }
+          await loadPresetsFromCache();
         })
         .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
-    }, [id, isOnline]),
+      void fetchPresets();
+    }, [fetchPresets, id, isOnline, loadPresetsFromCache]),
   );
 
   const refreshMedia = async () => {
@@ -178,6 +216,23 @@ export default function FeatureDetail() {
     );
   }
 
+  // Build the answer-badges list (§21.4.4).
+  const answersList: Array<{ key: string; label: string; value: string }> = [];
+  if (feature.preset_questions && feature.answers) {
+    for (const q of feature.preset_questions) {
+      const raw = (feature.answers as Record<string, unknown>)[q.key];
+      if (raw === undefined || raw === null) continue;
+      let display: string;
+      if (q.type === "boolean") {
+        display = raw ? "Yes" : "No";
+      } else {
+        const opt = q.options?.find((o) => o.value === raw);
+        display = opt?.label ?? String(raw);
+      }
+      answersList.push({ key: q.key, label: q.label, value: display });
+    }
+  }
+
   return (
     <>
       <Stack.Screen
@@ -200,17 +255,46 @@ export default function FeatureDetail() {
       <ScrollView style={styles.container} testID="feature-detail-screen">
         <View style={styles.section} testID="feature-meta">
           <View style={styles.nameRow}>
-            <FeatureTypeIcon type={feature.type_tag} size={20} />
+            <FeatureTypeIcon
+              type={feature.type_tag ?? undefined}
+              preset={{
+                iconName: feature.preset_icon_name ?? undefined,
+                iconColor: feature.preset_icon_color ?? undefined,
+                presetKey: feature.preset_key ?? undefined,
+              }}
+              label={feature.preset_label ?? undefined}
+              size={20}
+            />
             <Text style={styles.title} testID="feature-name">
               {feature.name}
             </Text>
           </View>
-          <Text style={styles.typeTag}>{feature.type_tag.replace(/_/g, " ")}</Text>
+          {feature.preset_label ? (
+            <Text style={styles.presetLabel} testID="feature-preset-label">
+              {feature.preset_label}
+            </Text>
+          ) : null}
+          {answersList.length > 0 ? (
+            <View style={styles.answersRow} testID="feature-answers">
+              {answersList.map((a) => (
+                <View key={a.key} style={styles.answerBadge}>
+                  <Text style={styles.answerLabel}>{a.label}:</Text>
+                  <Text style={styles.answerValue}>{a.value}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {feature.description ? <Text style={styles.body}>{feature.description}</Text> : null}
-          <ViewOnMapButton center={feature.center ?? null} zoom={14} testID="feature-view-on-map" />
+          <View style={styles.actionsRow}>
+            <VoteControl
+              targetType="feature"
+              targetId={feature.id}
+              size="small"
+              testID="feature-vote"
+            />
+            <ViewOnMapButton center={feature.center ?? null} zoom={14} testID="feature-view-on-map" />
+          </View>
         </View>
-
-        {feature ? null : null}
 
         <View style={styles.section} testID="feature-media">
           <View style={styles.row}>
@@ -252,38 +336,36 @@ export default function FeatureDetail() {
           />
         </View>
 
-        {feature ? (
-          <View style={styles.section} testID="feature-wiki">
-            <View style={styles.row}>
-              <Text style={styles.h2}>Wiki</Text>
-              <Button
-                variant={wikiPage ? "ghost" : "primary"}
-                size="small"
-                onPress={() =>
-                  router.push({
-                    pathname: "/wiki/edit/feature/[targetId]" as never,
-                    params: { targetId: feature.id, defaultTitle: feature.name },
-                  } as never)
-                }
-                testID="feature-wiki-edit"
-              >
-                {wikiPage ? "Edit" : "Create"}
-              </Button>
-            </View>
-            {wikiPage ? (
-              <Pressable
-                onPress={() => router.push(`/wiki/feature/${feature.id}` as never)}
-                testID="feature-wiki-view"
-              >
-                <View style={styles.wikiPreviewBox}>
-                  <WikiPageView wikiPage={wikiPage} compact />
-                </View>
-              </Pressable>
-            ) : (
-              <Text style={styles.body}>No wiki page yet for this feature.</Text>
-            )}
+        <View style={styles.section} testID="feature-wiki">
+          <View style={styles.row}>
+            <Text style={styles.h2}>Wiki</Text>
+            <Button
+              variant={wikiPage ? "ghost" : "primary"}
+              size="small"
+              onPress={() =>
+                router.push({
+                  pathname: "/wiki/edit/feature/[targetId]" as never,
+                  params: { targetId: feature.id, defaultTitle: feature.name },
+                } as never)
+              }
+              testID="feature-wiki-edit"
+            >
+              {wikiPage ? "Edit" : "Create"}
+            </Button>
           </View>
-        ) : null}
+          {wikiPage ? (
+            <Pressable
+              onPress={() => router.push(`/wiki/feature/${feature.id}` as never)}
+              testID="feature-wiki-view"
+            >
+              <View style={styles.wikiPreviewBox}>
+                <WikiPageView wikiPage={wikiPage} compact />
+              </View>
+            </Pressable>
+          ) : (
+            <Text style={styles.body}>No wiki page yet for this feature.</Text>
+          )}
+        </View>
       </ScrollView>
 
       <ImageViewer
@@ -302,18 +384,34 @@ const styles = StyleSheet.create({
   section: { padding: 16, gap: 8 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { fontSize: 22, fontWeight: "700", flexShrink: 1 },
-  h2: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
-  body: { fontSize: 14, color: "#444", lineHeight: 20 },
-  typeTag: {
-    fontSize: 12,
-    color: "#666",
-    textTransform: "capitalize",
-    backgroundColor: "#f1f1f1",
+  presetLabel: {
+    fontSize: 13,
+    color: "#444",
+    backgroundColor: "#f0fdf4",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
     alignSelf: "flex-start",
   },
+  answersRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 4,
+  },
+  answerBadge: {
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#f1f5f9",
+    borderRadius: 6,
+  },
+  answerLabel: { fontSize: 12, color: "#64748b" },
+  answerValue: { fontSize: 12, fontWeight: "600", color: "#0f172a" },
+  actionsRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 4 },
+  h2: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
+  body: { fontSize: 14, color: "#444", lineHeight: 20 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   wikiPreviewBox: {
     backgroundColor: "#f9fafb",

@@ -1,8 +1,16 @@
 import { Hono } from "hono";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { features } from "../db/schema.js";
-import { createFeatureInputSchema } from "@magnum/shared";
+import { features, presets, users } from "../db/schema.js";
+import {
+  createFeatureInputSchema,
+  updateFeatureInputSchema,
+  validateAnswers,
+} from "@magnum/shared";
+import { getPresetById } from "../services/presets.js";
+import { authRequired, type AuthUser } from "../middleware/auth.js";
+
+type Variables = { user?: AuthUser };
 
 function toCoordinate(x: number | string | null | undefined): number | null {
   if (x === null || x === undefined) return null;
@@ -10,34 +18,68 @@ function toCoordinate(x: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export const featuresRoute = new Hono();
+function extractLatLon(point: unknown): { lon: number | null; lat: number | null } {
+  let lon: number | null = null;
+  let lat: number | null = null;
+  if (!point || typeof point !== "object") return { lon, lat };
+  const p = point as { type?: string; coordinates?: unknown; lat?: unknown; lon?: unknown };
+  if (
+    p.type === "Point" &&
+    Array.isArray(p.coordinates) &&
+    p.coordinates.length >= 2
+  ) {
+    lon = toCoordinate(p.coordinates[0] as number | string);
+    lat = toCoordinate(p.coordinates[1] as number | string);
+  } else if (typeof p.lon === "number" || typeof p.lat === "number") {
+    lon = toCoordinate(p.lon as number | string);
+    lat = toCoordinate(p.lat as number | string);
+  }
+  return { lon, lat };
+}
+
+const baseFeatureSelect = {
+  id: features.id,
+  name: features.name,
+  type_tag: features.typeTag,
+  description: features.description,
+  trail_id: features.trailId,
+  system_id: features.systemId,
+  preset_id: features.presetId,
+  answers: features.answers,
+  created_at: features.createdAt,
+  updated_at: features.updatedAt,
+  lon: sql<number | null>`ST_X(${features.point}::geometry)`,
+  lat: sql<number | null>`ST_Y(${features.point}::geometry)`,
+} as const;
+
+const presetJoin = {
+  preset_key: presets.key,
+  preset_label: presets.label,
+  preset_icon_name: presets.iconName,
+  preset_icon_color: presets.iconColor,
+  preset_category: presets.category,
+  preset_questions: presets.questions,
+} as const;
+
+export const featuresRoute = new Hono<{ Variables: Variables }>();
 
 featuresRoute.get("/:id", async (c) => {
   const id = c.req.param("id");
   const rows = await db
-    .select({
-      id: features.id,
-      name: features.name,
-      type_tag: features.typeTag,
-      description: features.description,
-      trail_id: features.trailId,
-      system_id: features.systemId,
-      created_at: features.createdAt,
-      updated_at: features.updatedAt,
-      lon: sql<number | null>`ST_X(${features.point}::geometry)`,
-      lat: sql<number | null>`ST_Y(${features.point}::geometry)`,
-    })
+    .select({ ...baseFeatureSelect, ...presetJoin })
     .from(features)
+    .leftJoin(presets, eq(features.presetId, presets.id))
     .where(eq(features.id, id))
     .limit(1);
   const feat = rows[0];
   if (!feat) return c.json({ error: "not_found" }, 404);
-  const center = feat.lon != null && feat.lat != null ? { lat: feat.lat, lon: feat.lon } : null;
-  const { lon: _lon, lat: _lat, ...rest } = feat;
+  const { lon, lat, ...rest } = feat;
+  const center = lon != null && lat != null ? { lat, lon } : null;
   return c.json({ ...rest, center });
 });
 
-featuresRoute.post("/", async (c) => {
+featuresRoute.post("/", authRequired(), async (c) => {
+  const authUser = c.get("user");
   const body = await c.req.json().catch(() => null);
   const parsed = createFeatureInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -46,33 +88,16 @@ featuresRoute.post("/", async (c) => {
       400,
     );
   }
+  const { name, type_tag, preset_id, point, trail_id, system_id, description, answers } = parsed.data;
 
-  const { name, type_tag, point, trail_id, system_id, description } = parsed.data;
-
-  const geojson = point as {
-    type?: string;
-    coordinates?: [number, number];
-    lat?: number;
-    lon?: number;
-  };
-  let lon: number | null = null;
-  let lat: number | null = null;
-
-  if (
-    geojson?.type === "Point" &&
-    Array.isArray(geojson.coordinates) &&
-    geojson.coordinates.length >= 2
-  ) {
-    lon = toCoordinate(geojson.coordinates[0]);
-    lat = toCoordinate(geojson.coordinates[1]);
-  } else if (typeof geojson?.lon === "number" || typeof geojson?.lat === "number") {
-    lon = toCoordinate(geojson.lon);
-    lat = toCoordinate(geojson.lat);
-  } else if (Array.isArray(geojson) && geojson.length >= 2) {
-    lon = toCoordinate(geojson[0]);
-    lat = toCoordinate(geojson[1]);
+  if (!type_tag && !preset_id) {
+    return c.json(
+      { error: "invalid_input", message: "either preset_id or type_tag is required" },
+      400,
+    );
   }
 
+  const { lon, lat } = extractLatLon(point);
   if (lon === null || lat === null) {
     return c.json(
       { error: "invalid_input", message: "could not extract coordinates from point" },
@@ -80,15 +105,48 @@ featuresRoute.post("/", async (c) => {
     );
   }
 
+  // Validate answers against the preset's question schema.
+  let resolvedPresetId: string | null = preset_id ?? null;
+  let resolvedTypeTag: string | null = type_tag ?? null;
+  if (preset_id) {
+    const preset = await getPresetById(preset_id);
+    if (!preset) {
+      return c.json({ error: "invalid_input", message: "preset_id not found" }, 400);
+    }
+    const v = validateAnswers(
+      preset.questions as Array<{ key: string; type: "boolean" | "select"; options?: { value: string }[] }>,
+      answers,
+    );
+    if (!v.ok) {
+      return c.json(
+        { error: "invalid_answers", message: "answer validation failed", details: v.errors },
+        400,
+      );
+    }
+    resolvedPresetId = preset.id;
+    // Keep type_tag in sync so legacy clients still get a usable label.
+    resolvedTypeTag = preset.key;
+  }
+
+  // Look up the author for karma attribution.
+  const authorRows = authUser
+    ? await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, authUser.id)).limit(1)
+    : [];
+  const author = authorRows[0];
+
   const rows = await db
     .insert(features)
     .values({
       name,
-      typeTag: type_tag,
+      typeTag: resolvedTypeTag,
+      presetId: resolvedPresetId,
+      answers: answers ?? null,
       point: sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)`,
       trailId: trail_id ?? null,
       systemId: system_id ?? null,
       description: description ?? null,
+      createdByUserId: author?.id ?? null,
+      contributorName: author?.username ?? "anonymous",
     })
     .returning();
 
@@ -102,6 +160,8 @@ featuresRoute.post("/", async (c) => {
       id: feat.id,
       name: feat.name,
       type_tag: feat.typeTag,
+      preset_id: feat.presetId,
+      answers: feat.answers,
       description: feat.description,
       trail_id: feat.trailId,
       system_id: feat.systemId,
@@ -116,45 +176,65 @@ featuresRoute.post("/", async (c) => {
 featuresRoute.put("/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
+  const parsed = updateFeatureInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", message: "validation failed", details: parsed.error.flatten() },
+      400,
+    );
+  }
+  const { name, preset_id, type_tag, description, trail_id, system_id, answers } = parsed.data;
 
-  if (!body || typeof body !== "object") {
-    return c.json({ error: "invalid_input", message: "body required" }, 400);
+  // Validate answers against the resolved preset (incoming or existing).
+  if (answers !== undefined) {
+    let preset;
+    if (preset_id) {
+      preset = await getPresetById(preset_id);
+    } else {
+      const existing = await db
+        .select({ preset_id: features.presetId })
+        .from(features)
+        .where(eq(features.id, id))
+        .limit(1);
+      if (existing[0]?.preset_id) preset = await getPresetById(existing[0].preset_id);
+    }
+    if (preset) {
+      const v = validateAnswers(
+        preset.questions as Array<{ key: string; type: "boolean" | "select"; options?: { value: string }[] }>,
+        answers,
+      );
+      if (!v.ok) {
+        return c.json(
+          { error: "invalid_answers", message: "answer validation failed", details: v.errors },
+          400,
+        );
+      }
+    }
   }
 
   const updates: Record<string, unknown> = {};
-  if (typeof body.name === "string") updates.name = body.name;
-  if (typeof body.type_tag === "string") updates.typeTag = body.type_tag;
-  if (body.description !== undefined) updates.description = body.description || null;
-  if (body.trail_id !== undefined) updates.trailId = body.trail_id || null;
-  if (body.system_id !== undefined) updates.systemId = body.system_id || null;
+  if (name !== undefined) updates.name = name;
+  if (preset_id !== undefined) updates.presetId = preset_id;
+  if (type_tag !== undefined) updates.typeTag = type_tag;
+  if (description !== undefined) updates.description = description || null;
+  if (trail_id !== undefined) updates.trailId = trail_id || null;
+  if (system_id !== undefined) updates.systemId = system_id || null;
+  if (answers !== undefined) updates.answers = answers;
 
-  const pointData = body.point as
+  const pointData = body?.point as
     | { type?: string; coordinates?: [number, number]; lat?: number; lon?: number }
     | undefined;
   if (pointData) {
-    let lon: number | null = null;
-    let lat: number | null = null;
-    if (
-      pointData.type === "Point" &&
-      Array.isArray(pointData.coordinates) &&
-      pointData.coordinates.length >= 2
-    ) {
-      lon = toCoordinate(pointData.coordinates[0]);
-      lat = toCoordinate(pointData.coordinates[1]);
-    } else if (typeof pointData.lon === "number" || typeof pointData.lat === "number") {
-      lon = toCoordinate(pointData.lon);
-      lat = toCoordinate(pointData.lat);
-    }
+    const { lon, lat } = extractLatLon(pointData);
     if (lon !== null && lat !== null) {
-      (updates as Record<string, unknown>).point =
-        sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)`;
+      updates.point = sql`ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)`;
     }
   }
 
   if (Object.keys(updates).length === 0) {
     return c.json({ error: "invalid_input", message: "no fields to update" }, 400);
   }
-  (updates as Record<string, unknown>).updatedAt = sql`now()`;
+  updates.updatedAt = sql`now()`;
 
   const rows = await db
     .update(features)
@@ -169,6 +249,8 @@ featuresRoute.put("/:id", async (c) => {
     id: feat.id,
     name: feat.name,
     type_tag: feat.typeTag,
+    preset_id: feat.presetId,
+    answers: feat.answers,
     description: feat.description,
     trail_id: feat.trailId,
     system_id: feat.systemId,
