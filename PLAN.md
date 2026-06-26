@@ -768,9 +768,7 @@ packages/app/src/components/
 
 ---
 
-### Phase 9: Attestation System — Superseded
-
-**Status:** Superseded by the UI Redux (see §21) and the recording UX redesign (see §22). The original "GPS verifies a trail" attestation model is replaced by a tiered trail-trust model: GPS traces now _create and maintain_ synthesized trails (with wiki-style segment→trail marking and downvote-weighting), and karma/voting drives trust rather than attestation quorums. The existing `users.trust_score` field is reused as the karma total. The `ATTESTATION_*` constants in `packages/shared/src/constants.ts` are retained only until §21 lands. The recording-side UX (the focus of this phase) was redesigned in §22 to make the Record tab a first-class home-screen entry point with a kill-safe SQLite mirror.
+### Phase 9: GPS Trace Recording — Completed
 
 ---
 
@@ -979,8 +977,8 @@ These depend on native APIs, device sensors, app lifecycle, or offline-first arc
 | Storage manager interactions (download, delete, size bars) | Yes            | SQLite reads, file deletion               |
 | WebView map bridge (pinch-zoom, tap, long-press, drag)     | Yes            | `postMessage` bridge is platform-specific |
 | Camera capture + gallery pick for media                    | Yes            | `expo-camera`, `expo-image-picker`        |
-| GPS tracking / Record Hike                                 | Yes            | `expo-location`, background tasks         |
-| Background location for attestation                        | Yes            | `expo-task-manager`                       |
+| GPS trace recording (Record tab: start/pause/submit)       | Yes            | `react-native-background-geolocation`     |
+| Background location tracking                               | Yes            | `react-native-background-geolocation`     |
 | JWT storage in SecureStore                                 | Yes            | `expo-secure-store`                       |
 | App lifecycle (background → foreground sync trigger)       | Yes            | React Native `AppState`                   |
 | Network toggle (airplane mode simulation)                  | Yes            | Device-specific                           |
@@ -1098,7 +1096,7 @@ e2e/
 │   ├── 06-storage-manager.test.ts     # Phase 3
 │   ├── 07-webview-map.test.ts         # Phase 1 (map touch interactions)
 │   ├── 08-camera-gallery.test.ts      # Phase 4
-│   ├── 09-gps-recording.test.ts       # Phase 9
+│   ├── 09-record-trace.test.ts        # §TraceMode: start, pause, submit, discard
 │   ├── 10-auth-secure-store.test.ts   # Phase 6
 │   ├── 11-app-lifecycle.test.ts       # Background/foreground
 │   ├── 12-back-navigation.test.ts     # Android back button
@@ -1252,15 +1250,16 @@ CI=true detox test --configuration android.emu.release --cleanup
 
 #### Phase 9: GPS Recording (1 test file)
 
-**`09-gps-recording.test.ts`** — Record and upload GPS tracks:
+**`09-gps-recording.test.ts`** — Record tab: start, pause, submit, discard trace:
 
-1. Navigate to trail detail, tap "Record Hike"
-2. Verify tracking starts → timer running, distance accumulating
-3. Simulate location changes (mock `expo-location` via Detox launch args)
-4. Wait 10s → verify track recorded
-5. Tap "Stop & Save" → verify GPX data stored
-6. Upload track → verify strong attestation POST succeeds
-7. Verify "Verified" badge appears on trail (if quorum met)
+1. Navigate to Record tab, tap "Start recording"
+2. Verify status pill shows "Recording" with elapsed timer
+3. Simulate location changes (mock `react-native-background-geolocation` via Detox launch args)
+4. Verify live route appears on map, distance and point count update
+5. Tap "Pause" → verify status changes to "Paused", timer freezes
+6. Tap "Resume" → verify recording continues
+7. Tap "Submit" → verify trace uploaded / queued and appears in Recent list
+8. Start new recording → tap "Discard" → confirm dialog → verify session deleted
 
 #### Phase 6: Auth (1 test file)
 
@@ -2293,7 +2292,16 @@ Shipped as a seed migration (one row per old enum value, with OSM tag maps). Exi
 The DB already has `super_systems`, `systems`, `sub_systems` + join tables (`packages/api/src/db/schema.ts`). This phase adds CRUD, drawn boundaries, the Move-to organizer, and revision logging.
 
 - **API:** CRUD for `super_systems` and `sub_systems` (mirror existing `POST /systems`); join management (assign/remove super, trail↔sub); boundary via draw or GeoJSON; provenance fields required.
-- **Boundaries are drawn** on the map (polygon tool), reusing Explore's draw-interaction pattern. Provenance (`ownership_source` + `source_date`) is required per `outline.md`.
+- **Boundaries are drawn** on the map via the polygon editor. Provenance (`ownership_source` + `source_date`) is required per `outline.md`.
+
+  **Polygon editor** (`packages/app/src/components/polygon/ShapeEditor.tsx`, `packages/map/src/MapContainer.web.tsx`, `packages/map/src/MapContainer.native.tsx`):
+  - **Add mode** (default): click empty map → append vertex to the current open ring; click edge → split it at the click point; click the first vertex of the open ring (with ≥3 vertices) → close the ring. Multiple closed rings per session are supported.
+  - **Delete mode**: click vertex → remove it (ring opens if fewer than 3 vertices remain; ring is dropped if empty); click edge → split the ring into two open rings at that gap (non-destructive).
+  - **Drag**: long-press (~350 ms) on a vertex, then drag to reposition it.
+  - **Multi-polygon editing**: when loading an existing system, every polygon outer ring becomes a separate editable ring. Holes are still out of scope.
+  - **Shared state machine** (`packages/shared/src/shape/reducer.ts`): all gesture logic lives in a pure `shapeReducer(shape, action)` function used identically by both web and native MapContainers, so there is exactly one source of truth for coordinate math.
+  - Mode toggle rendered as a floating two-button stack (Add / Delete) on the left side of the map (`ShapeEditorModeToggle.tsx`).
+  - Bottom bar shows: back, title, contextual hint (vertex count / close prompt), and save (`ShapeEditorBar.tsx`).
 - **Permissions:** any logged-in contributor can create/edit; all actions revision-logged and revertable (see §21.8).
 - **Hierarchy tree** with **"Move to…" action sheet** (tap node → action sheet; no drag-drop needed on mobile).
 
