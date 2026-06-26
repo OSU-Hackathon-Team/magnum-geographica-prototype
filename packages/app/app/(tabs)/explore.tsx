@@ -62,6 +62,7 @@ export default function ExploreScreen() {
   const params = useLocalSearchParams<{ lat?: string; lon?: string; zoom?: string }>();
   const mapCenter = useMapStore((s) => s.center);
   const mapZoom = useMapStore((s) => s.zoom);
+  const tileVersion = useMapStore((s) => s.tileVersion);
   const setViewport = useMapStore((s) => s.setViewport);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const offlineRegions = useOfflineStore((s) => s.offlineRegions);
@@ -267,6 +268,10 @@ export default function ExploreScreen() {
         setSelectedSystemSlug(selection.slug);
         return;
       }
+      if (selection.layer === "superSystems" && selection.slug) {
+        setSelectedSystemSlug(selection.slug);
+        return;
+      }
       if (selection.layer === "features") {
         router.push(`/feature/${selection.id}` as never);
         return;
@@ -346,6 +351,7 @@ export default function ExploreScreen() {
         }
         const client = createMagnumClient(API_URL);
         await client.createFeature(payload as Parameters<typeof client.createFeature>[0]);
+        useMapStore.getState().incrementTileVersion();
         setAddFeatureAt(null);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to create feature";
@@ -469,6 +475,7 @@ export default function ExploreScreen() {
           offlineBaseLayer={offlineBaseLayer}
           drawMode={isDrawing}
           onDrawEnd={handleDrawEnd}
+          tileVersion={tileVersion}
         />
         <BaseLayerSwitcher layers={baseLayerDefs} testID="explore-base-layer-switcher" />
       </View>

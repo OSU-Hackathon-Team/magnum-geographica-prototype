@@ -20,6 +20,7 @@ import {
 } from "@magnum/shared";
 import { Button } from "../../src/components/ui/Button";
 import { useAuthStore } from "../../src/stores/authStore";
+import { useMapStore } from "../../src/stores/mapStore";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -48,8 +49,7 @@ export default function NewSystemScreen() {
   }>();
   const fromBoundary = params.fromBoundary === "1";
   // Decode the base64-encoded shape once. The boundary screen sent
-  // a base64-url encoded JSON string of the full Shape (including
-  // chords and connectFrom). The form only needs the closed rings.
+  // a base64-url encoded JSON string of the Shape.
   const decodedShape = decodeShapeParam(params.shape);
   const boundaryVertexCount = decodedShape
     ? decodedShape.rings
@@ -138,6 +138,7 @@ export default function NewSystemScreen() {
         "/api/systems",
         { body: payload },
       );
+      useMapStore.getState().incrementTileVersion();
       router.replace(`/system/${finalSlug}` as never);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create system");

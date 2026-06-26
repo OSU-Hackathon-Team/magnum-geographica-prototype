@@ -25,15 +25,16 @@ import { useOfflineStore } from "../../src/stores/offlineStore";
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
-function SystemMapPreview() {
+function SystemMapPreview({ center, boundary }: { center?: { lon: number; lat: number } | null; boundary?: unknown }) {
   return (
     <View style={styles.mapPreview}>
       <MapContainer
         config={{
           martinTilesUrl: MARTIN_URL,
-          initialCenter: [-82.9988, 39.9612],
-          initialZoom: 6,
+          initialCenter: center ? [center.lon, center.lat] : [-82.9988, 39.9612],
+          initialZoom: 10,
         }}
+        fitGeometry={boundary ?? null}
       />
     </View>
   );
@@ -140,7 +141,7 @@ export default function SystemDetail() {
     <>
       <Stack.Screen options={{ title: system.name, headerShown: true }} />
       <ScrollView style={styles.container} testID="system-detail-screen">
-        <SystemMapPreview />
+        <SystemMapPreview center={system.center} boundary={system.boundary} />
 
         <View style={styles.section} testID="system-meta">
           <Text style={styles.title} testID="system-name">
@@ -160,7 +161,7 @@ export default function SystemDetail() {
               <Text style={styles.linkText}>Official page</Text>
             </Pressable>
           ) : null}
-          <ViewOnMapButton center={system.center ?? null} zoom={9} testID="system-view-on-map" />
+          <ViewOnMapButton center={system.center ?? null} zoom={10} testID="system-view-on-map" />
           <Button
             variant="ghost"
             size="small"

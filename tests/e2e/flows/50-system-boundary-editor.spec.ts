@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { installApi, resetApi, apiFetch } from "../helpers/api.js";
 
 const BASE = "http://localhost:4173";
@@ -12,7 +12,7 @@ test.afterEach(() => {
 });
 
 
-test.describe("System boundary editor (§21.5, two-screen create + edit)", () => {
+test.describe("System boundary editor (§21.5)", () => {
   test("systems tab + button lands on the boundary editor", async ({ page }) => {
     await page.goto(`${BASE}/systems`);
     await page.getByTestId("systems-new").click();
@@ -30,25 +30,65 @@ test.describe("System boundary editor (§21.5, two-screen create + edit)", () =>
 
   test("save is disabled when no closed rings exist", async ({ page }) => {
     await page.goto(`${BASE}/system/boundary?mode=create`);
-    // Save is initially disabled because no rings are closed.
     await expect(page.getByTestId("boundary-save")).toBeDisabled();
     await expect(page.getByTestId("boundary-save-error")).toBeVisible();
   });
 
-  test("mode toggle has both Normal and Delete buttons", async ({ page }) => {
+  test("mode toggle has both Add and Delete buttons", async ({ page }) => {
     await page.goto(`${BASE}/system/boundary?mode=create`);
     await expect(page.getByTestId("boundary-mode-normal")).toBeVisible();
     await expect(page.getByTestId("boundary-mode-delete")).toBeVisible();
   });
 
+  test("Add mode is highlighted by default", async ({ page }) => {
+    await page.goto(`${BASE}/system/boundary?mode=create`);
+    await expect(page.getByTestId("boundary-mode-normal")).toBeVisible();
+  });
+
+  test("clicking the map in add mode appends a vertex", async ({ page }) => {
+    await page.goto(`${BASE}/system/boundary?mode=create`);
+    // Click the map canvas to add a vertex. The map fills the parent,
+    // so we click roughly in the center. Ohio is ~[-82.5, 40.0].
+    const canvas = page.getByTestId("boundary-screen").locator("canvas");
+    await canvas.click({ position: { x: 300, y: 250 } });
+    // After one click we should see the hint "2 more to close" (1 of 3 verts).
+    await expect(page.getByTestId("boundary-hint")).toContainText("more to close");
+  });
+
+  test("clicking three times then first vertex closes the ring", async ({ page }) => {
+    await page.goto(`${BASE}/system/boundary?mode=create`);
+    const canvas = page.getByTestId("boundary-screen").locator("canvas");
+    // Add 3 vertices.
+    await canvas.click({ position: { x: 250, y: 200 } });
+    await canvas.click({ position: { x: 350, y: 200 } });
+    await canvas.click({ position: { x: 350, y: 300 } });
+    // Hint should now say "Tap the first vertex to close the ring".
+    await expect(page.getByTestId("boundary-hint")).toContainText("close the ring");
+    // Click near the first vertex (top-left ≈ 250, 200).
+    await canvas.click({ position: { x: 250, y: 200 } });
+    // Save should now be enabled.
+    await expect(page.getByTestId("boundary-save")).not.toBeDisabled();
+  });
+
+  test("switching to Delete mode then back to Add mode works", async ({ page }) => {
+    await page.goto(`${BASE}/system/boundary?mode=create`);
+    await page.getByTestId("boundary-mode-delete").click();
+    await page.getByTestId("boundary-mode-normal").click();
+    await expect(page.getByTestId("boundary-mode-normal")).toBeVisible();
+  });
+
   test("the form (?fromBoundary=1) shows the boundary indicator", async ({ page }) => {
-    // Encode a tiny shape manually and visit the form with it.
     const shape = {
       rings: [
-        { vertices: [[-82.65, 39.38], [-82.4, 39.38], [-82.4, 39.52]], closed: true },
+        {
+          vertices: [
+            [-82.65, 39.38],
+            [-82.4, 39.38],
+            [-82.4, 39.52],
+          ],
+          closed: true,
+        },
       ],
-      chords: [],
-      connectFrom: null,
     };
     const encoded = Buffer.from(JSON.stringify(shape), "utf-8").toString("base64url");
     await page.goto(`${BASE}/system/new?fromBoundary=1&shape=${encoded}`);
@@ -57,7 +97,6 @@ test.describe("System boundary editor (§21.5, two-screen create + edit)", () =>
   });
 
   test("PUT /api/systems/:id updates the boundary", async ({ page }) => {
-    // Register a user and log in.
     await page.goto(`${BASE}/auth/register`);
     await page.getByTestId("register-username").fill("boundaryeditor");
     await page.getByTestId("register-email").fill("be@example.com");
@@ -68,7 +107,6 @@ test.describe("System boundary editor (§21.5, two-screen create + edit)", () =>
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    // Use a fixture system id from the seed.
     const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/move`, {
       method: "PUT",
       token,
@@ -92,16 +130,18 @@ test.describe("System boundary editor (§21.5, two-screen create + edit)", () =>
 
   test("PUT /api/systems/:id without a token returns 401", async ({ page }) => {
     const res = await page.evaluate(async () => {
-      const r = await fetch("http://localhost:3000/api/systems/00000000-0000-4000-a000-000000000001", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "x" }),
-      });
+      const r = await fetch(
+        "http://localhost:3000/api/systems/00000000-0000-4000-a000-000000000001",
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: "x" }),
+        },
+      );
       return r.status;
     });
     expect(res).toBe(401);
   });
 });
 
-// Imported lazily so the test file is self-contained.
 import { FIXTURE_IDS } from "../fixtures/ids.js";

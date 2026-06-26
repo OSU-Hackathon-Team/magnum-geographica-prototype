@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { Map, View } from "ol";
 import type { Layer } from "ol/layer.js";
 import "ol/ol.css";
-import { fromLonLat, toLonLat } from "ol/proj.js";
+import { fromLonLat, toLonLat, transformExtent } from "ol/proj.js";
 import { defaultMapConfig, resolveBaseLayers, resolveDefaultBaseLayerId } from "./shared/config.js";
+import { extentFromGeoJSON } from "./shared/extent.js";
 import { createTrailsLayer } from "./layers/TrailsLayer.js";
 import { createSystemsLayer } from "./layers/SystemsLayer.js";
 import { createFeaturesLayer } from "./layers/FeaturesLayer.js";
@@ -12,10 +13,15 @@ import { applyBaseLayer } from "./layers/BaseLayer.js";
 import {
   createShapeLayer,
   rebuildShapeSource,
-  findNearestEdge,
   shapeHitTest,
+  SHAPE_VERTEX_RADIUS,
 } from "./layers/ShapeLayer.js";
 import type { MapContainerProps } from "./types.js";
+import {
+  type ShapeAction,
+  findNearestEdge,
+  lastOpenRingIndex,
+} from "@magnum/shared";
 
 export type { MapContainerProps };
 
@@ -44,6 +50,9 @@ function asPixel(p: number[] | ArrayLike<number>): [number, number] {
   return [p[0] ?? 0, p[1] ?? 0] as [number, number];
 }
 
+const LONG_PRESS_MS = 250;
+const DRAG_SLOP_PX = 8;
+
 export default function MapContainer({
   config,
   baseLayerId,
@@ -56,7 +65,12 @@ export default function MapContainer({
   offlineData: _offlineData,
   onMapRef: _onMapRef,
   shape,
-  onShapeChange,
+  shapeMode,
+  onShapeAction,
+  liveShapeRef,
+  onShapeChange: _onShapeChange,
+  fitGeometry,
+  tileVersion,
 }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -64,12 +78,16 @@ export default function MapContainer({
   const onClickRef = useRef(onClick);
   const onFeatureSelectRef = useRef(onFeatureSelect);
   const onMoveEndRef = useRef(onMoveEnd);
-  const onShapeChangeRef = useRef(onShapeChange);
+  const onShapeActionRef = useRef(onShapeAction);
+  const shapeRef = useRef(shape);
+  const shapeModeRef = useRef(shapeMode);
   onReadyRef.current = onReady;
   onClickRef.current = onClick;
   onFeatureSelectRef.current = onFeatureSelect;
   onMoveEndRef.current = onMoveEnd;
-  onShapeChangeRef.current = onShapeChange;
+  onShapeActionRef.current = onShapeAction;
+  shapeRef.current = shape;
+  shapeModeRef.current = shapeMode;
 
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
   const baseLayerDefs = useMemo(() => resolveBaseLayers(merged), [merged]);
@@ -77,6 +95,10 @@ export default function MapContainer({
     () => resolveDefaultBaseLayerId(merged, baseLayerDefs),
     [merged, baseLayerDefs],
   );
+  const baseLayerDefsRef = useRef(baseLayerDefs);
+  baseLayerDefsRef.current = baseLayerDefs;
+  const defaultBaseLayerIdRef = useRef(defaultBaseLayerId);
+  defaultBaseLayerIdRef.current = defaultBaseLayerId;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -110,160 +132,125 @@ export default function MapContainer({
     });
     mapRef.current = map;
     // Stash the shape context for later effects.
-    (map as unknown as { __shapeCtx?: typeof shapeCtx }).__shapeCtx = shapeCtx;
+    (map as unknown as { __shapeCtx?: typeof shapeCtx; __systemsLayer?: typeof systemsLayer }).__shapeCtx = shapeCtx;
+    (map as unknown as { __systemsLayer?: typeof systemsLayer }).__systemsLayer = systemsLayer;
 
     applyBaseLayer(map, baseLayerDefs, defaultBaseLayerId);
 
-    // Track the live shape inside the click/drag handlers so they
-    // see the freshest copy (the closure's `shape` const is stale
-    // for the lifetime of the effect).
-    let liveShape: typeof shape = shape;
-    const renderShape = () => {
-      if (!liveShape) {
-        shapeCtx.source.clear();
-        shapeCtx.layer.setVisible(false);
-        return;
-      }
-      shapeCtx.layer.setVisible(true);
-      rebuildShapeSource(shapeCtx.source, liveShape);
-    };
-    renderShape();
+    // Drag state — managed across pointer events.
+    let dragTimer: ReturnType<typeof setTimeout> | null = null;
+    let dragRingIndex = -1;
+    let dragVertexIndex = -1;
+    let dragStartPixel: [number, number] = [0, 0];
+    let dragFired = false;
+
+    // Track the pixel position of the first vertex of the current
+    // open ring. Used for the close gesture: the user clicks the
+    // same pixel where they placed vertex 0 to close the ring.
+    let firstVertexPixel: [number, number] | null = null;
+    let placingOpenRingPixel = -1;
+    let placedCount = 0;
 
     map.on("click", (evt) => {
-      // First, hit-test the shape layer if the editor is active.
-      if (liveShape && shapeCtx) {
-        const pixel = asPixel(map.getEventPixel(evt.originalEvent));
-        const hit = shapeHitTest(map, shapeCtx.layer, pixel, 12);
-        const s = liveShape;
+      if (dragFired) {
+        dragFired = false;
+        return;
+      }
 
-        // Mode: delete.
-        if (s.mode === "delete") {
+      const curShape = liveShapeRef?.current ?? shapeRef.current;
+      const curMode = shapeModeRef.current;
+
+      // Shape editor hit-test takes priority when editor is active.
+      if (curShape && shapeCtx && curMode) {
+        // Rebuild the source synchronously so the hit-test always
+        // sees the latest shape (the React effect is async and may
+        // not have run between rapid clicks).
+        rebuildShapeSource(shapeCtx.source, { rings: curShape.rings });
+        const coordinate = evt.coordinate;
+        const [lon, lat] = toLonLat(coordinate);
+        if (typeof lon !== "number" || typeof lat !== "number") return;
+        const pixel = asPixel(map.getEventPixel(evt.originalEvent));
+        const hit = shapeHitTest(map, shapeCtx.layer, pixel, SHAPE_VERTEX_RADIUS + 12);
+
+        if (curMode === "delete") {
           if (hit.kind === "vertex" && hit.ringIndex >= 0) {
-            // Remove the vertex from the ring.
-            const rings = s.rings.map((r, ri) => {
-              if (ri !== hit.ringIndex) return r;
-              const verts = r.vertices.filter((_, vi) => vi !== hit.vertexIndex);
-              // If the ring had exactly 2 vertices and we removed one,
-              // remove the ring entirely.
-              if (verts.length === 0) return null;
-              return { ...r, vertices: verts, closed: r.closed && verts.length >= 3 };
-            }).filter(Boolean) as typeof s.rings;
-            onShapeChangeRef.current?.({
-              rings,
-              chords: s.chords,
-              connectFrom: null,
+            onShapeActionRef.current?.({
+              type: "deleteVertex",
+              ringIndex: hit.ringIndex,
+              vertexIndex: hit.vertexIndex,
             });
             return;
           }
           if (hit.kind === "edge" && hit.ringIndex >= 0) {
-            // Remove the ring entirely (collapsing the edge deletes
-            // its parent ring — finer-grained "remove edge only" is
-            // out of scope for v1).
-            const rings = s.rings.filter((_, ri) => ri !== hit.ringIndex);
-            onShapeChangeRef.current?.({
-              rings,
-              chords: s.chords,
-              connectFrom: null,
-            });
+            const nearest = findNearestEdge(curShape.rings, lon, lat);
+            if (nearest) {
+              onShapeActionRef.current?.({
+                type: "openEdge",
+                ringIndex: nearest.ringIndex,
+                after: nearest.insertAfter,
+              });
+            }
             return;
           }
-          // No-op for empty map in delete mode.
           return;
         }
 
-        // Mode: normal.
+        // Normal (add) mode.
+        // Close gesture: compare click pixel to the stored pixel
+        // of the first vertex of the current open ring.
+        {
+          const openIdx = lastOpenRingIndex(curShape);
+          if (openIdx >= 0 && placingOpenRingPixel === openIdx && firstVertexPixel) {
+            const openRing = curShape.rings[openIdx];
+            if (openRing && openRing.vertices.length >= 3) {
+              const dx = pixel[0] - firstVertexPixel[0];
+              const dy = pixel[1] - firstVertexPixel[1];
+              if (dx * dx + dy * dy <= (SHAPE_VERTEX_RADIUS + 12) ** 2) {
+                onShapeActionRef.current?.({ type: "closeRing" });
+                firstVertexPixel = null;
+                placingOpenRingPixel = -1;
+                placedCount = 0;
+                return;
+              }
+            }
+          }
+        }
+
         if (hit.kind === "vertex" && hit.ringIndex >= 0) {
-          // In-progress connect gesture.
-          if (s.connectFrom !== null) {
-            const fromIdx = globalVertexIndex(s.rings, s.connectFrom.ringIndex, s.connectFrom.vertexIndex);
-            const toIdx = globalVertexIndex(s.rings, hit.ringIndex, hit.vertexIndex);
-            if (fromIdx === toIdx) {
-              // Same vertex → cancel.
-              onShapeChangeRef.current?.({
-                rings: s.rings,
-                chords: s.chords,
-                connectFrom: null,
-              });
-              return;
-            }
-            // Add the chord (if not already present).
-            const already = s.chords.some(
-              ([a, b]) =>
-                (a === fromIdx && b === toIdx) || (a === toIdx && b === fromIdx),
-            );
-            if (!already) {
-              onShapeChangeRef.current?.({
-                rings: s.rings,
-                chords: [...s.chords, [fromIdx, toIdx]],
-                connectFrom: null,
-              });
-            } else {
-              onShapeChangeRef.current?.({
-                rings: s.rings,
-                chords: s.chords,
-                connectFrom: null,
-              });
-            }
-            return;
-          }
-          // §21.5 — single-click on vertex 0 of an open ring (with
-          // ≥3 vertices) closes the ring. This is the primary
-          // close gesture: the user draws 3+ vertices then taps
-          // the first one to seal the shape.
-          const hitRing = s.rings[hit.ringIndex];
-          if (
-            hitRing &&
-            !hitRing.closed &&
-            hit.vertexIndex === 0 &&
-            hitRing.vertices.length >= 3
-          ) {
-            onShapeChangeRef.current?.({
-              rings: s.rings.map((r, ri) =>
-                ri === hit.ringIndex ? { ...r, closed: true } : r,
-              ),
-              chords: s.chords,
-              connectFrom: null,
-            });
-            return;
-          }
-          // Otherwise: a no-op. The user can:
-          //   - dblclick to start the connect gesture
-          //   - switch to delete mode to remove the vertex
-          //   - drag to move it
           return;
         }
-
         if (hit.kind === "edge" && hit.ringIndex >= 0) {
-          // Split the edge: insert a new vertex at the click
-          // projection. We compute the projection on the host side
-          // via `findNearestEdge` (already used below) but here we
-          // approximate by inserting just before the next vertex of
-          // the hit ring.
-          const coord = toLonLat(evt.coordinate);
-          const lon = coord[0] ?? 0;
-          const lat = coord[1] ?? 0;
-          const rings = insertVertexOnRing(s.rings, hit.ringIndex, lon, lat);
-          onShapeChangeRef.current?.({
-            rings,
-            chords: s.chords,
-            connectFrom: null,
-          });
+          const nearest = findNearestEdge(curShape.rings, lon, lat);
+          if (nearest) {
+            onShapeActionRef.current?.({
+              type: "splitEdge",
+              ringIndex: nearest.ringIndex,
+              after: nearest.insertAfter,
+              lon,
+              lat,
+            });
+          }
           return;
         }
-
-        // No vertex or edge hit → treat as "tap on empty map" if
-        // we're in normal mode. The host (ShapeEditor) is also
-        // listening to onClick; we don't double-emit because we
-        // already handled the gesture here. But we DO want to
-        // surface the gesture up so the host can decide what to do
-        // (e.g. add a vertex vs. start a new ring). The simplest
-        // path: forward the click to onClickRef, and let the host
-        // call back with onShapeChange. We set the live shape
-        // ourselves (host will pick it up via prop diff).
-        const coord = toLonLat(evt.coordinate);
-        const lon = coord[0] ?? 0;
-        const lat = coord[1] ?? 0;
-        onClickRef.current?.(lon, lat);
+        // Empty map click in normal mode → append vertex.
+        {
+          const openIdx = lastOpenRingIndex(curShape);
+          if (placingOpenRingPixel !== openIdx) {
+            // Started a new ring or switched rings — reset tracking.
+            firstVertexPixel = null;
+            placedCount = 0;
+          }
+          placingOpenRingPixel = openIdx;
+          if (openIdx < 0) {
+            // All rings closed, new ring will be created — track it.
+            firstVertexPixel = pixel;
+            placedCount = 0;
+          } else if (placedCount === 0) {
+            firstVertexPixel = pixel;
+          }
+          placedCount = (openIdx >= 0 ? curShape.rings[openIdx]?.vertices.length ?? 0 : 0) + 1;
+        }
+        onShapeActionRef.current?.({ type: "appendVertex", lon, lat });
         return;
       }
 
@@ -293,60 +280,77 @@ export default function MapContainer({
       }
     });
 
-    // Double-click on a vertex starts the "connect two vertices"
-    // gesture.
-    map.on("dblclick", (evt) => {
-      if (!liveShape) return;
-      const pixel = asPixel(map.getEventPixel(evt.originalEvent));
-      const hit = shapeHitTest(map, shapeCtx.layer, pixel, 12);
-      if (hit.kind === "vertex" && hit.ringIndex >= 0) {
-        onShapeChangeRef.current?.({
-          rings: liveShape.rings,
-          chords: liveShape.chords,
-          connectFrom: { ringIndex: hit.ringIndex, vertexIndex: hit.vertexIndex },
-        });
-        evt.preventDefault();
-      }
-    });
-
-    // Drag a vertex. We use a single `pointermove` handler while
-    // the user is dragging (started on pointerdown on a vertex).
-    let drag: { ringIndex: number; vertexIndex: number } | null = null;
-    const handlePointerEvent = (evt: { originalEvent: unknown }) => {
-      if (!liveShape || !evt.originalEvent) return;
+    // Long-press-to-drag: pointerdown on a vertex starts a 350 ms timer.
+    // If the timer fires before significant movement, enter drag mode
+    // and emit moveVertex actions on pointermove until pointerup.
+    const handlePointerDown = (evt: { originalEvent: unknown }) => {
+      if (!(liveShapeRef?.current ?? shapeRef.current) || !shapeCtx) return;
       const ev = evt.originalEvent as MouseEvent;
       if ("button" in ev && ev.button !== 0) return;
-      const pixel = asPixel(map.getEventPixel(evt.originalEvent as Parameters<typeof map.getEventPixel>[0]));
-      const hit = shapeHitTest(map, shapeCtx.layer, pixel, 12);
-      if (hit.kind === "vertex" && hit.ringIndex >= 0) {
-        drag = { ringIndex: hit.ringIndex, vertexIndex: hit.vertexIndex };
-        ev.preventDefault();
-      }
+      const pixel = asPixel(
+        map.getEventPixel(
+          evt.originalEvent as Parameters<typeof map.getEventPixel>[0],
+        ),
+      );
+      const hit = shapeHitTest(map, shapeCtx.layer, pixel, SHAPE_VERTEX_RADIUS + 12);
+      if (hit.kind !== "vertex" || hit.ringIndex < 0) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      dragStartPixel = pixel;
+      dragRingIndex = hit.ringIndex;
+      dragVertexIndex = hit.vertexIndex;
+      dragFired = false;
+      dragTimer = setTimeout(() => {
+        dragTimer = null;
+        dragFired = true;
+      }, LONG_PRESS_MS);
     };
-    // OpenLayers uses 'pointerdown' / 'pointermove' / 'pointerup'.
-    // Fall back to 'mousedown' / 'mousemove' / 'mouseup' if the
-    // pointer variant isn't available (older OL builds). The casts
-    // below are safe — the event payload is the same.
-    map.on("pointerdown" as never, handlePointerEvent as never);
-    map.on("mousedown" as never, handlePointerEvent as never);
+
     const handlePointerMove = (evt: unknown) => {
-      if (!drag || !liveShape) return;
-      const e = evt as { coordinate: number[] };
+      const e = evt as { originalEvent?: MouseEvent; coordinate: number[] };
+      // If timer is still active, check for slop (early movement cancels drag).
+      if (dragTimer) {
+        const pixel = asPixel(
+          map.getEventPixel(
+            (e.originalEvent ?? e) as Parameters<typeof map.getEventPixel>[0],
+          ),
+        );
+        const dx = pixel[0] - dragStartPixel[0];
+        const dy = pixel[1] - dragStartPixel[1];
+        if (dx * dx + dy * dy > DRAG_SLOP_PX * DRAG_SLOP_PX) {
+          clearTimeout(dragTimer);
+          dragTimer = null;
+        }
+        return;
+      }
+      if (!dragFired) return;
+      // Suppress OL's pan/zoom while we're vertex-dragging.
+      if (e.originalEvent && "preventDefault" in e.originalEvent) {
+        (e.originalEvent as Event).preventDefault();
+      }
       if (!Array.isArray(e.coordinate)) return;
       const [lon, lat] = toLonLat(e.coordinate);
       if (typeof lon !== "number" || typeof lat !== "number") return;
-      const rings = moveVertex(liveShape.rings, drag.ringIndex, drag.vertexIndex, [lon, lat]);
-      onShapeChangeRef.current?.({
-        rings,
-        chords: liveShape.chords,
-        connectFrom: liveShape.connectFrom,
+      onShapeActionRef.current?.({
+        type: "moveVertex",
+        ringIndex: dragRingIndex,
+        vertexIndex: dragVertexIndex,
+        lon,
+        lat,
       });
     };
+
+    const endDrag = () => {
+      if (dragTimer) {
+        clearTimeout(dragTimer);
+        dragTimer = null;
+      }
+    };
+
+    map.on("pointerdown" as never, handlePointerDown as never);
+    map.on("mousedown" as never, handlePointerDown as never);
     map.on("pointermove" as never, handlePointerMove as never);
     map.on("mousemove" as never, handlePointerMove as never);
-    const endDrag = () => {
-      drag = null;
-    };
     map.on("pointerup" as never, endDrag as never);
     map.on("mouseup" as never, endDrag as never);
 
@@ -386,26 +390,42 @@ export default function MapContainer({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const id = baseLayerId ?? defaultBaseLayerId;
-    applyBaseLayer(map, baseLayerDefs, id);
-  }, [baseLayerId, baseLayerDefs, defaultBaseLayerId]);
+    const id = baseLayerId ?? defaultBaseLayerIdRef.current;
+    applyBaseLayer(map, baseLayerDefsRef.current, id);
+  }, [baseLayerId]);
 
   // Re-render the shape source whenever the host's shape prop
   // changes. We rely on the ShapeLayer being created in the mount
   // effect above and stashed on the map instance.
+  // Also disable all map interactions (DragPan, zoom, etc.) when
+  // shape editing is active so clicks never shift the view.
   useEffect(() => {
     const map = mapRef.current as unknown as
-      | (Map & { __shapeCtx?: ReturnType<typeof createShapeLayer> })
+      | (Map & {
+          __shapeCtx?: ReturnType<typeof createShapeLayer>;
+          __systemsLayer?: Layer;
+        })
       | null;
     const shapeCtx = map?.__shapeCtx;
+    const systemsLayer = map?.__systemsLayer;
     if (!shapeCtx) return;
     if (!shape) {
       shapeCtx.source.clear();
       shapeCtx.layer.setVisible(false);
+      if (systemsLayer) systemsLayer.setVisible(true);
+      const interactions = map?.getInteractions().getArray();
+      if (interactions) {
+        for (const ix of interactions) ix.setActive(true);
+      }
       return;
     }
     shapeCtx.layer.setVisible(true);
+    if (systemsLayer) systemsLayer.setVisible(false);
     rebuildShapeSource(shapeCtx.source, shape);
+    const interactions = map?.getInteractions().getArray();
+    if (interactions) {
+      for (const ix of interactions) ix.setActive(false);
+    }
   }, [shape]);
 
   const lastFlyToRef = useRef<{ lon: number; lat: number; zoom?: number } | null>(null);
@@ -423,67 +443,42 @@ export default function MapContainer({
     });
   }, [flyTo]);
 
+  const lastFitRef = useRef<unknown>(null);
+  useEffect(() => {
+    if (!mapRef.current || !fitGeometry) return;
+    if (fitGeometry === lastFitRef.current) return;
+    lastFitRef.current = fitGeometry;
+    const ext = extentFromGeoJSON(fitGeometry);
+    if (!ext) return;
+    const mapExt = transformExtent(ext, "EPSG:4326", "EPSG:3857");
+    const view = mapRef.current.getView();
+    view.fit(mapExt, {
+      padding: [30, 30, 30, 30],
+      duration: 300,
+      maxZoom: 16,
+    });
+  }, [fitGeometry]);
+
+  const prevTileVersionRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || typeof tileVersion !== "number") return;
+    if (prevTileVersionRef.current === tileVersion) return;
+    prevTileVersionRef.current = tileVersion;
+    const layers = map.getLayers().getArray();
+    for (const layer of layers) {
+      const src = (layer as unknown as { getSource?: () => unknown }).getSource?.();
+      if (src && typeof (src as { getUrls?: () => string[] }).getUrls === "function") {
+        const s = src as unknown as { getUrls: () => string[]; setUrl: (url: string) => void };
+        const urls = s.getUrls();
+        if (urls && urls[0]) {
+          const baseUrl = urls[0].replace(/[?&]_v=\d+/, "");
+          s.setUrl(`${baseUrl}${baseUrl.includes("?") ? "&" : "?"}_v=${tileVersion}`);
+        }
+      }
+    }
+  }, [tileVersion]);
+
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 }
 
-/* ----------------------------------------------------------------- */
-/* Helpers — the editor state-machine math                            */
-/* ----------------------------------------------------------------- */
-
-type ShapeRing = { vertices: Array<[number, number]>; closed: boolean };
-type ShapeRings = ShapeRing[];
-
-/**
- * Insert a new vertex into the given ring at the position closest
- * to the click point. We do this in (lon, lat) space by walking the
- * ring's segments and inserting after the segment whose projection
- * is closest.
- */
-function insertVertexOnRing(
-  rings: ShapeRings,
-  ringIndex: number,
-  lon: number,
-  lat: number,
-): ShapeRings {
-  return rings.map((r, ri) => {
-    if (ri !== ringIndex) return r;
-    if (r.vertices.length < 2) {
-      return { ...r, vertices: [[lon, lat]] };
-    }
-    const nearest = findNearestEdge([r], lon, lat);
-    if (!nearest) return { ...r, vertices: [...r.vertices, [lon, lat]] };
-    const verts = [...r.vertices];
-    verts.splice(nearest.insertAfter + 1, 0, [lon, lat]);
-    return { ...r, vertices: verts };
-  });
-}
-
-/** Move a vertex in place. */
-function moveVertex(
-  rings: ShapeRings,
-  ringIndex: number,
-  vertexIndex: number,
-  newPos: [number, number],
-): ShapeRings {
-  return rings.map((r, ri) => {
-    if (ri !== ringIndex) return r;
-    return {
-      ...r,
-      vertices: r.vertices.map((v, vi) => (vi === vertexIndex ? newPos : v)),
-    };
-  });
-}
-
-/** Convert a (ringIndex, vertexIndex) pair into the global vertex index. */
-function globalVertexIndex(
-  rings: ShapeRings,
-  ringIndex: number,
-  vertexIndex: number,
-): number {
-  let n = 0;
-  for (let ri = 0; ri < rings.length; ri++) {
-    if (ri === ringIndex) return n + vertexIndex;
-    n += rings[ri]!.vertices.length;
-  }
-  return -1;
-}

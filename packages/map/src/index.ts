@@ -28,5 +28,6 @@ export {
   featureLabelFor,
   TRAIL_STROKE_WIDTH,
 } from "./shared/styles.js";
+export { extentFromGeoJSON } from "./shared/extent.js";
 export type { BridgeEvent, BridgeCommand, BridgeMethod } from "./bridge/types.js";
 export { commandToScript, isBridgeEvent, isBridgeMethod } from "./bridge/ol-bridge.js";

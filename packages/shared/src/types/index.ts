@@ -144,19 +144,6 @@ export type ShapeRing = {
 };
 export type Shape = {
   rings: ShapeRing[];
-  /**
-   * Edges added via the "connect two vertices" gesture that don't sit
-   * on any ring's vertex sequence. Pairs of indices into each
-   * ring's flattened vertex list.
-   */
-  chords: Array<[number, number]>;
-  /**
-   * Position of the vertex the user double-clicked to start a
-   * "connect two vertices" gesture. Null when not connecting.
-   * Editor state — NOT persisted to the server (see
-   * shapeToGeoJSON).
-   */
-  connectFrom: { ringIndex: number; vertexIndex: number } | null;
 };
 
 export type HierarchyTreeNode = {

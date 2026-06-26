@@ -11,6 +11,7 @@ import {
 import { commandToScript, isBridgeEvent } from "./bridge/ol-bridge.js";
 import type { MapContainerProps } from "./types.js";
 import type { BridgeCommand, BridgeEvent } from "./bridge/types.js";
+import { extentFromGeoJSON } from "./shared/extent.js";
 import {
   type ShapeAction,
   findNearestEdge,
@@ -278,6 +279,7 @@ function buildMapHtml(
         vectorLayers.systems=new ol.layer.Vector({source:new ol.source.Vector(),style:createSystemVectorStyle(),visible:offlineMode});
         vectorLayers.systems.set('name','systems');
         allLayers.push(vectorLayers.systems);
+        vectorLayers.systems.on('click',function(e){var f=map.forEachFeatureAtPixel(e.pixel,function(f){return f});if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'systems',slug:f.get('slug'),name:f.get('name')})});
 
         vectorLayers.features=new ol.layer.Vector({source:new ol.source.Vector(),style:createFeatureVectorStyle(),visible:offlineMode});
         vectorLayers.features.set('name','features');
@@ -374,6 +376,29 @@ function buildMapHtml(
               postToRN({type:'shapeHit',kind:hit.kind,ringIndex:hit.ringIndex,vertexIndex:hit.vertexIndex,lon:c[0],lat:c[1]});
               return;
             }
+          }
+          // Hit-test tile/vector features (trails, systems, features,
+          // super-systems) and send a featureSelect event when one is
+          // found. We do this directly in the map click handler because
+          // OpenLayers layer-specific click events do not fire reliably
+          // for VectorTile layers on Android WebView.
+          var hitResult = null;
+          map.forEachFeatureAtPixel(e.pixel,function(f,l){
+            if(!hitResult && f){
+              var nm = l && l.get ? l.get('name') : '';
+              // Map internal layer names to bridge layer identifiers.
+              if(nm==='super_systems')nm='superSystems';
+              hitResult = {feature:f, layerName:nm};
+            }
+            return null;
+          },{layerFilter:function(l){return l!==shapeLayer}});
+          if(hitResult){
+            var f = hitResult.feature;
+            var id = f.get('id');
+            var slug = f.get('slug');
+            var name = f.get('name');
+            if(id) postToRN({type:'featureSelect',id:id,layer:hitResult.layerName,slug:slug,name:name});
+            return;
           }
           var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]});
         });
@@ -521,8 +546,13 @@ function buildMapHtml(
             if(!shapeSource||!shapeLayer) return;
             shapeSource.clear();
             var rings = a.rings || [];
-            if(!rings.length){ shapeLayer.setVisible(false); return; }
+            if(!rings.length){
+              shapeLayer.setVisible(false);
+              if(tileLayers.systems) tileLayers.systems.setVisible(true);
+              return;
+            }
             shapeLayer.setVisible(true);
+            if(tileLayers.systems) tileLayers.systems.setVisible(false);
             for(var ri=0;ri<rings.length;ri++){
               var r=rings[ri];
               if(!r.vertices||r.vertices.length<2) continue;
@@ -538,6 +568,31 @@ function buildMapHtml(
                 pt.set('ringIndex',ri);
                 pt.set('vertexIndex',vi);
                 shapeSource.addFeature(pt);
+              }
+            }
+          }else if(m === 'fitBounds' && a){
+            if(!map) return;
+            var fitExt = [a.minLon, a.minLat, a.maxLon, a.maxLat];
+            var pad = typeof a.padding === 'number' ? a.padding : 30;
+            var dur = typeof a.duration === 'number' ? a.duration : 300;
+            var mz = typeof a.maxZoom === 'number' ? a.maxZoom : 16;
+            map.getView().fit(ol.proj.transformExtent(fitExt, 'EPSG:4326', 'EPSG:3857'), {
+              padding: [pad, pad, pad, pad],
+              duration: dur,
+              maxZoom: mz
+            });
+          }else if(m === 'refreshTiles' && a){
+            if(!map) return;
+            var ver = typeof a.version === 'number' ? a.version : 0;
+            var layers = map.getLayers().getArray();
+            for(var li = 0; li < layers.length; li++){
+              var src = layers[li].getSource ? layers[li].getSource() : null;
+              if(src && src.getUrls){
+                var urls = src.getUrls();
+                if(urls && urls[0]){
+                  var baseUrl = urls[0].replace(/[?&]_v=\\d+/,'');
+                  src.setUrl(baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + '_v=' + ver);
+                }
               }
             }
           }
@@ -711,7 +766,34 @@ function buildMapHtml(
             map.getView().animate({center:ol.proj.fromLonLat([a.followLon,a.followLat]),duration:250});
           }
         },
-        clearLiveRoute:function(){if(liveRouteSource)liveRouteSource.clear()}
+        clearLiveRoute:function(){if(liveRouteSource)liveRouteSource.clear()},
+        fitBounds:function(a){
+          if(!map)return;
+          var ext=[a.minLon,a.minLat,a.maxLon,a.maxLat];
+          var pad=typeof a.padding==='number'?a.padding:30;
+          var dur=typeof a.duration==='number'?a.duration:300;
+          var mz=typeof a.maxZoom==='number'?a.maxZoom:16;
+          map.getView().fit(ol.proj.transformExtent(ext,'EPSG:4326','EPSG:3857'),{
+            padding:[pad,pad,pad,pad],
+            duration:dur,
+            maxZoom:mz
+          });
+        },
+        refreshTiles:function(a){
+          if(!map)return;
+          var ver=typeof a.version==='number'?a.version:0;
+          var layers=map.getLayers().getArray();
+          for(var li=0;li<layers.length;li++){
+            var src=layers[li].getSource?layers[li].getSource():null;
+            if(src&&src.getUrls){
+              var urls=src.getUrls();
+              if(urls&&urls[0]){
+                var baseUrl=urls[0].replace(/[?&]_v=\\d+/,'');
+                src.setUrl(baseUrl+(baseUrl.indexOf('?')>=0?'&':'?')+'_v='+ver);
+              }
+            }
+          }
+        }
       };
       window.addEventListener('error',function(e){postToRN({type:'error',message:e.message})});
       // Replay any commands the host sent before the bridge was installed.
@@ -739,6 +821,8 @@ export default function MapContainer({
   shape,
   shapeMode,
   onShapeAction,
+  fitGeometry,
+  tileVersion,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
@@ -751,10 +835,16 @@ export default function MapContainer({
   const initSentRef = useRef(false);
   const drawModeRef = useRef<boolean | undefined>(undefined);
   const baseLayerRef = useRef<string | undefined>(undefined);
+  const baseLayerDefsRef = useRef(baseLayerDefs);
+  baseLayerDefsRef.current = baseLayerDefs;
+  const defaultBaseLayerIdRef = useRef(defaultBaseLayerId);
+  defaultBaseLayerIdRef.current = defaultBaseLayerId;
   const offlineModeRef = useRef<boolean | undefined>(undefined);
   const offlineBaseLayerRef = useRef<MapContainerProps["offlineBaseLayer"] | undefined>(undefined);
   const liveRouteRef = useRef<MapContainerProps["liveRoute"] | undefined>(undefined);
   const shapeRef = useRef<MapContainerProps["shape"] | undefined>(undefined);
+  const fitGeometryRef = useRef<MapContainerProps["fitGeometry"] | undefined>(undefined);
+  const tileVersionRef = useRef<number | undefined>(undefined);
 
   const initialCenter = merged.initialCenter ?? defaultMapConfig.initialCenter;
   const initialZoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
@@ -942,6 +1032,15 @@ export default function MapContainer({
     if (shapeRef.current) {
       send({ method: "setShape", args: { rings: shapeRef.current.rings } });
     }
+    if (fitGeometryRef.current) {
+      const ext = extentFromGeoJSON(fitGeometryRef.current);
+      if (ext) {
+        send({ method: "fitBounds", args: { minLon: ext[0], minLat: ext[1], maxLon: ext[2], maxLat: ext[3], padding: 30, duration: 300, maxZoom: 16 } });
+      }
+    }
+    if (typeof tileVersionRef.current === "number") {
+      send({ method: "refreshTiles", args: { version: tileVersionRef.current } });
+    }
   }, [send]);
 
   // Expose send function to parent
@@ -952,11 +1051,11 @@ export default function MapContainer({
   // Sync base layer choice to the WebView. The HTML's `init` already inserted
   // the default; this effect only fires if the user later switches layers.
   useEffect(() => {
-    const id = baseLayerId ?? defaultBaseLayerId;
+    const id = baseLayerId ?? defaultBaseLayerIdRef.current;
     baseLayerRef.current = id;
     if (!initSentRef.current) return;
     send({ method: "setBaseLayer", args: { id } });
-  }, [baseLayerId, defaultBaseLayerId, send]);
+  }, [baseLayerId, send]);
 
   // Sync offline mode to WebView
   useEffect(() => {
@@ -1040,6 +1139,26 @@ export default function MapContainer({
     send({ method: "flyTo", args: { lon: flyTo.lon, lat: flyTo.lat, zoom: flyTo.zoom } });
   }, [flyTo, send]);
 
+  const lastFitGeomRef = useRef<unknown>(null);
+  useEffect(() => {
+    fitGeometryRef.current = fitGeometry;
+    if (!fitGeometry || !initSentRef.current) return;
+    if (fitGeometry === lastFitGeomRef.current) return;
+    lastFitGeomRef.current = fitGeometry;
+    const ext = extentFromGeoJSON(fitGeometry);
+    if (!ext) return;
+    send({
+      method: "fitBounds",
+      args: { minLon: ext[0], minLat: ext[1], maxLon: ext[2], maxLat: ext[3], padding: 30, duration: 300, maxZoom: 16 },
+    });
+  }, [fitGeometry, send]);
+
+  useEffect(() => {
+    tileVersionRef.current = tileVersion;
+    if (typeof tileVersion !== "number" || !initSentRef.current) return;
+    send({ method: "refreshTiles", args: { version: tileVersion } });
+  }, [tileVersion, send]);
+
   if (Platform.OS === "web") {
     return null;
   }
@@ -1108,8 +1227,8 @@ function handleBridgeEvent(
       handlers.onFeatureSelect?.({
         id: event.id,
         layer,
-        slug: null,
-        name: null,
+        slug: event.slug ?? null,
+        name: event.name ?? null,
       });
       return;
     }

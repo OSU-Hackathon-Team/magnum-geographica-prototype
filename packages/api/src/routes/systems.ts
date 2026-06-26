@@ -11,7 +11,7 @@ import { recordRevision } from "../services/revisions.js";
 import { resolveContributorName } from "../services/identity.js";
 import { canWrite, getProtection, refreshProtection } from "../services/protection.js";
 import { evaluateAction } from "../services/patrol.js";
-import { updateSystem } from "../services/hierarchy.js";
+import { updateSystem, deleteSystem } from "../services/hierarchy.js";
 
 type Variables = { user?: AuthUser };
 
@@ -339,4 +339,54 @@ systemsRoute.put("/:id", authRequired(), async (c) => {
   const { lon, lat, ...rest } = fresh;
   const center = lon != null && lat != null ? { lat, lon } : null;
   return c.json({ ...rest, center });
+});
+
+systemsRoute.delete("/:id", authRequired(), async (c) => {
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+  const id = c.req.param("id");
+
+  const actorRow = await db
+    .select({ karma: users.trustScore, role: users.role })
+    .from(users)
+    .where(eq(users.id, authUser.id))
+    .limit(1);
+  const allowed = canWrite(
+    (await getProtection("system", id)).level,
+    {
+      role: actorRow[0]?.role ?? null,
+      karma: Number(actorRow[0]?.karma ?? 0),
+      loggedIn: true,
+    },
+  );
+  if (!allowed) {
+    return c.json({ error: "forbidden", message: "protection level requires higher trust tier" }, 403);
+  }
+
+  const snapshot = await db
+    .select({ name: systems.name, slug: systems.slug })
+    .from(systems)
+    .where(eq(systems.id, id))
+    .limit(1);
+
+  const deleted = await deleteSystem(id);
+  if (!deleted) return c.json({ error: "not_found" }, 404);
+
+  if (snapshot[0]) {
+    await recordRevision({
+      targetType: "system",
+      targetId: id,
+      action: "delete",
+      actorId: authUser.id,
+      contributorName: resolveContributorName({
+        req: c.req,
+        get: c.get.bind(c),
+      }),
+      editSummary: `Deleted system '${snapshot[0].name}' (${snapshot[0].slug})`,
+      payloadBefore: { name: snapshot[0].name, slug: snapshot[0].slug },
+      payloadAfter: null,
+    });
+  }
+
+  return c.json({ ok: true });
 });

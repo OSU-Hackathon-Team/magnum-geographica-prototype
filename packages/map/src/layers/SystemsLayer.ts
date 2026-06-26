@@ -8,7 +8,7 @@ import { SYSTEM_FILL_OPACITY, SYSTEM_STROKE_WIDTH } from "../shared/styles.js";
 import type { MapConfig } from "../shared/config.js";
 
 export const SYSTEM_MIN_ZOOM = 5;
-export const SYSTEM_MAX_ZOOM = 12;
+export const SYSTEM_MAX_ZOOM = 14;
 
 function hexToRgba(hex: string, opacity: number): string {
   const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);

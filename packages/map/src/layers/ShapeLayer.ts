@@ -1,16 +1,12 @@
 /**
- * §21.5 — shape editor layer.
+ * Shape editor layer. Renders an in-progress boundary shape (one or
+ * more rings of [lon, lat] vertices). Closed rings are drawn as a
+ * solid green stroke with translucent fill; open rings are drawn as
+ * a dashed green line. Vertices are rendered as circles.
  *
- * Renders an in-progress boundary shape (one or more rings, each a
- * sequence of [lon, lat] vertices, plus optional chord edges). Closed
- * rings are drawn as a solid green stroke with a translucent fill;
- * the last open ring is drawn as a dashed green line. Vertices are
- * rendered as circles; the "connect" source vertex is highlighted.
- *
- * The host screen owns the Shape state and the mode toggle. This
- * module's only job is to render the current state and to expose
- * hit-test helpers so the host can decide whether a click landed
- * on a vertex, an edge, or empty map.
+ * This module's only job is to render the current state and to
+ * expose hit-test helpers so the host can decide whether a click
+ * landed on a vertex, an edge, or empty map.
  */
 import VectorLayer from "ol/layer/Vector.js";
 import VectorSource from "ol/source/Vector.js";
@@ -25,9 +21,7 @@ import type { Map } from "ol";
 export const SHAPE_OPEN_RING_COLOR = "#22c55e";
 export const SHAPE_OPEN_RING_FILL = "rgba(34, 197, 94, 0.15)";
 export const SHAPE_VERTEX_COLOR = "#0f172a";
-export const SHAPE_VERTEX_RADIUS = 6;
-export const SHAPE_CONNECT_FROM_COLOR = "#f59e0b";
-export const SHAPE_CHORD_COLOR = "#3b82f6";
+export const SHAPE_VERTEX_RADIUS = 8;
 
 export interface ShapeRing {
   vertices: Array<[number, number]>;
@@ -36,9 +30,6 @@ export interface ShapeRing {
 
 export interface ShapeLayerState {
   rings: ShapeRing[];
-  chords: Array<[number, number]>;
-  /** Vertex the user double-clicked to start a "connect" gesture. */
-  connectFrom: { ringIndex: number; vertexIndex: number } | null;
 }
 
 type Ring = Array<[number, number]>;
@@ -134,38 +125,6 @@ export function rebuildShapeSource(
       source.addFeature(feat2);
     }
   }
-
-  // Chord edges.
-  const verts = allVertices(state.rings);
-  for (const [a, b] of state.chords) {
-    if (a >= 0 && a < verts.length && b >= 0 && b < verts.length) {
-      const feat = new Feature({
-        geometry: new LineString([
-          fromLonLat(verts[a]!),
-          fromLonLat(verts[b]!),
-        ]),
-        shapeKind: "chord",
-      });
-      feat.setId(vid(`chord-${a}-${b}`));
-      source.addFeature(feat);
-    }
-  }
-
-  // Highlight the connect-from vertex.
-  if (state.connectFrom !== null) {
-    const { ringIndex, vertexIndex } = state.connectFrom;
-    const ring = state.rings[ringIndex];
-    const vertex = ring?.vertices[vertexIndex];
-    if (vertex) {
-      const [lon, lat] = vertex;
-      const feat = new Feature({
-        geometry: new Point(fromLonLat([lon, lat])),
-        shapeKind: "connect-from",
-      });
-      feat.setId(vid("connect-from"));
-      source.addFeature(feat);
-    }
-  }
 }
 
 export function createShapeLayer(): {
@@ -201,24 +160,6 @@ export function createShapeLayer(): {
             radius: SHAPE_VERTEX_RADIUS,
             fill: new Fill({ color: SHAPE_VERTEX_COLOR }),
             stroke: new Stroke({ color: "#fff", width: 2 }),
-          }),
-        });
-      }
-      if (kind === "connect-from") {
-        return new Style({
-          image: new CircleStyle({
-            radius: SHAPE_VERTEX_RADIUS + 2,
-            fill: new Fill({ color: SHAPE_CONNECT_FROM_COLOR }),
-            stroke: new Stroke({ color: "#fff", width: 2 }),
-          }),
-        });
-      }
-      if (kind === "chord") {
-        return new Style({
-          stroke: new Stroke({
-            color: SHAPE_CHORD_COLOR,
-            width: 1.5,
-            lineDash: [3, 3],
           }),
         });
       }
@@ -274,58 +215,15 @@ export function shapeHitTest(
       return { kind: "vertex", ringIndex, vertexIndex };
     }
   }
-  // Second pass: edge / chord.
+  // Second pass: edge.
   for (const f of features) {
     const kind = (f as { get: (k: string) => unknown }).get("shapeKind");
     if (kind === "ring-outline") {
       const ringIndex = Number((f as { get: (k: string) => unknown }).get("ringIndex") ?? -1);
       return { kind: "edge", ringIndex, vertexIndex: -1 };
     }
-    if (kind === "chord") {
-      return { kind: "edge", ringIndex: -1, vertexIndex: -1 };
-    }
   }
   return { kind: "empty" };
 }
 
-/**
- * Find the nearest point on a ring edge to a projected click point.
- * Returns the ring index + position to insert the new vertex at.
- * Used by the host to split an edge.
- */
-export function findNearestEdge(
-  rings: ShapeRing[],
-  lon: number,
-  lat: number,
-): { ringIndex: number; insertAfter: number } | null {
-  let best: {
-    ringIndex: number;
-    insertAfter: number;
-    distSq: number;
-  } | null = null;
-  for (let ri = 0; ri < rings.length; ri++) {
-    const r = rings[ri]!;
-    if (r.vertices.length < 2) continue;
-    for (let i = 0; i < r.vertices.length - 1; i++) {
-      const [aLon, aLat] = r.vertices[i]!;
-      const [bLon, bLat] = r.vertices[i + 1]!;
-      const dx = bLon - aLon;
-      const dy = bLat - aLat;
-      const lenSq = dx * dx + dy * dy;
-      let t = 0;
-      if (lenSq > 0) {
-        t = ((lon - aLon) * dx + (lat - aLat) * dy) / lenSq;
-        t = Math.max(0, Math.min(1, t));
-      }
-      const projLon = aLon + t * dx;
-      const projLat = aLat + t * dy;
-      const ddx = lon - projLon;
-      const ddy = lat - projLat;
-      const distSq = ddx * ddx + ddy * ddy;
-      if (best === null || distSq < best.distSq) {
-        best = { ringIndex: ri, insertAfter: i, distSq };
-      }
-    }
-  }
-  return best ? { ringIndex: best.ringIndex, insertAfter: best.insertAfter } : null;
-}
+

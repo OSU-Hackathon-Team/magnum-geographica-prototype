@@ -35,6 +35,10 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.clearLiveRoute();`;
     case "setShape":
       return `window.olBridge.setShape(${json});`;
+    case "fitBounds":
+      return `window.olBridge.fitBounds(${json});`;
+    case "refreshTiles":
+      return `window.olBridge.refreshTiles(${json});`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -61,6 +65,8 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "setLiveRoute",
     "clearLiveRoute",
     "setShape",
+    "fitBounds",
+    "refreshTiles",
   ].includes(method);
 }
 

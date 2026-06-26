@@ -47,30 +47,33 @@ export interface MapContainerProps {
     followLat?: number | null;
   } | null;
   /**
-   * Real-time shape editor (§21.5 boundary editor). When set, the map
-   * mounts an editable layer for the in-progress boundary. The
-   * editor drives gestures through the existing `onClick` callback
-   * (vertex add / edge split / vertex tap) and emits changes via
-   * `onShapeChange`. The host screen owns the Shape state and the
-   * mode toggle (normal vs delete).
+   * Real-time shape editor. When set, the map mounts a vector layer
+   * rendering the rings. Gestures (click, long-press drag) are
+   * translated to `ShapeAction` and emitted via `onShapeAction`.
+   * The host owns state, mode, and the reducer.
    */
-  shape?: {
-    rings: Array<{ vertices: Array<[number, number]>; closed: boolean }>;
-    /** Edges from the "connect two vertices" gesture. */
-    chords: Array<[number, number]>;
-    /** "normal" places/adds; "delete" removes. */
-    mode: "normal" | "delete";
-    /**
-     * Position of the vertex the user double-clicked to start a
-     * "connect two vertices" gesture. Null when not connecting.
-     * Identified by ring+vertex indices (not a global index) so
-     * the host can resolve it against its own copy of the rings.
-     */
-    connectFrom: { ringIndex: number; vertexIndex: number } | null;
-  } | null;
-  onShapeChange?: (shape: {
-    rings: Array<{ vertices: Array<[number, number]>; closed: boolean }>;
-    chords: Array<[number, number]>;
-    connectFrom: { ringIndex: number; vertexIndex: number } | null;
-  }) => void;
+  shape?: { rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> } | null;
+  shapeMode?: "normal" | "delete";
+  onShapeAction?: (action: import("@magnum/shared").ShapeAction) => void;
+  onShapeChange?: (shape: { rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> }) => void;
+  /**
+   * Synchronous ref to the current shape. Updated by the host
+   * immediately when an action is dispatched (before React re-renders).
+   * The map reads this ref in gesture handlers so hit-testing always
+   * sees the latest shape, even between rapid clicks.
+   */
+  liveShapeRef?: React.RefObject<{ rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> } | null | undefined>;
+  /**
+   * GeoJSON geometry to fit the viewport to. When provided, the map
+   * will automatically pan/zoom so the entire geometry is visible
+   * with comfortable padding. Used by system/trail preview maps.
+   * Set to null to clear the fit constraint.
+   */
+  fitGeometry?: unknown | null;
+  /**
+   * Incremented after server-side mutations to invalidate the
+   * client-side vector tile cache. The map appends `?_v=$tileVersion`
+   * to tile URLs, forcing re-fetches. Default 0.
+   */
+  tileVersion?: number;
 }

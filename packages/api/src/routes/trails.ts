@@ -67,14 +67,15 @@ trailsRoute.get("/", async (c) => {
 
 const baseTrailSelectWithCenter = {
   ...baseTrailSelect,
+  geometry: sql<unknown>`CASE WHEN ${trails.geometry} IS NULL THEN NULL ELSE ST_AsGeoJSON(${trails.geometry})::json END`,
   lon: sql<number | null>`ST_X(ST_StartPoint(ST_LineMerge(${trails.geometry})))`,
   lat: sql<number | null>`ST_Y(ST_StartPoint(ST_LineMerge(${trails.geometry})))`,
 } as const;
 
-function withCenter<T extends { lon: number | null; lat: number | null }>(row: T) {
-  const { lon, lat, ...rest } = row;
+function withCenter<T extends { geometry: unknown; lon: number | null; lat: number | null }>(row: T) {
+  const { lon, lat, geometry, ...rest } = row;
   const center = lon != null && lat != null ? { lat, lon } : null;
-  return { ...rest, center };
+  return { ...rest, geometry, center };
 }
 
 trailsRoute.get("/by-slug/:slug", async (c) => {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { createMagnumClient, type Shape, type System } from "@magnum/shared";
+import { createMagnumClient, type Shape, type ShapeRing, type System } from "@magnum/shared";
 import {
   ShapeEditor,
   shapeToBoundary,
@@ -10,6 +10,8 @@ import {
 } from "../../src/components/polygon/ShapeEditor";
 import { ShapeEditorBar } from "../../src/components/polygon/ShapeEditorBar";
 import { ShapeEditorModeToggle } from "../../src/components/polygon/ShapeEditorModeToggle";
+import { useAuthStore } from "../../src/stores/authStore";
+import { useMapStore } from "../../src/stores/mapStore";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
@@ -33,6 +35,7 @@ const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001"
  */
 export default function BoundaryScreen() {
   const router = useRouter();
+  const token = useAuthStore((s) => s.token);
   const params = useLocalSearchParams<{
     mode?: string;
     slug?: string;
@@ -42,6 +45,7 @@ export default function BoundaryScreen() {
 
   const [shape, setShape] = useState<Shape | null>(null);
   const [initialShape, setInitialShape] = useState<Shape | null>(null);
+  const [boundaryGeoJSON, setBoundaryGeoJSON] = useState<unknown>(null);
   const [loading, setLoading] = useState(editorMode === "edit");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +64,7 @@ export default function BoundaryScreen() {
         const sh = systemToShape(s);
         setShape(sh);
         setInitialShape(sh);
+        setBoundaryGeoJSON(s.boundary);
         setLoading(false);
       })
       .catch((e: unknown) => {
@@ -90,13 +95,16 @@ export default function BoundaryScreen() {
   const hasOpenRingWithVertices = !!lastOpenRing && openRingVertexCount > 0;
   const hasOpenRingReadyToClose = !!lastOpenRing && openRingVertexCount >= 3;
   const hasNoRings = shape && shape.rings.length === 0;
+  const anyVertices = shape?.rings.some((r) => r.vertices.length > 0) ?? false;
   const bottomHint: string | null = hasNoRings
     ? "Tap the map to add a vertex"
     : hasOpenRingReadyToClose
       ? "Tap the first vertex to close the ring"
       : hasOpenRingWithVertices
         ? `${3 - openRingVertexCount} more to close`
-        : null;
+        : anyVertices
+          ? "Long-press a vertex to drag"
+          : null;
 
   const handleBack = useCallback(() => {
     const proceed = () => {
@@ -143,9 +151,12 @@ export default function BoundaryScreen() {
         setError("Missing system slug.");
         return;
       }
-      const client = createMagnumClient(API_URL);
+      const client = createMagnumClient(API_URL, {
+        getAuthToken: () => token ?? undefined,
+      });
       const s2 = await client.getSystemBySlug(slug);
       await client.updateSystem(s2.id, { boundary });
+      useMapStore.getState().incrementTileVersion();
       dirtyRef.current = false;
       router.replace(`/system/${slug}` as never);
     } catch (e) {
@@ -153,7 +164,7 @@ export default function BoundaryScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [editorMode, slug, router]);
+  }, [editorMode, slug, router, token]);
 
   if (loading) {
     return (
@@ -175,6 +186,7 @@ export default function BoundaryScreen() {
           mode={mode}
           mapConfig={{ martinTilesUrl: MARTIN_URL }}
           onChange={handleShapeChange}
+          fitGeometry={boundaryGeoJSON}
         />
         <ShapeEditorModeToggle
           mode={mode}
@@ -199,8 +211,8 @@ export default function BoundaryScreen() {
 
 /**
  * Convert the server's `System` response into the editor's Shape.
- * For now we only support the outer ring; holes and multi-polygon
- * boundaries are flattened to the first ring.
+ * Each polygon outer ring becomes a separate closed ring. Holes are
+ * skipped (out of scope for v1).
  */
 function systemToShape(s: System): Shape {
   const boundary = s.boundary as
@@ -212,35 +224,40 @@ function systemToShape(s: System): Shape {
     typeof boundary !== "object" ||
     !Array.isArray(boundary.coordinates)
   ) {
-    return {
-      rings: [{ vertices: [], closed: false }],
-      chords: [],
-      connectFrom: null,
-    };
+    return { rings: [{ vertices: [], closed: false }] };
   }
   const coords = boundary.coordinates as unknown[];
-  let ring: Array<[number, number]> = [];
+  const rings: ShapeRing[] = [];
+
   if (boundary.type === "Polygon") {
     const outer = coords[0] as unknown[] | undefined;
-    if (Array.isArray(outer)) ring = outer as Array<[number, number]>;
+    if (Array.isArray(outer)) {
+      const ring = normalizeRing(outer as Array<[number, number]>);
+      if (ring.length >= 3) rings.push({ vertices: ring, closed: true });
+    }
   } else if (boundary.type === "MultiPolygon") {
-    const first = coords[0] as unknown[] | undefined;
-    const outer = first?.[0] as unknown[] | undefined;
-    if (Array.isArray(outer)) ring = outer as Array<[number, number]>;
+    for (const poly of coords) {
+      const outer = (poly as unknown[])?.[0] as unknown[] | undefined;
+      if (Array.isArray(outer)) {
+        const ring = normalizeRing(outer as Array<[number, number]>);
+        if (ring.length >= 3) rings.push({ vertices: ring, closed: true });
+      }
+    }
   }
-  if (ring.length >= 2) {
-    const [a0, a1] = ring[0]!;
-    const [b0, b1] = ring[ring.length - 1]!;
-    if (a0 === b0 && a1 === b1) ring = ring.slice(0, -1);
-  }
+
   return {
-    rings:
-      ring.length >= 3
-        ? [{ vertices: ring, closed: true }]
-        : [{ vertices: [], closed: false }],
-    chords: [],
-    connectFrom: null,
+    rings: rings.length > 0 ? rings : [{ vertices: [], closed: false }],
   };
+}
+
+function normalizeRing(ring: Array<[number, number]>): Array<[number, number]> {
+  if (ring.length < 2) return ring;
+  const first = ring[0]!;
+  const last = ring[ring.length - 1]!;
+  if (first[0] === last[0] && first[1] === last[1]) {
+    return ring.slice(0, -1);
+  }
+  return ring;
 }
 
 /**

@@ -37,15 +37,16 @@ import {
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
-function TrailMapPreview() {
+function TrailMapPreview({ center, geometry }: { center?: { lon: number; lat: number } | null; geometry?: unknown }) {
   return (
     <View style={styles.mapPreview}>
       <MapContainer
         config={{
           martinTilesUrl: MARTIN_URL,
-          initialCenter: [-82.9988, 39.9612],
-          initialZoom: 8,
+          initialCenter: center ? [center.lon, center.lat] : [-82.9988, 39.9612],
+          initialZoom: 12,
         }}
+        fitGeometry={geometry ?? null}
       />
     </View>
   );
@@ -494,7 +495,7 @@ export default function TrailDetail() {
     <>
       <Stack.Screen options={{ title: trail.name, headerShown: true }} />
       <ScrollView style={styles.container} testID="trail-detail-screen">
-        <TrailMapPreview />
+        <TrailMapPreview center={trail.center} geometry={trail.geometry} />
 
         <View style={styles.section} testID="trail-meta">
           <View style={styles.row}>

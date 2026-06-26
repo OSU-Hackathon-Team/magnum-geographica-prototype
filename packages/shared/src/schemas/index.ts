@@ -89,12 +89,6 @@ export const subSystemSchema = z.object({
 // closed by the user (double-clicking the first vertex) and once
 // closed the next click on empty map starts a new ring. Deleting an
 // edge in a closed ring re-opens it.
-//
-// Chords (the "connect two vertices" gesture) are stored as indices
-// into the flattened vertex list and are dropped if they would split
-// the same ring into multiple disjoint polygons. We pre-compute the
-// resulting GeoJSON in `shapeToGeoJSON` before sending it on the
-// wire; the server stores whatever GeoJSON the client sends.
 // =====================================================================
 
 export const shapeRingSchema = z.object({
@@ -106,20 +100,6 @@ export const shapeRingSchema = z.object({
 
 export const shapeSchema = z.object({
   rings: z.array(shapeRingSchema),
-  chords: z
-    .array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]))
-    .default([]),
-  // Editor state — the vertex currently selected for the "connect
-  // two vertices" gesture. Dropped when the shape is serialized to
-  // GeoJSON (see shapeToGeoJSON). Defaulted to null so that existing
-  // shapes without the field still validate.
-  connectFrom: z
-    .object({
-      ringIndex: z.number().int().nonnegative(),
-      vertexIndex: z.number().int().nonnegative(),
-    })
-    .nullable()
-    .default(null),
 });
 
 /**
@@ -141,16 +121,9 @@ export interface GeoJSONMultiPolygonGeometry {
  * the API. Returns null if the shape has no closed rings (which
  * means there's nothing to save).
  *
- * Algorithm:
- *   - Drop open rings (they're in-progress and not part of the saved
- *     geometry).
- *   - For each chord within a single ring, if the chord sits between
- *     two existing edges and partitions the ring's vertices, the ring
- *     becomes a MultiPolygon. We split on chord endpoints and emit
- *     each side as its own polygon.
- *   - Cross-ring chords are dropped (v1 limitation).
- *   - If exactly one closed ring remains → Polygon; otherwise
- *     MultiPolygon.
+ * Drops open rings (they're in-progress and not part of the saved
+ * geometry). If exactly one closed ring remains → Polygon; otherwise
+ * MultiPolygon.
  */
 export function shapeToGeoJSON(
   shape: z.infer<typeof shapeSchema>,
@@ -158,32 +131,11 @@ export function shapeToGeoJSON(
   const closedRings = shape.rings.filter((r) => r.closed && r.vertices.length >= 3);
   if (closedRings.length === 0) return null;
 
-  // Build chord-set keyed by ring index for fast lookup.
-  const chordsByRing = new Map<number, Array<[number, number]>>();
-  for (const chord of shape.chords) {
-    // We don't know which ring the chord sits in without the editor
-    // passing ring membership. For v1 we treat all chords as
-    // belonging to the ring that contains both indices in its
-    // flattened list. Indices are 0-based into the per-ring
-    // flattened list; the editor will pass them accordingly.
-    // Cross-ring chords are dropped (can't disambiguate).
-    for (let ri = 0; ri < closedRings.length; ri++) {
-      const ring = closedRings[ri]!;
-      if (chord[0] < ring.vertices.length && chord[1] < ring.vertices.length) {
-        const arr = chordsByRing.get(ri) ?? [];
-        arr.push(chord);
-        chordsByRing.set(ri, arr);
-        break;
-      }
-    }
-  }
-
   const polygons: number[][][] = [];
 
   for (let ri = 0; ri < closedRings.length; ri++) {
     const ring = closedRings[ri]!;
     const coords = [...ring.vertices];
-    // Close the ring if it isn't already.
     if (
       coords.length > 0 &&
       (coords[0]![0] !== coords[coords.length - 1]![0] ||
@@ -191,18 +143,6 @@ export function shapeToGeoJSON(
     ) {
       coords.push(coords[0]!);
     }
-
-    const ringChords = chordsByRing.get(ri) ?? [];
-    if (ringChords.length === 0) {
-      polygons.push(coords);
-      continue;
-    }
-
-    // For v1, if a ring has any chord, we emit the ring as-is
-    // (a self-intersecting polygon is allowed in the stored data —
-    // PostGIS accepts it). Cross-ring chords are dropped. A future
-    // iteration could partition the ring into multiple polygons on
-    // either side of each chord.
     polygons.push(coords);
   }
 

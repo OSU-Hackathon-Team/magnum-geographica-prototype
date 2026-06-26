@@ -3,13 +3,11 @@ import { shapeSchema, shapeToGeoJSON } from "../src/index.js";
 
 describe("shapeSchema", () => {
   test("parses a minimal empty shape", () => {
-    const parsed = shapeSchema.parse({ rings: [], chords: [] });
-    expect(parsed.connectFrom).toBeNull();
+    const parsed = shapeSchema.parse({ rings: [] });
     expect(parsed.rings).toEqual([]);
-    expect(parsed.chords).toEqual([]);
   });
 
-  test("parses a closed ring with default connectFrom", () => {
+  test("parses a closed ring", () => {
     const parsed = shapeSchema.parse({
       rings: [
         {
@@ -22,7 +20,6 @@ describe("shapeSchema", () => {
         },
       ],
     });
-    expect(parsed.connectFrom).toBeNull();
     expect(parsed.rings[0]?.closed).toBe(true);
   });
 
@@ -37,15 +34,13 @@ describe("shapeSchema", () => {
 
 describe("shapeToGeoJSON", () => {
   test("returns null for an empty shape", () => {
-    expect(shapeToGeoJSON({ rings: [], chords: [], connectFrom: null })).toBeNull();
+    expect(shapeToGeoJSON({ rings: [] })).toBeNull();
   });
 
   test("returns null when no rings are closed", () => {
     expect(
       shapeToGeoJSON({
         rings: [{ vertices: [[0, 0]], closed: false }],
-        chords: [],
-        connectFrom: null,
       }),
     ).toBeNull();
   });
@@ -56,8 +51,6 @@ describe("shapeToGeoJSON", () => {
         rings: [
           { vertices: [[0, 0], [0, 1]], closed: true },
         ],
-        chords: [],
-        connectFrom: null,
       }),
     ).toBeNull();
   });
@@ -74,8 +67,6 @@ describe("shapeToGeoJSON", () => {
           closed: true,
         },
       ],
-      chords: [],
-      connectFrom: null,
     });
     expect(out?.type).toBe("Polygon");
     if (out?.type === "Polygon") {
@@ -108,8 +99,6 @@ describe("shapeToGeoJSON", () => {
           closed: true,
         },
       ],
-      chords: [],
-      connectFrom: null,
     });
     expect(out?.type).toBe("MultiPolygon");
     if (out?.type === "MultiPolygon") {
@@ -117,7 +106,7 @@ describe("shapeToGeoJSON", () => {
     }
   });
 
-  test("emits a MultiPolygon when a mix of closed and open rings is provided", () => {
+  test("emits a Polygon when a mix of closed and open rings is provided", () => {
     const out = shapeToGeoJSON({
       rings: [
         {
@@ -130,8 +119,6 @@ describe("shapeToGeoJSON", () => {
         },
         { vertices: [[5, 5], [6, 6]], closed: false }, // skipped
       ],
-      chords: [],
-      connectFrom: null,
     });
     expect(out?.type).toBe("Polygon"); // only 1 closed ring → Polygon
   });

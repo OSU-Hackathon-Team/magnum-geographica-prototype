@@ -12,6 +12,10 @@ export interface ButtonProps {
   children?: ReactNode;
 }
 
+function nodeIsString(node: ReactNode): node is string {
+  return typeof node === "string";
+}
+
 export function Button({
   title,
   onPress,
@@ -22,6 +26,41 @@ export function Button({
   testID,
   children,
 }: ButtonProps) {
+  const textStyle = [
+    styles.text,
+    styles[`${variant}Text` as keyof typeof styles],
+    styles[`${size}Text` as keyof typeof styles],
+  ];
+
+  let content: ReactNode;
+  if (children === undefined || children === null) {
+    content = <Text style={textStyle}>{title}</Text>;
+  } else if (nodeIsString(children)) {
+    content = <Text style={textStyle}>{children}</Text>;
+  } else if (
+    Array.isArray(children) &&
+    children.some((c) => nodeIsString(c))
+  ) {
+    // Mixed children (e.g. icon + text) — wrap in a row and ensure
+    // every string child gets its own <Text> wrapper so React Native
+    // never sees a raw string outside of <Text>.
+    content = (
+      <>
+        {children.map((child, i) =>
+          nodeIsString(child) ? (
+            <Text key={i} style={textStyle}>
+              {child}
+            </Text>
+          ) : (
+            child
+          ),
+        )}
+      </>
+    );
+  } else {
+    content = children;
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -36,21 +75,7 @@ export function Button({
       ]}
       testID={testID}
     >
-      {typeof children === "string" ? (
-        <Text
-          style={[styles.text, styles[`${variant}Text` as const], styles[`${size}Text` as const]]}
-        >
-          {children}
-        </Text>
-      ) : children !== undefined ? (
-        children
-      ) : (
-        <Text
-          style={[styles.text, styles[`${variant}Text` as const], styles[`${size}Text` as const]]}
-        >
-          {title}
-        </Text>
-      )}
+      {content}
     </Pressable>
   );
 }

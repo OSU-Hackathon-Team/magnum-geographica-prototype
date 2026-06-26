@@ -5,9 +5,11 @@ export interface MapState {
   zoom: number;
   selectedTrailId: string | null;
   selectedSystemId: string | null;
+  tileVersion: number;
   setViewport: (center: [number, number], zoom: number) => void;
   selectTrail: (id: string | null) => void;
   selectSystem: (id: string | null) => void;
+  incrementTileVersion: () => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -15,7 +17,9 @@ export const useMapStore = create<MapState>((set) => ({
   zoom: 6,
   selectedTrailId: null,
   selectedSystemId: null,
+  tileVersion: 0,
   setViewport: (center, zoom) => set({ center, zoom }),
   selectTrail: (id) => set({ selectedTrailId: id }),
   selectSystem: (id) => set({ selectedSystemId: id }),
+  incrementTileVersion: () => set((s) => ({ tileVersion: s.tileVersion + 1 })),
 }));

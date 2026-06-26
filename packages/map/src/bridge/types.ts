@@ -65,11 +65,21 @@ export type BridgeCommand =
       method: "setShape";
       args: {
         rings: Array<{ vertices: Array<[number, number]>; closed: boolean }>;
-        chords: Array<[number, number]>;
-        mode: "normal" | "delete";
-        connectFrom: number | null;
       };
-    };
+    }
+  | {
+      method: "fitBounds";
+      args: {
+        minLon: number;
+        minLat: number;
+        maxLon: number;
+        maxLat: number;
+        padding?: number;
+        duration?: number;
+        maxZoom?: number;
+      };
+    }
+  | { method: "refreshTiles"; args: { version: number } };
 
 export type BridgeEvent =
   | { type: "ready" }

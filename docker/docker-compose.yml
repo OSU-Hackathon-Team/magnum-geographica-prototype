@@ -50,7 +50,7 @@ services:
       DATABASE_URL: postgres://${DB_USER:-magnum}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-magnum}
       MARTIN_URL: http://martin:3000
       ADMIN_SECRET: ${ADMIN_SECRET:-dev-secret-change-me}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:8081,http://localhost:19006,http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:8081,http://localhost:19006,http://localhost:3000,http://localhost:4173}
       METRO_URL: http://host.docker.internal:${METRO_HOST_PORT:-8081}
       API_PORT: "3000"
       NODE_ENV: development
