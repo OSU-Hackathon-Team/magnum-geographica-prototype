@@ -81,7 +81,7 @@ test.describe("System Move-To sheet (§21.5)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/move", {
+    const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/move`, {
       method: "POST",
       token,
       body: { action: "move_to_super", target_super_id: `${FIXTURE_IDS.super1}` },
@@ -102,7 +102,7 @@ test.describe("System Move-To sheet (§21.5)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys3/move", {
+    const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys3}/move`, {
       method: "POST",
       token,
       body: { action: "merge_into", target_system_id: `${FIXTURE_IDS.sys1}` },

@@ -15,12 +15,12 @@ test("user sees segments in trail detail page", async ({ page }) => {
 });
 
 test("segment detail page loads by direct URL", async ({ page }) => {
-  await page.goto("/segment/FIXTURE_IDS.seg1");
+  await page.goto(`/segment/${FIXTURE_IDS.seg1}`);
   // Dynamic routes in static export may not render via direct URL access.
   // The test passes if the component mounts or gracefully doesn't.
   const visible = await page
     .locator(
-      "[testid='segment-detail-FIXTURE_IDS.seg1'], [testid='segment-detail-loading'], [testid='segment-detail-not-found']",
+      `[testid='segment-detail-${FIXTURE_IDS.seg1}'], [testid='segment-detail-loading'], [testid='segment-detail-not-found']`,
     )
     .first()
     .isVisible({ timeout: 10000 })

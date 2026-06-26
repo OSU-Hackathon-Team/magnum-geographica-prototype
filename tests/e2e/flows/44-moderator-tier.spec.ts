@@ -18,7 +18,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     page,
   }) => {
     await page.goto(`${BASE}/explore`);
-    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
+    const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/synthesize`, {
       method: "POST",
     });
     expect(res.status).toBe(401);
@@ -38,7 +38,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
+    const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/synthesize`, {
       method: "POST",
       token,
     });
@@ -61,7 +61,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
+    const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/synthesize`, {
       method: "POST",
       token: access_token,
     });
@@ -87,7 +87,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    const res = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/synthesize", {
+    const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/synthesize`, {
       method: "POST",
       token: access_token,
     });
@@ -108,7 +108,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await apiFetch(page, "/api/admin/trails/FIXTURE_IDS.trail1/promote", {
+    const res = await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
       method: "POST",
       token,
       body: { to: "elevated" },

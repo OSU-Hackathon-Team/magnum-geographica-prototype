@@ -14,13 +14,13 @@ test.afterEach(() => {
 
 test.describe("Feature detail — preset rendering (§21.4)", () => {
   test("preset label is shown for FIXTURE_IDS.f4 (Cedar Falls Overlook, viewpoint)", async ({ page }) => {
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f4`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f4}`);
     await expect(page.getByTestId("feature-detail-screen")).toBeVisible();
     await expect(page.getByTestId("feature-preset-label")).toHaveText("Viewpoint");
   });
 
   test("answer badges render for boolean preset questions", async ({ page }) => {
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f4`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f4}`);
     // FIXTURE_IDS.f4 has answers {panoramic: true, covered: false}. The detail
     // page should show those as badges.
     await expect(page.getByTestId("feature-answers")).toBeVisible();
@@ -29,7 +29,7 @@ test.describe("Feature detail — preset rendering (§21.4)", () => {
   });
 
   test("feature without preset does not show a preset label", async ({ page }) => {
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
     await expect(page.getByTestId("feature-detail-screen")).toBeVisible();
     // FIXTURE_IDS.f1 has no preset — no preset label.
     await expect(page.getByTestId("feature-preset-label")).not.toBeVisible();

@@ -98,7 +98,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
     const token = await page.evaluate(() => {
       return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
     });
-    const res = await apiFetch(page, "/api/admin/synthesis-proposals?system_id=FIXTURE_IDS.sys1", {
+    const res = await apiFetch(page, `/api/admin/synthesis-proposals?system_id=${FIXTURE_IDS.sys1}`, {
       token,
     });
     expect(res.status).toBe(403);
@@ -117,7 +117,7 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    const res = await apiFetch(page, "/api/admin/synthesis-proposals?system_id=FIXTURE_IDS.sys1", {
+    const res = await apiFetch(page, `/api/admin/synthesis-proposals?system_id=${FIXTURE_IDS.sys1}`, {
       token: access_token,
     });
     expect(res.status).toBe(200);

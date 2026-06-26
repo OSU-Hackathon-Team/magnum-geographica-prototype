@@ -21,7 +21,7 @@ test("conflict page loads for a conflict ID", async ({ page }) => {
 });
 
 test("media gallery section visible on feature detail", async ({ page }) => {
-  await page.goto("/feature/FIXTURE_IDS.f1");
+  await page.goto(`/feature/${FIXTURE_IDS.f1}`);
   await expect(page.getByTestId("feature-detail-screen")).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId("feature-media")).toBeVisible();
   await expect(page.getByTestId("feature-media-gallery")).toBeVisible();

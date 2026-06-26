@@ -129,15 +129,19 @@ e2eTestRoute.post("/seed", async (c) => {
   // users. The advisory lock makes one wait for the other; the
   // second then finds an empty database (the first truncated and
   // re-seeded) and proceeds cleanly.
-  await db.execute(sql.raw(`SELECT pg_advisory_xact_lock(727272)`));
-  // Truncate first so the seed is idempotent.
-  await db.execute(
-    sql.raw(
-      `TRUNCATE TABLE ${APP_TABLES.map((t) => `"${t}"`).join(", ")} RESTART IDENTITY CASCADE`,
-    ),
-  );
-  const hash = (pwd: string) => Bun.password.hash(pwd);
-  await seedFixtures(db, FIXTURE_IDS, hash);
+  // Wrap in a transaction so pg_advisory_xact_lock is held for
+  // the entire truncate+seed operation, not released after the
+  // auto-committed SELECT statement.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SELECT pg_advisory_xact_lock(727272)`));
+    await tx.execute(
+      sql.raw(
+        `TRUNCATE TABLE ${APP_TABLES.map((t) => `"${t}"`).join(", ")} RESTART IDENTITY CASCADE`,
+      ),
+    );
+    const hash = (pwd: string) => Bun.password.hash(pwd);
+    await seedFixtures(tx, FIXTURE_IDS, hash);
+  });
   return c.json({ ok: true });
 });
 

@@ -158,7 +158,7 @@ test.describe("Record Trace screen (§21.3.2 step 2)", () => {
     await registerAndLogin(page, "rec9", "rec9@example.com");
     const token = await getToken(page);
     // Use the seeded FIXTURE_IDS.trace1 fixture.
-    const cut = await apiFetch(page, "/api/traces/FIXTURE_IDS.trace1/segments", {
+    const cut = await apiFetch(page, `/api/traces/${FIXTURE_IDS.trace1}/segments`, {
       method: "POST",
       token,
     });
@@ -167,7 +167,7 @@ test.describe("Record Trace screen (§21.3.2 step 2)", () => {
     expect(body.ok).toBe(true);
     expect(body.segments).toBeGreaterThanOrEqual(1);
     // GET returns the new segment in the list.
-    const list = await apiFetch(page, "/api/traces/FIXTURE_IDS.trace1/segments");
+    const list = await apiFetch(page, `/api/traces/${FIXTURE_IDS.trace1}/segments`);
     expect(list.status).toBe(200);
     const listBody = list.body as { items: Array<{ trace_id: string }> };
     expect(listBody.items.some((s) => s.trace_id === `${FIXTURE_IDS.trace1}`)).toBe(true);

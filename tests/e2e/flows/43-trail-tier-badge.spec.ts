@@ -41,7 +41,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
     // Promote FIXTURE_IDS.trail1 to synthesized via the API directly.
-    const promote = await apiFetch(page, "/api/admin/trails/FIXTURE_IDS.trail1/promote", {
+    const promote = await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
       method: "POST",
       token: access_token,
       body: { to: "elevated" },

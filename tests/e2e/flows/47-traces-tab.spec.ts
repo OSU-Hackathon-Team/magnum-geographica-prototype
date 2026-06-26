@@ -66,7 +66,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     await button.scrollIntoViewIfNeeded();
     await button.click();
     // The button uses the system id (FIXTURE_IDS.sys1), not the slug.
-    await expect(page).toHaveURL(/\/system\/FIXTURE_IDS.sys1\/organize/);
+    await expect(page).toHaveURL(new RegExp(`/system/${FIXTURE_IDS.sys1}/organize`));
   });
 
   test("upload button navigates to the upload sheet", async ({ page }) => {
@@ -74,7 +74,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     const button = page.getByTestId("traces-upload");
     await button.scrollIntoViewIfNeeded();
     await button.click();
-    await expect(page).toHaveURL(/\/system\/FIXTURE_IDS.sys1\/traces\/upload/);
+    await expect(page).toHaveURL(new RegExp(`/system/${FIXTURE_IDS.sys1}/traces/upload`));
     await expect(page.getByTestId("system-upload-trace-sheet")).toBeVisible();
   });
 

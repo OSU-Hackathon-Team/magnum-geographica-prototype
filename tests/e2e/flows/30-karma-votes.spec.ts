@@ -25,7 +25,7 @@ async function registerAndLogin(page: Page, username: string, email: string) {
 
 test.describe("Vote control — feature page (§21.7)", () => {
   test("anonymous user sees vote score but cannot click arrows", async ({ page }) => {
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
     await expect(page.getByTestId("feature-vote-score")).toBeVisible();
     await expect(page.getByTestId("feature-vote-up")).toBeVisible();
     await expect(page.getByTestId("feature-vote-down")).toBeVisible();
@@ -33,7 +33,7 @@ test.describe("Vote control — feature page (§21.7)", () => {
 
   test("upvote increases score and highlights the up arrow", async ({ page }) => {
     await registerAndLogin(page, "voter1", "voter1@example.com");
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
 
     const up = page.getByTestId("feature-vote-up");
     const down = page.getByTestId("feature-vote-down");
@@ -49,7 +49,7 @@ test.describe("Vote control — feature page (§21.7)", () => {
 
   test("downvote highlights down arrow and produces negative score", async ({ page }) => {
     await registerAndLogin(page, "voter2", "voter2@example.com");
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
     await page.getByTestId("feature-vote-down").click();
     await expect(page.getByTestId("feature-vote-score")).toHaveText("-1");
   });
@@ -94,11 +94,11 @@ test.describe("Vote control — feature page (§21.7)", () => {
 
   test("vote persists across navigation", async ({ page }) => {
     await registerAndLogin(page, "voter4", "voter4@example.com");
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
     await page.getByTestId("feature-vote-up").click();
     await expect(page.getByTestId("feature-vote-score")).toHaveText("1");
     await page.goto(`${BASE}/explore`);
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
     await expect(page.getByTestId("feature-vote-score")).toHaveText("1");
   });
 });
@@ -123,7 +123,7 @@ test.describe("Karma card on profile (§21.7)", () => {
     // voter5 upvotes FIXTURE_IDS.f1 (authored by FIXTURE_IDS.user100 in the seed). The mock
     // should reflect the +1 in `/api/votes/users/FIXTURE_IDS.user100/karma`.
     await registerAndLogin(page, "voter5", "voter5@example.com");
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
     const score = page.getByTestId("feature-vote-score");
     const beforeText = await score.textContent();
     await page.getByTestId("feature-vote-up").click();
@@ -136,7 +136,7 @@ test.describe("Karma card on profile (§21.7)", () => {
     // `authorForTarget` resolves the author and the new user is
     // distinct, so the new user remains at karma 0.
     await registerAndLogin(page, "voter6", "voter6@example.com");
-    await page.goto(`${BASE}/feature/FIXTURE_IDS.f1`);
+    await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
     await page.getByTestId("feature-vote-up").click();
     await page.goto(`${BASE}/profile`);
     // We expect the new user to still have karma 0 because they aren't

@@ -205,6 +205,7 @@ export default function ExploreScreen() {
         .catch(() => {
           if (requestId !== lastRequestRef.current) return;
           setResults({ systems: [], trails: [], features: [] });
+          setShowResults(true);
         })
         .finally(() => {
           if (requestId !== lastRequestRef.current) return;

@@ -83,7 +83,7 @@ test.describe("Admin patrol actions (§21.8)", () => {
     await page.goto(`${BASE}/admin/patrol`);
     await expect(page.getByTestId(`patrol-entry-${id}`)).toBeVisible();
     await expect(page.getByTestId(`patrol-entry-${id}`)).toContainText("New-tier edit on protected entity");
-    await expect(page.getByTestId(`patrol-entry-${id}`)).toContainText("system/FIXTURE_IDS.sys1");
+    await expect(page.getByTestId(`patrol-entry-${id}`)).toContainText(`system/${FIXTURE_IDS.sys1}`);
     await expect(page.getByTestId(`patrol-entry-${id}`)).toContainText("low-trust edit on a protected system");
   });
 

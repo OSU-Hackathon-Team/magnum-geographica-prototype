@@ -188,9 +188,32 @@ export async function installApi(page?: Page): Promise<void> {
       `^${base.protocol}//${base.host.replace(/\./g, "\\.")}(:\\d+)?/api/`,
     );
     await page.route(pattern, async (route) => {
-      const originalUrl = new URL(route.request().url());
+      const request = route.request();
+      const originalUrl = new URL(request.url());
       const targetUrl = `${api.apiUrl}${originalUrl.pathname}${originalUrl.search}`;
-      return route.continue({ url: targetUrl });
+      try {
+        const response = await fetch(targetUrl, {
+          method: request.method(),
+          headers: request.headers(),
+          body: request.postDataBuffer() ?? undefined,
+        });
+        const headers: Record<string, string> = {};
+        response.headers.forEach((v, k) => {
+          headers[k] = v;
+        });
+        await route.fulfill({
+          status: response.status,
+          headers,
+          body: Buffer.from(await response.arrayBuffer()),
+        });
+      } catch (err) {
+        console.error(`[route error] ${targetUrl}: ${(err as Error).message}`);
+        await route.fulfill({
+          status: 502,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "proxy_error", message: (err as Error).message }),
+        });
+      }
     });
   }
   await api.reset();

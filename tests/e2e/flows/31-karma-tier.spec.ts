@@ -32,7 +32,7 @@ test.describe("Trust tier thresholds (§21.7)", () => {
   });
 
   test("karma endpoint reflects tier based on trust_score", async ({ page }) => {
-    const adminKarma = await apiFetch(page, "/api/votes/users/FIXTURE_IDS.userAdmin/karma");
+    const adminKarma = await apiFetch(page, `/api/votes/users/${FIXTURE_IDS.userAdmin}/karma`);
     expect(adminKarma.status).toBe(200);
     const body = adminKarma.body as { tier: string; karma: number };
     expect(body.tier).toBe("trusted");
@@ -55,7 +55,7 @@ test.describe("Trust tier thresholds (§21.7)", () => {
     });
     const token = auth.replace(/"/g, "");
 
-    const moveRes = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/move", {
+    const moveRes = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/move`, {
       method: "POST",
       token,
       body: { action: "move_to_super", target_super_id: `${FIXTURE_IDS.super1}` },
@@ -77,7 +77,7 @@ test.describe("Trust tier thresholds (§21.7)", () => {
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
 
-    const moveRes = await apiFetch(page, "/api/systems/FIXTURE_IDS.sys1/move", {
+    const moveRes = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/move`, {
       method: "POST",
       token: access_token,
       body: { action: "move_to_super", target_super_id: `${FIXTURE_IDS.super1}` },

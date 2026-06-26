@@ -64,7 +64,7 @@ test("user can select other feature types", async ({ page }) => {
 });
 
 test("create-feature URL accepts preset and system_id query params", async ({ page }) => {
-  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54&preset_id=FIXTURE_IDS.preset1&system_id=FIXTURE_IDS.sys1`);
+  await page.goto(`${BASE}/feature/create?lat=39.43&lon=-82.54&preset_id=${FIXTURE_IDS.preset1}&system_id=${FIXTURE_IDS.sys1}`);
   await expect(page.getByTestId("create-feature-form")).toBeVisible({ timeout: 15000 });
   // The form should still render even with the extra params.
   await expect(page.getByTestId("feature-form-name")).toBeVisible();
