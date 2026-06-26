@@ -14,7 +14,17 @@
       "bundleIdentifier": "org.magnum.app"
     },
     "android": {
-      "package": "org.magnum.app"
+      "package": "org.magnum.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -28,10 +38,7 @@
       [
         "react-native-background-geolocation",
         {
-          "license": {
-            "appId": "org.magnum.app",
-            "entitlements": ["core"]
-          }
+          "license": "{\"app_id\":\"org.magnum.app\",\"entitlements\":[\"core\",\"polygon-geofencing\",\"firebase\",\"hms\"]}"
         }
       ]
     ],

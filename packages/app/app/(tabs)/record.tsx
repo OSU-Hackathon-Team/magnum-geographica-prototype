@@ -256,6 +256,16 @@ export default function RecordScreen() {
     return null;
   }, [livePoints, persistedPoints]);
 
+  useEffect(() => {
+    console.log(
+      "[record] state update: status=", status,
+      "livePoints=", livePoints.length,
+      "persistedPoints=", persistedPoints.length,
+      "routeCoords=", liveRouteCoords.length,
+      "followTarget=", followTarget ? `${followTarget.lon.toFixed(5)},${followTarget.lat.toFixed(5)}` : null,
+    );
+  }, [status, livePoints, persistedPoints, liveRouteCoords, followTarget]);
+
   const mapCenter = followTarget
     ? [followTarget.lon, followTarget.lat]
     : activeSession

@@ -11,6 +11,11 @@ import {
 import { commandToScript, isBridgeEvent } from "./bridge/ol-bridge.js";
 import type { MapContainerProps } from "./types.js";
 import type { BridgeCommand, BridgeEvent } from "./bridge/types.js";
+import {
+  type ShapeAction,
+  findNearestEdge,
+  lastOpenRingIndex,
+} from "@magnum/shared";
 
 export type { MapContainerProps };
 
@@ -67,7 +72,11 @@ function buildMapHtml(
           dragBox=null,
           dragLayer=null,
           savedDragPan=null,
-          liveRouteSource=null;
+          liveRouteSource=null,
+          shapeSource=null,
+          shapeLayer=null,
+          dragVertex=null,
+          dragFired=false;
 
       function postToRN(e){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(e))}}
 
@@ -311,9 +320,104 @@ function buildMapHtml(
         liveRouteLayer.set('name', 'live_route');
         map.addLayer(liveRouteLayer);
 
+        // Shape editor layer.
+        shapeSource = new ol.source.Vector();
+        var shapeStyleFn = function(feature){
+          var kind = feature.get('shapeKind');
+          if(kind === 'vertex'){
+            return new ol.style.Style({
+              image: new ol.style.Circle({radius:8, fill:new ol.style.Fill({color:'#0f172a'}), stroke:new ol.style.Stroke({color:'#fff',width:2})})
+            });
+          }
+          if(kind === 'ring-outline' && feature.get('closed')){
+            return new ol.style.Style({
+              stroke: new ol.style.Stroke({color:'#22c55e',width:2})
+            });
+          }
+          return new ol.style.Style({
+            stroke: new ol.style.Stroke({color:'#22c55e',width:2,lineDash:[6,4]})
+          });
+        };
+        shapeLayer = new ol.layer.Vector({source:shapeSource,style:shapeStyleFn});
+        shapeLayer.set('name','shape-editor');
+        shapeLayer.setZIndex(1000);
+        map.addLayer(shapeLayer);
+
         console.log('[map] buildMap done, activeBaseLayer=', initialBaseId, 'layerCount=', map.getLayers().getArray().length);
-        map.on('click',function(e){var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]})});
+        map.on('click',function(e){
+          if(shapeLayer && shapeLayer.getVisible() && shapeSource){
+            var hit = null;
+            try {
+              var features = map.getFeaturesAtPixel(e.pixel, {hitTolerance:14, layerFilter:function(l){return l===shapeLayer}});
+              if(features){
+                for(var fi=0;fi<features.length;fi++){
+                  var k = features[fi].get('shapeKind');
+                  if(k==='vertex'){
+                    hit={kind:'vertex',ringIndex:features[fi].get('ringIndex')||0,vertexIndex:features[fi].get('vertexIndex')||0};
+                    break;
+                  }
+                }
+                if(!hit){
+                  for(var ej=0;ej<features.length;ej++){
+                    var ek = features[ej].get('shapeKind');
+                    if(ek==='ring-outline'){
+                      hit={kind:'edge',ringIndex:features[ej].get('ringIndex')||0,vertexIndex:-1};
+                      break;
+                    }
+                  }
+                }
+              }
+            }catch(_){}
+            if(hit){
+              dragFired=false;
+              var c = ol.proj.toLonLat(e.coordinate);
+              postToRN({type:'shapeHit',kind:hit.kind,ringIndex:hit.ringIndex,vertexIndex:hit.vertexIndex,lon:c[0],lat:c[1]});
+              return;
+            }
+          }
+          var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]});
+        });
         map.on('moveend',function(){var v=map.getView();var c=ol.proj.toLonLat(v.getCenter());postToRN({type:'moveEnd',center:c,zoom:v.getZoom()})});
+
+        // Long-press-to-drag for shape vertices.
+        var dragTimer=null;
+        map.on('pointerdown',function(e){
+          if(!shapeLayer||!shapeLayer.getVisible()||!shapeSource)return;
+          var ev=e.originalEvent;
+          if(ev.button!==0)return;
+          try{
+            var features=map.getFeaturesAtPixel(e.pixel,{hitTolerance:12,layerFilter:function(l){return l===shapeLayer}});
+            if(!features)return;
+            for(var fi=0;fi<features.length;fi++){
+              if(features[fi].get('shapeKind')==='vertex'){
+                dragFired=false;
+                var ringIdx=features[fi].get('ringIndex')||0;
+                var vertIdx=features[fi].get('vertexIndex')||0;
+                ev.preventDefault();
+                dragTimer=setTimeout(function(){
+                  dragTimer=null;
+                  dragVertex={ringIndex:ringIdx,vertexIndex:vertIdx};
+                  dragFired=true;
+                },250);
+                return;
+              }
+            }
+          }catch(_){}
+        });
+        map.on('pointermove',function(e){
+          if(dragTimer){
+            clearTimeout(dragTimer);
+            dragTimer=null;
+            return;
+          }
+          if(!dragVertex)return;
+          var c=ol.proj.toLonLat(e.coordinate);
+          postToRN({type:'shapeDrag',ringIndex:dragVertex.ringIndex,vertexIndex:dragVertex.vertexIndex,lon:c[0],lat:c[1]});
+        });
+        map.on('pointerup',function(){
+          if(dragTimer){clearTimeout(dragTimer);dragTimer=null;}
+          dragVertex=null;
+        });
       }
 
       // Auto-initialize the map when the page loads. The React Native side
@@ -389,7 +493,10 @@ function buildMapHtml(
               window.olBridge.exitDrawMode();
             }
           }else if(m === 'setLiveRoute' && a){
-            if(!map || !liveRouteSource) return;
+            if(!map || !liveRouteSource){
+              console.log('[map] setLiveRoute skipped: map=', !!map, 'liveRouteSource=', !!liveRouteSource);
+              return;
+            }
             var coords = a.coordinates || [];
             if(coords.length < 2){
               liveRouteSource.clear();
@@ -400,13 +507,39 @@ function buildMapHtml(
             liveRouteSource.clear();
             liveRouteSource.addFeature(new ol.Feature({geometry: line}));
             if(typeof a.followLon === 'number' && typeof a.followLat === 'number'){
+              console.log('[map] setLiveRoute: pts=', coords.length, 'animating to', a.followLon.toFixed(5), a.followLat.toFixed(5));
               map.getView().animate({
                 center: ol.proj.fromLonLat([a.followLon, a.followLat]),
                 duration: 250
               });
+            } else {
+              console.log('[map] setLiveRoute: pts=', coords.length, 'no follow');
             }
           }else if(m === 'clearLiveRoute'){
             if(liveRouteSource) liveRouteSource.clear();
+          }else if(m === 'setShape' && a){
+            if(!shapeSource||!shapeLayer) return;
+            shapeSource.clear();
+            var rings = a.rings || [];
+            if(!rings.length){ shapeLayer.setVisible(false); return; }
+            shapeLayer.setVisible(true);
+            for(var ri=0;ri<rings.length;ri++){
+              var r=rings[ri];
+              if(!r.vertices||r.vertices.length<2) continue;
+              var coords=r.vertices.map(function(v){return ol.proj.fromLonLat(v)});
+              var lineFeat=new ol.Feature({geometry:new ol.geom.LineString(coords)});
+              lineFeat.set('shapeKind','ring-outline');
+              lineFeat.set('closed',r.closed);
+              lineFeat.set('ringIndex',ri);
+              shapeSource.addFeature(lineFeat);
+              for(var vi=0;vi<r.vertices.length;vi++){
+                var pt=new ol.Feature({geometry:new ol.geom.Point(ol.proj.fromLonLat(r.vertices[vi]))});
+                pt.set('shapeKind','vertex');
+                pt.set('ringIndex',ri);
+                pt.set('vertexIndex',vi);
+                shapeSource.addFeature(pt);
+              }
+            }
           }
         }catch(err){
           postToRN({type:'error', message: 'onHostMessage: ' + (err && err.message || String(err))});
@@ -603,6 +736,9 @@ export default function MapContainer({
   onDrawEnd,
   onMapRef,
   liveRoute,
+  shape,
+  shapeMode,
+  onShapeAction,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
@@ -613,21 +749,37 @@ export default function MapContainer({
   );
   const [mapUri, setMapUri] = useState<string | null>(null);
   const initSentRef = useRef(false);
-  // Track the latest state we need to sync to the WebView. The useEffect-driven
-  // `send()` only runs once `initSentRef.current` is true, so if the user taps
-  // the download FAB or switches layers before the WebView finishes loading,
-  // those commands are dropped. We capture the latest values in refs and replay
-  // them in onLoadEnd so the WebView always ends up in the correct state.
   const drawModeRef = useRef<boolean | undefined>(undefined);
   const baseLayerRef = useRef<string | undefined>(undefined);
   const offlineModeRef = useRef<boolean | undefined>(undefined);
   const offlineBaseLayerRef = useRef<MapContainerProps["offlineBaseLayer"] | undefined>(undefined);
   const liveRouteRef = useRef<MapContainerProps["liveRoute"] | undefined>(undefined);
+  const shapeRef = useRef<MapContainerProps["shape"] | undefined>(undefined);
 
   const initialCenter = merged.initialCenter ?? defaultMapConfig.initialCenter;
   const initialZoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
 
-  // Write map files to disk for offline-capable loading
+  const initCfgRef = useRef<{
+    martinTilesUrl: string | null;
+    baseLayerDefs: BaseLayerDef[];
+    baseLayerId: string;
+    center: [number, number];
+    zoom: number;
+  } | null>(null);
+  if (!initCfgRef.current) {
+    initCfgRef.current = {
+      martinTilesUrl: merged.martinTilesUrl ?? null,
+      baseLayerDefs,
+      baseLayerId: defaultBaseLayerId,
+      center: initialCenter,
+      zoom: initialZoom,
+    };
+  }
+  const initCfg = initCfgRef.current;
+
+  // Write map files to disk for offline-capable loading. Runs once on
+  // mount with the initial config; subsequent viewport changes are
+  // delivered live via postMessage (e.g. setLiveRoute with followLon).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -664,12 +816,12 @@ export default function MapContainer({
 
         // Write map HTML (with basemap info baked in).
         const html = buildMapHtml(
-          merged.martinTilesUrl ?? null,
+          initCfg.martinTilesUrl,
           false,
-          baseLayerDefs,
-          defaultBaseLayerId,
-          initialCenter,
-          initialZoom,
+          initCfg.baseLayerDefs,
+          initCfg.baseLayerId,
+          initCfg.center,
+          initCfg.zoom,
         );
         await FS.writeAsStringAsync(htmlPath, html);
 
@@ -681,20 +833,27 @@ export default function MapContainer({
     return () => {
       cancelled = true;
     };
-  }, [merged.martinTilesUrl, baseLayerDefs, defaultBaseLayerId, initialCenter, initialZoom]);
+  }, []);
 
   const htmlFallback = useMemo(
     () =>
       buildMapHtml(
-        merged.martinTilesUrl ?? null,
+        initCfg.martinTilesUrl,
         false,
-        baseLayerDefs,
-        defaultBaseLayerId,
-        initialCenter,
-        initialZoom,
+        initCfg.baseLayerDefs,
+        initCfg.baseLayerId,
+        initCfg.center,
+        initCfg.zoom,
       ),
-    [merged.martinTilesUrl, baseLayerDefs, defaultBaseLayerId, initialCenter, initialZoom],
+    [initCfg],
   );
+
+  const shapeForHandler = useRef<typeof shape>(shape);
+  const shapeModeForHandler = useRef<typeof shapeMode>(shapeMode);
+  const onShapeActionForHandler = useRef<typeof onShapeAction>(onShapeAction);
+  shapeForHandler.current = shape;
+  shapeModeForHandler.current = shapeMode;
+  onShapeActionForHandler.current = onShapeAction;
 
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
@@ -705,9 +864,18 @@ export default function MapContainer({
         return;
       }
       if (!isBridgeEvent(parsed)) return;
-      handleBridgeEvent(parsed, { onReady, onClick, onFeatureSelect, onMoveEnd, onDrawEnd });
+      handleBridgeEvent(parsed, {
+        onReady,
+        onClick,
+        onFeatureSelect,
+        onMoveEnd,
+        onDrawEnd,
+        shape: shapeForHandler.current,
+        shapeMode: shapeModeForHandler.current,
+        onShapeAction: onShapeActionForHandler.current,
+      });
     },
-    [onReady, onClick, onFeatureSelect, onMoveEnd],
+    [onReady, onClick, onFeatureSelect, onMoveEnd, onDrawEnd],
   );
 
   const send = useCallback((command: BridgeCommand) => {
@@ -743,7 +911,7 @@ export default function MapContainer({
     // The WebView auto-initializes the map and posts `{type:'ready'}` to the
     // host as soon as OL finishes loading. The original `injectJavaScript`
     // init call was a no-op on the JS side and is no longer needed.
-    console.log("[MapContainer] onLoadEnd, replaying drawMode=", drawModeRef.current);
+    console.log("[MapContainer] onLoadEnd, replaying drawMode=", drawModeRef.current, "liveRoute=", liveRouteRef.current ? `${liveRouteRef.current.coordinates.length}pts` : null);
     initSentRef.current = true;
     // Replay any state changes that happened before the WebView finished
     // loading. The per-state useEffects gate on `initSentRef.current`, so
@@ -770,6 +938,9 @@ export default function MapContainer({
     }
     if (liveRouteRef.current) {
       send({ method: "setLiveRoute", args: liveRouteRef.current });
+    }
+    if (shapeRef.current) {
+      send({ method: "setShape", args: { rings: shapeRef.current.rings } });
     }
   }, [send]);
 
@@ -831,6 +1002,12 @@ export default function MapContainer({
   // submit).
   useEffect(() => {
     liveRouteRef.current = liveRoute ?? undefined;
+    const pts = liveRoute?.coordinates?.length ?? 0;
+    console.log(
+      "[MapContainer] liveRoute effect: initSent=", initSentRef.current,
+      "pts=", pts,
+      "follow=", liveRoute?.followLon != null ? `${liveRoute.followLon.toFixed(5)},${liveRoute.followLat!.toFixed(5)}` : null,
+    );
     if (!initSentRef.current) return;
     if (!liveRoute || liveRoute.coordinates.length < 2) {
       send({ method: "clearLiveRoute", args: {} });
@@ -838,6 +1015,17 @@ export default function MapContainer({
       send({ method: "setLiveRoute", args: liveRoute });
     }
   }, [liveRoute, send]);
+
+  // Sync shape to WebView.
+  useEffect(() => {
+    shapeRef.current = shape ?? undefined;
+    if (!initSentRef.current) return;
+    if (!shape) {
+      send({ method: "setShape", args: { rings: [] } });
+    } else {
+      send({ method: "setShape", args: { rings: shape.rings } });
+    }
+  }, [shape, send]);
 
   // Track the last flyTo values so we only re-send when the target actually
   // changes (not when the parent passes a new object ref with same values).
@@ -900,6 +1088,9 @@ function handleBridgeEvent(
     }) => void;
     onMoveEnd?: (center: [number, number], zoom: number) => void;
     onDrawEnd?: (bbox: { minLon: number; minLat: number; maxLon: number; maxLat: number }) => void;
+    onShapeAction?: (action: ShapeAction) => void;
+    shape?: { rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> } | null;
+    shapeMode?: "normal" | "delete";
   },
 ) {
   switch (event.type) {
@@ -933,6 +1124,57 @@ function handleBridgeEvent(
         maxLat: event.maxLat,
       });
       return;
+    case "shapeHit": {
+      const { shape, shapeMode, onShapeAction } = handlers;
+      if (!shape || !shapeMode || !onShapeAction) return;
+      const { kind, ringIndex, vertexIndex, lon, lat } = event;
+      if (shapeMode === "delete") {
+        if (kind === "vertex" && ringIndex >= 0) {
+          onShapeAction({ type: "deleteVertex", ringIndex, vertexIndex });
+        } else if (kind === "edge" && ringIndex >= 0) {
+          const nearest = findNearestEdge(shape.rings, lon, lat);
+          if (nearest) {
+            onShapeAction({ type: "openEdge", ringIndex: nearest.ringIndex, after: nearest.insertAfter });
+          }
+        }
+        return;
+      }
+      if (kind === "vertex" && ringIndex >= 0) {
+        const openIdx = lastOpenRingIndex(shape);
+        const ring = shape.rings[ringIndex];
+        if (openIdx === ringIndex && vertexIndex === 0 && ring && ring.vertices.length >= 3) {
+          onShapeAction({ type: "closeRing" });
+        }
+        return;
+      }
+      if (kind === "edge" && ringIndex >= 0) {
+        const nearest = findNearestEdge(shape.rings, lon, lat);
+        if (nearest) {
+          onShapeAction({
+            type: "splitEdge",
+            ringIndex: nearest.ringIndex,
+            after: nearest.insertAfter,
+            lon,
+            lat,
+          });
+        }
+        return;
+      }
+      onShapeAction({ type: "appendVertex", lon, lat });
+      return;
+    }
+    case "shapeDrag": {
+      const { onShapeAction } = handlers;
+      if (!onShapeAction) return;
+      onShapeAction({
+        type: "moveVertex",
+        ringIndex: event.ringIndex,
+        vertexIndex: event.vertexIndex,
+        lon: event.lon,
+        lat: event.lat,
+      });
+      return;
+    }
     case "mapLongPress":
     case "error":
       return;

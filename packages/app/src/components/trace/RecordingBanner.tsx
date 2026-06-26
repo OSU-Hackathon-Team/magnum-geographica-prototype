@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTraceStore, sessionElapsedMs } from "../../stores/traceStore";
 
 /**
@@ -16,6 +17,7 @@ import { useTraceStore, sessionElapsedMs } from "../../stores/traceStore";
  * can spare).
  */
 export function RecordingBanner() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const status = useTraceStore((s) => s.status);
   const startedAt = useTraceStore((s) => s.startedAt);
@@ -52,6 +54,7 @@ export function RecordingBanner() {
       onPress={() => router.push("/record" as never)}
       style={({ pressed }) => [
         styles.banner,
+        { paddingTop: insets.top + 10 },
         isPaused ? styles.bannerPaused : styles.bannerRecording,
         pressed ? styles.bannerPressed : null,
       ]}

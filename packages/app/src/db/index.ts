@@ -64,7 +64,8 @@ export async function initDatabase(): Promise<OfflineDatabase> {
   if (currentVersion < SCHEMA_VERSION) {
     await db.exec("BEGIN TRANSACTION");
     try {
-      const statements = OFFLINE_SCHEMA_SQL.split(";")
+      const statements = OFFLINE_SCHEMA_SQL.replace(/--[^\n]*/g, "")
+        .split(";")
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       for (const stmt of statements) {

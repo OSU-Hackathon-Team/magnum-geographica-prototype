@@ -1,6 +1,8 @@
-import { Platform } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
 import { createMagnumClient } from "@magnum/shared";
+import BackgroundGeolocation, { type Config } from "react-native-background-geolocation";
 import { useAuthStore } from "../stores/authStore";
+import { useTraceStore } from "../stores/traceStore";
 import { useOfflineStore } from "../stores/offlineStore";
 import {
   addPendingContribution,
@@ -32,8 +34,6 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 /**
  * Library event payload (the fields we use; the real one is larger).
- * The library's `Location` is structurally a superset — we just
- * narrow it down here.
  */
 export interface BGGLocation {
   coords: {
@@ -48,51 +48,15 @@ export interface BGGLocation {
   uuid?: string;
 }
 
-/**
- * The `react-native-background-geolocation` module is native-only;
- * on web we expose a no-op stub so callers don't have to branch.
- */
-type BGGModule = {
-  ready: (config: Record<string, unknown>) => Promise<void>;
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  changePace: (moving: boolean) => Promise<void>;
-  onLocation: (cb: (loc: BGGLocation) => void) => () => void;
-  onMotionChange: (cb: (e: { isMoving: boolean }) => void) => () => void;
-  onHeartbeat: (cb: (e: unknown) => void) => () => void;
-  getCurrentPosition: () => Promise<BGGLocation>;
-  destroyLocations: () => Promise<void>;
-  logger: { enable: () => void };
-};
+let bggInstance: typeof BackgroundGeolocation | null = null;
 
-let bggInstance: BGGModule | null = null;
-let bggLoadPromise: Promise<BGGModule | null> | null = null;
-
-async function loadBGG(): Promise<BGGModule | null> {
-  if (bggInstance) return bggInstance;
-  if (bggLoadPromise) return bggLoadPromise;
-  bggLoadPromise = (async () => {
-    if (Platform.OS === "web") return null;
-    try {
-      const mod = await import("react-native-background-geolocation");
-      // The library exports a default singleton plus named exports.
-      // Both shapes exist depending on bundler interop; handle both.
-      const candidate: unknown = (mod as { default?: unknown }).default ?? mod;
-      if (
-        candidate &&
-        typeof candidate === "object" &&
-        "ready" in candidate &&
-        "start" in candidate
-      ) {
-        bggInstance = candidate as BGGModule;
-        return bggInstance;
-      }
-    } catch (e) {
-      console.warn("[trace] react-native-background-geolocation not available", e);
-    }
-    return null;
-  })();
-  return bggLoadPromise;
+function loadBGG(): typeof BackgroundGeolocation | null {
+  if (Platform.OS === "web") return null;
+  if (!bggInstance) {
+    bggInstance = BackgroundGeolocation;
+    console.log("[trace] BGG loaded statically, hasReady:", typeof (BackgroundGeolocation as unknown as Record<string, unknown>).ready === "function", "hasStart:", typeof (BackgroundGeolocation as unknown as Record<string, unknown>).start === "function");
+  }
+  return bggInstance;
 }
 
 const SESSION_LIVE_KEY = "magnum.activeTraceSession";
@@ -111,9 +75,9 @@ const SESSION_LIVE_KEY = "magnum.activeTraceSession";
  *   `locationAuthorizationRequest: Always` — iOS background
  *   tracking requires "Always", not "When in use".
  */
-function bggConfig(sessionId: string) {
+function bggConfig(sessionId: string): Config {
   return {
-    desiredAccuracy: 0, // HIGH
+    desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
     distanceFilter: 5, // meters
     stopOnTerminate: false,
     startOnBoot: true,
@@ -121,6 +85,7 @@ function bggConfig(sessionId: string) {
     heartbeatInterval: 60,
     locationAuthorizationRequest: "Always",
     locationAuthorizationAlert: {
+      titleWhenOff: "Location services are off",
       titleWhenNotEnabled: "Background location is required",
       titleWhenDisabled: "Background location is disabled",
       instructions: "Magnum uses background location to record your hike.",
@@ -138,7 +103,7 @@ function bggConfig(sessionId: string) {
     // library writes it on every record so we can identify which
     // session a recovered location belongs to.
     extras: { session_id: sessionId },
-  };
+  } as Config;
 }
 
 /**
@@ -156,11 +121,55 @@ export async function startTraceRecording(): Promise<TraceSession> {
   }
   const bgg = await loadBGG();
   if (bgg) {
-    await bgg.ready(bggConfig(session.id));
+    console.log("[trace] BGG loaded, requesting permissions...");
+    if (Platform.OS === "android") {
+      try {
+        const fineGranted = await PermissionsAndroid.request(
+          "android.permission.ACCESS_FINE_LOCATION",
+          {
+            title: "Location Permission",
+            message: "Magnum needs location access to record your hike.",
+            buttonPositive: "Allow",
+            buttonNegative: "Deny",
+          },
+        );
+        console.log("[trace] Android ACCESS_FINE_LOCATION:", fineGranted);
+        if (fineGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+          throw new Error("Location permission denied");
+        }
+        if (Platform.Version >= 29) {
+          const bgGranted = await PermissionsAndroid.request(
+            "android.permission.ACCESS_BACKGROUND_LOCATION",
+            {
+              title: "Background Location",
+              message: "Allow Magnum to track your location even when the app is closed?",
+              buttonPositive: "Allow",
+              buttonNegative: "Deny",
+            },
+          );
+          console.log("[trace] Android ACCESS_BACKGROUND_LOCATION:", bgGranted);
+        }
+      } catch (e) {
+        console.warn("[trace] Permission request failed:", e);
+        throw e;
+      }
+    }
+    try {
+      console.log("[trace] calling bgg.ready() with config...");
+      await bgg.ready(bggConfig(session.id));
+      console.log("[trace] bgg.ready() OK");
+    } catch (e) {
+      console.warn("[trace] bgg.ready() failed:", e);
+      throw new Error(`Background-geolocation init failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
     bgg.onLocation((loc) => {
       void persistLocation(session.id, loc);
     });
+    console.log("[trace] onLocation listener registered");
     await bgg.start();
+    console.log("[trace] BGG started, session=", session.id, "waiting for locations...");
+  } else {
+    console.warn("[trace] BGG not available (web or failed load)");
   }
   return session;
 }
@@ -334,16 +343,19 @@ async function persistLocation(sessionId: string, loc: BGGLocation): Promise<voi
   const recorded_at = new Date(
     typeof loc.timestamp === "number" ? loc.timestamp : Date.now(),
   ).toISOString();
+  const point = {
+    lon: loc.coords.longitude,
+    lat: loc.coords.latitude,
+    elevation: loc.coords.altitude ?? null,
+    accuracy: loc.coords.accuracy ?? null,
+    speed: loc.coords.speed ?? null,
+    heading: loc.coords.heading ?? null,
+    recorded_at,
+  };
+  console.log("[trace] location received:", point.lon.toFixed(6), point.lat.toFixed(6), "acc=", point.accuracy);
+  useTraceStore.getState().appendPoint(point);
   try {
-    await appendTracePoint(sessionId, {
-      lon: loc.coords.longitude,
-      lat: loc.coords.latitude,
-      elevation: loc.coords.altitude ?? null,
-      accuracy: loc.coords.accuracy ?? null,
-      speed: loc.coords.speed ?? null,
-      heading: loc.coords.heading ?? null,
-      recorded_at,
-    });
+    await appendTracePoint(sessionId, point);
   } catch (e) {
     console.warn("[trace] persistLocation failed", e);
   }
