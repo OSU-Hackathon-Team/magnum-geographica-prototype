@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq, desc, sql, gt, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { wikiPages, revisions, features, trailSegments, media } from "../db/schema.js";
+import { resolveContributorName } from "../services/identity.js";
 
 export const syncRoute = new Hono();
 
@@ -12,6 +13,12 @@ syncRoute.post("/contributions", async (c) => {
   if (!Array.isArray(contributions) || contributions.length === 0) {
     return c.json({ results: [] });
   }
+
+  // The pending contribution was queued offline; whatever the client
+  // stored in `contributor_name` is untrusted. Re-derive the
+  // attribution from the current auth context (authenticated user
+  // or the caller's IP) so a malicious client can't spoof it.
+  const contributorName = resolveContributorName(c);
 
   const results: Array<{
     local_id: number;
@@ -48,7 +55,7 @@ syncRoute.post("/contributions", async (c) => {
               wikiPageId: rows[0].id,
               contentMd: data.content_md,
               action: "create",
-              contributorName: (contrib.contributor_name as string) ?? "anonymous",
+              contributorName,
             });
           }
 
@@ -93,7 +100,7 @@ syncRoute.post("/contributions", async (c) => {
             wikiPageId: entityId,
             contentMd: data.content_md,
             action: "update",
-            contributorName: (contrib.contributor_name as string) ?? "anonymous",
+            contributorName,
           });
 
           if (updatedRow) {

@@ -22,6 +22,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="record"
+        options={{
+          title: "Record",
+          tabBarButtonTestID: "tab-record",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="radio-button-on-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="systems"
         options={{
           title: "Systems",

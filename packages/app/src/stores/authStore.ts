@@ -1,16 +1,20 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createMagnumClient } from "@magnum/shared/api/endpoints";
 import type { User } from "@magnum/shared/types";
 
 const TOKEN_KEY = "magnum_auth_token";
 const REFRESH_KEY = "magnum_refresh_token";
 const USER_KEY = "magnum_user";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+
 export interface AuthState {
   token: string | null;
   refreshToken: string | null;
   user: User | null;
   contributorName: string;
+  isIpContributor: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
@@ -20,6 +24,7 @@ export interface AuthState {
   setToken: (token: string) => Promise<void>;
   logout: () => Promise<void>;
   loadStoredAuth: () => Promise<void>;
+  fetchIpContributor: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -27,12 +32,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: null,
   user: null,
   contributorName: "anonymous",
+  isIpContributor: false,
   isAuthenticated: false,
   isAdmin: false,
   isLoading: true,
 
   setContributorName: (name: string) => {
-    set({ contributorName: name.trim() || "anonymous" });
+    const trimmed = name.trim() || "anonymous";
+    set({ contributorName: trimmed, isIpContributor: false });
   },
 
   setAuth: async (token: string, refreshToken: string, user: User) => {
@@ -48,6 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: true,
       isAdmin: user.role === "admin" || user.role === "moderator",
       contributorName: user.username,
+      isIpContributor: false,
       isLoading: false,
     });
   },
@@ -66,8 +74,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: false,
       isAdmin: false,
       contributorName: "anonymous",
+      isIpContributor: false,
       isLoading: false,
     });
+    void get().fetchIpContributor();
   },
 
   loadStoredAuth: async () => {
@@ -85,13 +95,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAuthenticated: true,
           isAdmin: user.role === "admin" || user.role === "moderator",
           contributorName: user.username,
+          isIpContributor: false,
           isLoading: false,
         });
       } else {
         set({ isLoading: false });
+        void get().fetchIpContributor();
       }
     } catch {
       set({ isLoading: false });
+      void get().fetchIpContributor();
+    }
+  },
+
+  // Wikipedia-style anonymous attribution: the server reports the client's
+  // public IP, and we use "IP:<address>" as the contributor name for
+  // unauthenticated edits. The IP is fetched fresh on each app start
+  // (not persisted) so it tracks the current network.
+  fetchIpContributor: async () => {
+    try {
+      const client = createMagnumClient(API_URL);
+      const { ip } = await client.getClientIp();
+      if (!ip) return;
+      if (get().isAuthenticated) return;
+      set({ contributorName: `IP:${ip}`, isIpContributor: true });
+    } catch {
+      // Leave the contributor as the default "anonymous" fallback.
     }
   },
 }));

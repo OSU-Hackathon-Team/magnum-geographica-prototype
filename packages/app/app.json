@@ -8,6 +8,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "platforms": ["ios", "android", "web"],
+        "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.magnum.app"
@@ -19,7 +20,21 @@
       "bundler": "metro",
       "output": "static"
     },
-    "plugins": ["expo-router", "expo-asset", "expo-font", "@config-plugins/detox"],
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-font",
+      "@config-plugins/detox",
+      [
+        "react-native-background-geolocation",
+        {
+          "license": {
+            "appId": "org.magnum.app",
+            "entitlements": ["core"]
+          }
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     },

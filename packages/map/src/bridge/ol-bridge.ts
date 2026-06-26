@@ -29,6 +29,12 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.enterDrawMode();`;
     case "exitDrawMode":
       return `window.olBridge.exitDrawMode();`;
+    case "setLiveRoute":
+      return `window.olBridge.setLiveRoute(${json});`;
+    case "clearLiveRoute":
+      return `window.olBridge.clearLiveRoute();`;
+    case "setShape":
+      return `window.olBridge.setShape(${json});`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -52,6 +58,9 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "setOfflineBaseLayer",
     "enterDrawMode",
     "exitDrawMode",
+    "setLiveRoute",
+    "clearLiveRoute",
+    "setShape",
   ].includes(method);
 }
 
@@ -60,8 +69,16 @@ export function isBridgeEvent(value: unknown): value is BridgeEvent {
   const t = (value as { type?: unknown }).type;
   return (
     typeof t === "string" &&
-    ["ready", "mapClick", "mapLongPress", "moveEnd", "featureSelect", "error", "drawEnd"].includes(
-      t,
-    )
+    [
+      "ready",
+      "mapClick",
+      "mapLongPress",
+      "moveEnd",
+      "featureSelect",
+      "error",
+      "drawEnd",
+      "shapeHit",
+      "shapeDrag",
+    ].includes(t)
   );
 }

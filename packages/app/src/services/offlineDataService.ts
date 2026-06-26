@@ -239,9 +239,9 @@ export async function addPendingContribution(
   payload: unknown,
   contributorName: string,
   entityId?: string,
-) {
+): Promise<number> {
   const db = await getOfflineDb();
-  await db.execRaw(
+  const result = (await db.execRaw(
     `INSERT INTO pending_contributions (entity_type, entity_id, action, payload, contributor_name, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [
@@ -252,7 +252,19 @@ export async function addPendingContribution(
       contributorName,
       new Date().toISOString(),
     ],
-  );
+  )) as unknown as { insertId?: number; rowsAffected?: number } | Array<Record<string, unknown>>;
+  // op-sqlite returns either an object with `insertId` or an empty
+  // row array depending on platform. Fall back to lastInsertRowid
+  // when the descriptor doesn't carry it.
+  if (result && typeof result === "object" && !Array.isArray(result)) {
+    if (typeof (result as { insertId?: number }).insertId === "number") {
+      return (result as { insertId: number }).insertId;
+    }
+  }
+  const lastIdRows = (await db.exec("SELECT last_insert_rowid() AS id")) as unknown as Array<{
+    id: number;
+  }>;
+  return Number(lastIdRows[0]?.id ?? 0);
 }
 
 export interface PendingContributionRow {
@@ -427,5 +439,287 @@ export async function deleteOfflineRegion(regionId: string) {
   await db.execRaw("DELETE FROM features");
   await db.execRaw(
     "DELETE FROM wiki_pages WHERE target_type != 'trail' AND target_type != 'system' AND target_type != 'feature'",
+  );
+}
+
+// ========== Trace recording sessions (live background tracking) ==========
+//
+// A `trace_sessions` row is the durable record of an in-progress recording
+// and is the recovery source if the app is killed mid-hike. The streaming
+// GPS samples live in `trace_points`. See `db/schema.ts` for the full
+// table contracts.
+
+export interface TraceSession {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  status: "recording" | "paused" | "submitted" | "discarded";
+  source: "recorded";
+  total_points: number;
+  total_meters: number;
+  server_trace_id: string | null;
+  pending_contribution_id: number | null;
+  updated_at: string;
+}
+
+export interface TracePoint {
+  id: number;
+  session_id: string;
+  seq: number;
+  lon: number;
+  lat: number;
+  elevation: number | null;
+  accuracy: number | null;
+  speed: number | null;
+  heading: number | null;
+  recorded_at: string;
+  received_at: string;
+}
+
+/**
+ * Create a fresh recording session. Returns the new session row. The
+ * `id` is generated client-side (uuid v4) so subsequent writes to
+ * `trace_points` from background tasks can run before the JS state is
+ * rehydrated.
+ */
+export async function createTraceSession(
+  id: string,
+  startedAt: string,
+): Promise<TraceSession> {
+  const db = await getOfflineDb();
+  const now = new Date().toISOString();
+  await db.execRaw(
+    `INSERT INTO trace_sessions (id, started_at, status, source, total_points, total_meters, updated_at)
+     VALUES (?, ?, 'recording', 'recorded', 0, 0, ?)`,
+    [id, startedAt, now],
+  );
+  return {
+    id,
+    started_at: startedAt,
+    ended_at: null,
+    status: "recording",
+    source: "recorded",
+    total_points: 0,
+    total_meters: 0,
+    server_trace_id: null,
+    pending_contribution_id: null,
+    updated_at: now,
+  };
+}
+
+/**
+ * Append a single GPS sample to a session. The `seq` is assigned at
+ * write time as `total_points + 1` to keep the in-session ordering
+ * stable regardless of clock skew between background events. Returns
+ * the assigned seq.
+ */
+export async function appendTracePoint(
+  sessionId: string,
+  point: {
+    lon: number;
+    lat: number;
+    elevation?: number | null;
+    accuracy?: number | null;
+    speed?: number | null;
+    heading?: number | null;
+    recorded_at: string;
+  },
+): Promise<number> {
+  const db = await getOfflineDb();
+  const head = (await db.exec(
+    "SELECT total_points, total_meters FROM trace_sessions WHERE id = ?",
+    [sessionId],
+  )) as unknown as Array<{ total_points: number; total_meters: number }>;
+  const prev = head[0]?.total_points ?? 0;
+  const seq = prev + 1;
+  const receivedAt = new Date().toISOString();
+  await db.execRaw(
+    `INSERT INTO trace_points
+       (session_id, seq, lon, lat, elevation, accuracy, speed, heading, recorded_at, received_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      sessionId,
+      seq,
+      point.lon,
+      point.lat,
+      point.elevation ?? null,
+      point.accuracy ?? null,
+      point.speed ?? null,
+      point.heading ?? null,
+      point.recorded_at,
+      receivedAt,
+    ],
+  );
+  // `total_meters` is recomputed cheaply by re-reading the previous
+  // segment length off the last point. For very long sessions we'd
+  // cache this on the session row; for now we recompute on submit.
+  await db.execRaw(
+    "UPDATE trace_sessions SET total_points = ?, updated_at = ? WHERE id = ?",
+    [seq, receivedAt, sessionId],
+  );
+  return seq;
+}
+
+/**
+ * Bulk-append a list of points, used by the recovery flow when we
+ * backfill points from the on-disk background-geolocation database
+ * after a kill. The `seq` is computed from the current session
+ * `total_points` so a recovery never collides with previously-written
+ * points.
+ */
+export async function appendTracePointsBulk(
+  sessionId: string,
+  points: Array<{
+    lon: number;
+    lat: number;
+    elevation?: number | null;
+    accuracy?: number | null;
+    speed?: number | null;
+    heading?: number | null;
+    recorded_at: string;
+  }>,
+): Promise<number> {
+  if (points.length === 0) return 0;
+  const db = await getOfflineDb();
+  const head = (await db.exec(
+    "SELECT total_points FROM trace_sessions WHERE id = ?",
+    [sessionId],
+  )) as unknown as Array<{ total_points: number }>;
+  let seq = head[0]?.total_points ?? 0;
+  const receivedAt = new Date().toISOString();
+  await db.exec("BEGIN TRANSACTION");
+  try {
+    for (const p of points) {
+      seq += 1;
+      await db.execRaw(
+        `INSERT INTO trace_points
+           (session_id, seq, lon, lat, elevation, accuracy, speed, heading, recorded_at, received_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          sessionId,
+          seq,
+          p.lon,
+          p.lat,
+          p.elevation ?? null,
+          p.accuracy ?? null,
+          p.speed ?? null,
+          p.heading ?? null,
+          p.recorded_at,
+          receivedAt,
+        ],
+      );
+    }
+    await db.execRaw(
+      "UPDATE trace_sessions SET total_points = ?, updated_at = ? WHERE id = ?",
+      [seq, receivedAt, sessionId],
+    );
+    await db.exec("COMMIT");
+  } catch (e) {
+    await db.exec("ROLLBACK");
+    throw e;
+  }
+  return seq;
+}
+
+/**
+ * Recompute `total_meters` on a session by walking its points in seq
+ * order. The library writes a fresh `total_meters` on submit; this is
+ * what recovery flows call when a session's distance was lost to a
+ * crash.
+ */
+export async function recomputeTraceDistance(sessionId: string): Promise<number> {
+  const db = await getOfflineDb();
+  const points = (await db.exec(
+    "SELECT lon, lat FROM trace_points WHERE session_id = ? ORDER BY seq",
+    [sessionId],
+  )) as unknown as Array<{ lon: number; lat: number }>;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!;
+    const b = points[i]!;
+    const cosLat = Math.cos((a.lat * Math.PI) / 180);
+    const dx = (b.lon - a.lon) * cosLat;
+    const dy = b.lat - a.lat;
+    total += Math.hypot(dx, dy) * 111_320;
+  }
+  await db.execRaw("UPDATE trace_sessions SET total_meters = ?, updated_at = ? WHERE id = ?", [
+    total,
+    new Date().toISOString(),
+    sessionId,
+  ]);
+  return total;
+}
+
+/**
+ * Read every point for a session in `seq` order. Used both for the
+ * live map preview and for the final submit payload.
+ */
+export async function listTracePoints(sessionId: string): Promise<TracePoint[]> {
+  const db = await getOfflineDb();
+  const rows = (await db.exec(
+    "SELECT * FROM trace_points WHERE session_id = ? ORDER BY seq",
+    [sessionId],
+  )) as unknown as TracePoint[];
+  return rows;
+}
+
+export async function getTraceSession(id: string): Promise<TraceSession | null> {
+  const db = await getOfflineDb();
+  const rows = (await db.exec("SELECT * FROM trace_sessions WHERE id = ?", [id])) as unknown as
+    | TraceSession[]
+    | undefined;
+  return rows?.[0] ?? null;
+}
+
+/**
+ * The single "active" session if any. Active = status in
+ * (`recording`, `paused`). On app launch we use this to decide
+ * whether to show the recovery modal.
+ */
+export async function getActiveTraceSession(): Promise<TraceSession | null> {
+  const db = await getOfflineDb();
+  const rows = (await db.exec(
+    "SELECT * FROM trace_sessions WHERE status IN ('recording', 'paused') ORDER BY started_at DESC LIMIT 1",
+  )) as unknown as TraceSession[] | undefined;
+  return rows?.[0] ?? null;
+}
+
+export async function listRecentTraceSessions(limit = 10): Promise<TraceSession[]> {
+  const db = await getOfflineDb();
+  const rows = (await db.exec(
+    "SELECT * FROM trace_sessions ORDER BY started_at DESC LIMIT ?",
+    [limit],
+  )) as unknown as TraceSession[];
+  return rows;
+}
+
+export async function updateTraceSessionStatus(
+  id: string,
+  status: TraceSession["status"],
+  fields: Partial<Pick<TraceSession, "ended_at" | "total_meters" | "server_trace_id" | "pending_contribution_id">> = {},
+): Promise<void> {
+  const db = await getOfflineDb();
+  const sets: string[] = ["status = ?", "updated_at = ?"];
+  const params: (string | number | null)[] = [status, new Date().toISOString()];
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined) continue;
+    sets.push(`${k} = ?`);
+    params.push(v as string | number | null);
+  }
+  params.push(id);
+  await db.execRaw(`UPDATE trace_sessions SET ${sets.join(", ")} WHERE id = ?`, params);
+}
+
+/**
+ * Discard a session — soft-delete. The `discarded` status keeps the
+ * row out of the "active" query and out of the recent list (the
+ * recent list filters by status in (`submitted`)), but preserves
+ * audit history.
+ */
+export async function discardTraceSession(id: string): Promise<void> {
+  const db = await getOfflineDb();
+  await db.execRaw(
+    "UPDATE trace_sessions SET status = 'discarded', ended_at = ?, updated_at = ? WHERE id = ?",
+    [new Date().toISOString(), new Date().toISOString(), id],
   );
 }

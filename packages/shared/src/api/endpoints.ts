@@ -10,6 +10,7 @@ import type {
   TrailSegment,
   PaginatedResponse,
   User,
+  HierarchyTreeNode,
 } from "../types/index.js";
 import type {
   CreateSystemInput,
@@ -29,6 +30,7 @@ import type {
   MergeSegmentsInput,
   RegisterInput,
   LoginInput,
+  UpdateSystemInput,
 } from "./types.js";
 
 export function createMagnumClient(
@@ -36,7 +38,6 @@ export function createMagnumClient(
   opts?: {
     fetch?: typeof fetch;
     getAdminSecret?: () => string | undefined;
-    getContributorName?: () => string | undefined;
     getAuthToken?: () => string | undefined;
   },
 ) {
@@ -44,7 +45,6 @@ export function createMagnumClient(
     baseUrl,
     fetch: opts?.fetch,
     getAdminSecret: opts?.getAdminSecret,
-    getContributorName: opts?.getContributorName,
     getAuthToken: opts?.getAuthToken,
   });
 
@@ -62,6 +62,8 @@ export function createMagnumClient(
     listSystemFeatures: (id: string) =>
       client.get<{ items: Feature[]; total: number }>(`/api/systems/${id}/features`),
     createSystem: (body: CreateSystemInput) => client.post<System>("/api/systems", body),
+    updateSystem: (id: string, body: UpdateSystemInput) =>
+      client.put<System>(`/api/systems/${id}`, body),
 
     listTrails: (params?: {
       page?: number;
@@ -151,6 +153,7 @@ export function createMagnumClient(
         refresh_token: refreshToken,
       }),
     getMe: () => client.get<User>("/api/auth/me"),
+    getClientIp: () => client.get<{ ip: string }>("/api/auth/client-ip"),
     getUser: (id: string) => client.get<User>(`/api/users/${id}`),
     getUserContributions: (id: string, params?: { page?: number; pageSize?: number }) =>
       client.get<PaginatedResponse<Revision>>(`/api/users/${id}/contributions`, params),
@@ -167,14 +170,11 @@ export function createMagnumClient(
       client.post<{ ok: boolean }>(`/api/admin/revisions/${revisionId}/revert`),
     adminDeleteWikiPage: (id: string) =>
       client.delete<{ ok: boolean }>(`/api/admin/wiki-pages/${id}`),
-    adminDeleteFeature: (id: string) =>
-      client.delete<{ ok: boolean }>(`/api/admin/features/${id}`),
+    adminDeleteFeature: (id: string) => client.delete<{ ok: boolean }>(`/api/admin/features/${id}`),
     adminListUsers: (params?: { page?: number; pageSize?: number; q?: string }) =>
       client.get<PaginatedResponse<User>>("/api/admin/users", params),
-    adminBanUser: (id: string) =>
-      client.post<{ ok: boolean }>(`/api/admin/users/${id}/ban`),
-    adminUnbanUser: (id: string) =>
-      client.post<{ ok: boolean }>(`/api/admin/users/${id}/unban`),
+    adminBanUser: (id: string) => client.post<{ ok: boolean }>(`/api/admin/users/${id}/ban`),
+    adminUnbanUser: (id: string) => client.post<{ ok: boolean }>(`/api/admin/users/${id}/unban`),
 
     // §21.7 / §21.8 — karma, votes, protection, generalized revisions, patrol.
     castVote: (body: { target_type: string; target_id: string; value: 1 | -1 }) =>
@@ -218,21 +218,42 @@ export function createMagnumClient(
         revision_count: number;
       }>(`/api/votes/users/${id}/karma`),
 
-    listRevisionsForTarget: (targetType: string, targetId: string, params?: { page?: number; pageSize?: number }) =>
+    listRevisionsForTarget: (
+      targetType: string,
+      targetId: string,
+      params?: { page?: number; pageSize?: number },
+    ) =>
       client.get<{ items: Revision[]; total: number; page: number; pageSize: number }>(
         `/api/revisions/target/${targetType}/${targetId}`,
         params,
       ),
-    queryRevisions: (params?: { target_type?: string; target_id?: string; author_id?: string; page?: number; pageSize?: number }) =>
-      client.get<{ items: Revision[]; total: number; page: number; pageSize: number }>("/api/revisions", params),
+    queryRevisions: (params?: {
+      target_type?: string;
+      target_id?: string;
+      author_id?: string;
+      page?: number;
+      pageSize?: number;
+    }) =>
+      client.get<{ items: Revision[]; total: number; page: number; pageSize: number }>(
+        "/api/revisions",
+        params,
+      ),
     revertRevision: (id: string, body?: { contributor_name?: string; edit_summary?: string }) =>
       client.post<{ ok: boolean; revision_id: string }>(`/api/revisions/${id}/revert`, body ?? {}),
 
-    adminListPatrol: (params?: { reason?: string; user_id?: string; resolved?: boolean; page?: number; pageSize?: number }) =>
-      client.get<{ items: Array<Record<string, unknown>>; total: number; page: number; pageSize: number }>(
-        "/api/admin/patrol",
-        params,
-      ),
+    adminListPatrol: (params?: {
+      reason?: string;
+      user_id?: string;
+      resolved?: boolean;
+      page?: number;
+      pageSize?: number;
+    }) =>
+      client.get<{
+        items: Array<Record<string, unknown>>;
+        total: number;
+        page: number;
+        pageSize: number;
+      }>("/api/admin/patrol", params),
     adminPatrolAct: (body: {
       flag_id?: string;
       revision_id?: string;
@@ -245,42 +266,36 @@ export function createMagnumClient(
     // §21.4 — presets
     listPresets: (params?: { category?: string; upstreamable?: boolean }) =>
       client.get<{ items: Array<Record<string, unknown>>; total: number }>("/api/presets", params),
-    getPreset: (id: string) =>
-      client.get<Record<string, unknown>>(`/api/presets/${id}`),
+    getPreset: (id: string) => client.get<Record<string, unknown>>(`/api/presets/${id}`),
     getPresetByKey: (key: string) =>
       client.get<Record<string, unknown>>(`/api/presets/by-key/${key}`),
     createPreset: (body: Record<string, unknown>) =>
       client.post<Record<string, unknown>>("/api/presets", body),
     updatePreset: (id: string, body: Record<string, unknown>) =>
       client.put<Record<string, unknown>>(`/api/presets/${id}`, body),
-    deletePreset: (id: string) =>
-      client.delete<{ ok: boolean }>(`/api/presets/${id}`),
+    deletePreset: (id: string) => client.delete<{ ok: boolean }>(`/api/presets/${id}`),
 
     // §21.5 — hierarchy
     listSuperSystems: () =>
       client.get<{ items: Array<Record<string, unknown>>; total: number }>("/api/super-systems"),
-    getSuperSystem: (id: string) =>
-      client.get<Record<string, unknown>>(`/api/super-systems/${id}`),
+    getSuperSystem: (id: string) => client.get<Record<string, unknown>>(`/api/super-systems/${id}`),
     createSuperSystem: (body: Record<string, unknown>) =>
       client.post<Record<string, unknown>>("/api/super-systems", body),
     updateSuperSystem: (id: string, body: Record<string, unknown>) =>
       client.put<Record<string, unknown>>(`/api/super-systems/${id}`, body),
-    deleteSuperSystem: (id: string) =>
-      client.delete<{ ok: boolean }>(`/api/super-systems/${id}`),
+    deleteSuperSystem: (id: string) => client.delete<{ ok: boolean }>(`/api/super-systems/${id}`),
 
     listSubSystems: (params?: { system_id?: string }) =>
       client.get<{ items: Array<Record<string, unknown>>; total: number }>(
         "/api/sub-systems",
         params,
       ),
-    getSubSystem: (id: string) =>
-      client.get<Record<string, unknown>>(`/api/sub-systems/${id}`),
+    getSubSystem: (id: string) => client.get<Record<string, unknown>>(`/api/sub-systems/${id}`),
     createSubSystem: (body: Record<string, unknown>) =>
       client.post<Record<string, unknown>>("/api/sub-systems", body),
     updateSubSystem: (id: string, body: Record<string, unknown>) =>
       client.put<Record<string, unknown>>(`/api/sub-systems/${id}`, body),
-    deleteSubSystem: (id: string) =>
-      client.delete<{ ok: boolean }>(`/api/sub-systems/${id}`),
+    deleteSubSystem: (id: string) => client.delete<{ ok: boolean }>(`/api/sub-systems/${id}`),
 
     moveSystem: (
       systemId: string,
@@ -291,19 +306,20 @@ export function createMagnumClient(
         sub_system_id?: string;
         trail_ids?: string[];
       },
-    ) => client.post<{ ok: boolean; action: string; affected: number }>(
-      `/api/systems/${systemId}/move`,
-      body,
-    ),
+    ) =>
+      client.post<{ ok: boolean; action: string; affected: number }>(
+        `/api/systems/${systemId}/move`,
+        body,
+      ),
 
     getHierarchyTree: () =>
-      client.get<{ nodes: Array<Record<string, unknown>>; total: number }>("/api/systems/tree"),
+      client.get<{ nodes: HierarchyTreeNode[]; total: number }>("/api/systems/tree"),
 
     getSystemsContaining: (params: { lon: number; lat: number }) =>
-      client.get<{ systems: Array<{ id: string; name: string; slug: string; distance_m?: number }>; fallback: "point_in_polygon" | "nearest" }>(
-        "/api/systems/contains",
-        params,
-      ),
+      client.get<{
+        systems: Array<{ id: string; name: string; slug: string; distance_m?: number }>;
+        fallback: "point_in_polygon" | "nearest";
+      }>("/api/systems/contains", params),
 
     // §21.6 — GPS traces
     listTraces: (params?: {
@@ -313,12 +329,13 @@ export function createMagnumClient(
       page?: number;
       pageSize?: number;
     }) =>
-      client.get<{ items: Array<Record<string, unknown>>; total: number; page: number; pageSize: number }>(
-        "/api/traces",
-        params,
-      ),
-    getTrace: (id: string) =>
-      client.get<Record<string, unknown>>(`/api/traces/${id}`),
+      client.get<{
+        items: Array<Record<string, unknown>>;
+        total: number;
+        page: number;
+        pageSize: number;
+      }>("/api/traces", params),
+    getTrace: (id: string) => client.get<Record<string, unknown>>(`/api/traces/${id}`),
     createTrace: (body: {
       geometry: { type: "LineString"; coordinates: Array<[number, number]> };
       source: "import" | "recorded";
@@ -335,14 +352,14 @@ export function createMagnumClient(
       recorded_at?: string;
       contributor_name?: string;
     }) =>
-      client.post<{ trace: Record<string, unknown>; tagged_system_ids: string[]; points: number; length_meters: number }>(
-        "/api/traces/import",
-        body,
-      ),
-    deleteTrace: (id: string) =>
-      client.delete<{ ok: boolean }>(`/api/traces/${id}`),
-    removeTrace: (id: string) =>
-      client.post<{ ok: boolean }>(`/api/traces/${id}/remove`),
+      client.post<{
+        trace: Record<string, unknown>;
+        tagged_system_ids: string[];
+        points: number;
+        length_meters: number;
+      }>("/api/traces/import", body),
+    deleteTrace: (id: string) => client.delete<{ ok: boolean }>(`/api/traces/${id}`),
+    removeTrace: (id: string) => client.post<{ ok: boolean }>(`/api/traces/${id}/remove`),
     cutTraceSegments: (id: string) =>
       client.post<{ ok: boolean; segments: number }>(`/api/traces/${id}/segments`),
     listTraceSegments: (id: string) =>
@@ -350,19 +367,27 @@ export function createMagnumClient(
         `/api/traces/${id}/segments`,
       ),
     voteOnTrace: (id: string, value: 1 | -1) =>
-      client.post<{ upvotes: number; downvotes: number; net: number; hidden: boolean; my_vote: -1 | 0 | 1; karma_awarded: number }>(
-        `/api/traces/${id}/vote`,
-        { value },
-      ),
+      client.post<{
+        upvotes: number;
+        downvotes: number;
+        net: number;
+        hidden: boolean;
+        my_vote: -1 | 0 | 1;
+        karma_awarded: number;
+      }>(`/api/traces/${id}/vote`, { value }),
     retractTraceVote: (id: string) =>
-      client.delete<{ upvotes: number; downvotes: number; net: number; hidden: boolean; my_vote: 0; karma_awarded: number }>(
-        `/api/traces/${id}/vote`,
-      ),
+      client.delete<{
+        upvotes: number;
+        downvotes: number;
+        net: number;
+        hidden: boolean;
+        my_vote: 0;
+        karma_awarded: number;
+      }>(`/api/traces/${id}/vote`),
     voteOnTraceSegment: (
       segmentId: string,
       body: { trail_id?: string | null; contributor_name?: string },
-    ) =>
-      client.post<{ ok: boolean }>(`/api/trace-segments/${segmentId}/vote`, body),
+    ) => client.post<{ ok: boolean }>(`/api/trace-segments/${segmentId}/vote`, body),
     // §21.6 phase 2 — synthesis
     synthesize: (systemId: string) =>
       client.post<{
@@ -388,10 +413,7 @@ export function createMagnumClient(
         body,
       ),
     rejectSynthesisProposal: (segmentId: string, body: { system_id: string }) =>
-      client.post<{ ok: boolean }>(
-        `/api/admin/synthesis-proposals/${segmentId}/reject`,
-        body,
-      ),
+      client.post<{ ok: boolean }>(`/api/admin/synthesis-proposals/${segmentId}/reject`, body),
     promoteTrail: (trailId: string, to: "elevated" | "premium") =>
       client.post<{ id: string; tier: string }>(`/api/admin/trails/${trailId}/promote`, { to }),
     importPremiumTrail: (body: {

@@ -24,17 +24,17 @@ export default function WikiEditScreen() {
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [citations, setCitations] = useState<Citation[]>([]);
-  const [contributorName, setContributorName] = useState("anonymous");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
+  // The contributor name is no longer client-editable. It's resolved
+  // server-side from auth context (username for logged-in, "IP:<addr>"
+  // otherwise). We still read it here for the offline queue so the
+  // pending entry shows the right name locally — the server will
+  // override it on sync.
   const storedContributor = useAuthStore((s) => s.contributorName);
-
-  useEffect(() => {
-    setContributorName(storedContributor);
-  }, [storedContributor]);
 
   const load = useCallback(async () => {
     if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string")
@@ -113,7 +113,9 @@ export default function WikiEditScreen() {
       return;
     setSaving(true);
     setError(null);
-    const finalContributor = contributorName || "anonymous";
+    // We no longer send `contributor_name` — the server derives it
+    // from the auth context. The local offline queue still keeps it
+    // for display purposes.
     const client = createMagnumClient(API_URL);
     try {
       if (!isOnline) {
@@ -127,7 +129,7 @@ export default function WikiEditScreen() {
             content_md: data.content_md,
             edit_summary: data.edit_summary,
           },
-          finalContributor,
+          storedContributor,
           wikiPage?.id,
         );
         const newCount = await getPendingCount();
@@ -140,7 +142,6 @@ export default function WikiEditScreen() {
         const updated = await client.updateWikiPage(wikiPage.id, {
           title: data.title,
           content_md: data.content_md,
-          contributor_name: finalContributor,
           edit_summary: data.edit_summary || undefined,
         });
         setWikiPage(updated);
@@ -150,7 +151,6 @@ export default function WikiEditScreen() {
           target_id: targetId,
           title: data.title,
           content_md: data.content_md,
-          contributor_name: finalContributor,
           edit_summary: data.edit_summary,
         });
         setWikiPage(created);
@@ -172,7 +172,7 @@ export default function WikiEditScreen() {
               content_md: data.content_md,
               edit_summary: data.edit_summary,
             },
-            finalContributor,
+            storedContributor,
             wikiPage?.id,
           );
           const newCount = await getPendingCount();
@@ -198,7 +198,6 @@ export default function WikiEditScreen() {
     try {
       const updated = await client.revertWikiPage(wikiPage.id, {
         revision_id: revisionId,
-        contributor_name: contributorName || "anonymous",
       });
       setWikiPage(updated);
       router.back();
@@ -229,6 +228,7 @@ export default function WikiEditScreen() {
   }
 
   async function handleDeleteCitation(citationId: string) {
+    if (!wikiPage) return;
     if (!isOnline) {
       setError("Citation changes require an online connection");
       return;
@@ -268,8 +268,6 @@ export default function WikiEditScreen() {
       <WikiPageEditor
         wikiPage={wikiPage}
         isLoading={loading}
-        contributorName={contributorName}
-        onContributorNameChange={setContributorName}
         onSave={handleSave}
         canSave={!saving}
         revisions={revisions}

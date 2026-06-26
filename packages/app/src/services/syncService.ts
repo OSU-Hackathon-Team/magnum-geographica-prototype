@@ -11,9 +11,13 @@ import {
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export async function syncContributions(
-  contributorName: string,
+  _contributorName: string,
 ): Promise<{ synced: number; conflicts: number }> {
-  const client = createMagnumClient(API_URL, { getContributorName: () => contributorName });
+  // The contributor name passed in is unused: the server now derives
+  // the attribution from the auth context. We accept the argument so
+  // call-sites don't have to change.
+  void _contributorName;
+  const client = createMagnumClient(API_URL);
   const pending = await getPendingContributions();
 
   if (pending.length === 0) return { synced: 0, conflicts: 0 };
@@ -21,13 +25,14 @@ export async function syncContributions(
   let synced = 0;
   let conflicts = 0;
 
+  // `contributor_name` from the local pending row is intentionally
+  // NOT sent — the server will override it with the auth context.
   const payload = pending.map((p: PendingContributionRow) => ({
     local_id: p.id,
     entity_type: p.entity_type,
     entity_id: p.entity_id,
     action: p.action,
     payload: p.payload,
-    contributor_name: p.contributor_name,
   }));
 
   try {

@@ -304,26 +304,33 @@ async function moveToSuper(params: MoveParams): Promise<MoveResult> {
 }
 
 async function moveOutOfSuper(params: MoveParams): Promise<MoveResult> {
-  if (!params.sourceSystemId || !params.targetSuperId) {
-    return { ok: false, reason: "source_system_id and target_super_id required" };
+  if (!params.sourceSystemId) {
+    return { ok: false, reason: "source_system_id required" };
   }
-  const rows = await db
-    .delete(systemSuperSystems)
-    .where(
-      and(
+  // The Move-to sheet uses the all-zeros UUID as a sentinel for
+  // "remove from all super-systems" (the user just wants the system
+  // to be loose). When we see it, we drop every membership for the
+  // source system; otherwise we drop just the targeted membership.
+  const detachAll = params.targetSuperId === "00000000-0000-0000-0000-000000000000";
+  const where = detachAll
+    ? eq(systemSuperSystems.systemId, params.sourceSystemId)
+    : and(
         eq(systemSuperSystems.systemId, params.sourceSystemId),
-        eq(systemSuperSystems.superSystemId, params.targetSuperId),
-      ),
-    )
-    .returning();
+        eq(systemSuperSystems.superSystemId, params.targetSuperId ?? ""),
+      );
+  const rows = await db.delete(systemSuperSystems).where(where).returning();
   await recordRevision({
     targetType: "system",
     targetId: params.sourceSystemId,
     action: "reassign",
     actorId: params.actorId,
     contributorName: "anonymous",
-    editSummary: `Removed system from super-system ${params.targetSuperId}`,
-    payloadBefore: { superSystemId: params.targetSuperId },
+    editSummary: detachAll
+      ? "Removed system from all super-systems"
+      : `Removed system from super-system ${params.targetSuperId}`,
+    payloadBefore: detachAll
+      ? { removedFromAll: true }
+      : { superSystemId: params.targetSuperId },
   });
   return { ok: true, affected: rows.length };
 }

@@ -34,6 +34,15 @@ adb reverse "tcp:${MARTIN_PORT}" "tcp:${MARTIN_PORT}" 2>/dev/null || true
 echo "[android] EXPO_PUBLIC_API_URL=${API_URL}"
 echo "[android] EXPO_PUBLIC_MARTIN_URL=${MARTIN_URL}"
 
+DEVICE_FLAG=()
+DEVICE_ID="$(adb devices | awk 'NR>1 && $2=="device" && $1 !~ /^emulator-/ {print $1; exit}')"
+if [ -n "${DEVICE_ID:-}" ]; then
+  echo "[android] targeting device: ${DEVICE_ID}"
+  export ANDROID_SERIAL="${DEVICE_ID}"
+else
+  echo "[android] no physical device found, falling back to default (emulator)"
+fi
+
 cd packages/app
 exec env \
   EXPO_PUBLIC_API_URL="${API_URL}" \

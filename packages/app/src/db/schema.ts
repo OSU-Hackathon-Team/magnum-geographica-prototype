@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const OFFLINE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -144,4 +144,56 @@ CREATE INDEX IF NOT EXISTS idx_offline_features_system ON features(system_id);
 CREATE INDEX IF NOT EXISTS idx_offline_wiki_target ON wiki_pages(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_offline_revisions_page ON revisions(wiki_page_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_offline_pending_status ON pending_contributions(sync_status);
+
+-- ========== TraceMode: live recording sessions ==========
+--
+-- trace_sessions is the durable record of an in-progress recording.
+-- The user can be in any of: recording, paused, or submitted
+-- (the latter means the points have been uploaded/queued and the
+-- session is preserved for the "recent traces" list). discarded
+-- exists so an explicit discard isn't hard-deleted; it's hidden from
+-- the active query.
+--
+-- trace_points is the immutable stream of every location event the
+-- tracker delivered while the session was recording (paused sessions
+-- stop appending; resumed sessions keep appending with monotonic
+-- recorded_at timestamps).
+--
+-- The combination of (session_id, recorded_at, seq) is the canonical
+-- ordering for replay. We never delete points while the session is
+-- active - this is the buffer the library writes to on every event so
+-- a process kill is recoverable.
+
+CREATE TABLE IF NOT EXISTS trace_sessions (
+  id TEXT PRIMARY KEY,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  status TEXT NOT NULL DEFAULT 'recording', -- recording | paused | submitted | discarded
+  source TEXT NOT NULL DEFAULT 'recorded',  -- recorded (import lives in pending_contributions)
+  total_points INTEGER NOT NULL DEFAULT 0,
+  total_meters REAL NOT NULL DEFAULT 0,
+  server_trace_id TEXT,                     -- assigned after a successful submit
+  pending_contribution_id INTEGER,          -- FK to pending_contributions when offline-queued
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_trace_sessions_status ON trace_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_trace_sessions_started ON trace_sessions(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS trace_points (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,             -- monotonic per-session ordinal assigned at write
+  lon REAL NOT NULL,
+  lat REAL NOT NULL,
+  elevation REAL,
+  accuracy REAL,
+  speed REAL,
+  heading REAL,
+  recorded_at TEXT NOT NULL,        -- ISO 8601 — when the GPS sample was taken
+  received_at TEXT NOT NULL,        -- ISO 8601 — when we wrote it to SQLite
+  FOREIGN KEY (session_id) REFERENCES trace_sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_trace_points_session ON trace_points(session_id, seq);
 `;

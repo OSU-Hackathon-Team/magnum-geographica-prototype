@@ -164,6 +164,16 @@ export default function SystemDetail() {
           <Button
             variant="ghost"
             size="small"
+            onPress={() =>
+              router.push(`/system/boundary?mode=edit&slug=${system.slug}` as never)
+            }
+            testID="system-edit-boundary"
+          >
+            Edit boundary
+          </Button>
+          <Button
+            variant="ghost"
+            size="small"
             onPress={() => setShowMoveTo(true)}
             testID="system-move-to"
           >

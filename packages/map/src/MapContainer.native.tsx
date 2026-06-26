@@ -66,7 +66,8 @@ function buildMapHtml(
           activeBaseLayer=null,
           dragBox=null,
           dragLayer=null,
-          savedDragPan=null;
+          savedDragPan=null,
+          liveRouteSource=null;
 
       function postToRN(e){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(e))}}
 
@@ -276,6 +277,40 @@ function buildMapHtml(
 
         map=new ol.Map({target:'map',layers:allLayers,view:new ol.View({center:ol.proj.fromLonLat(initCenter),zoom:initZoom})});
         setActiveBaseLayer(initialBaseId);
+
+        // Live recording route — a top-most vector layer driven by
+        // setLiveRoute. The recording screen sends coordinates here
+        // so the user can watch their trace grow on the map.
+        liveRouteSource = new ol.source.Vector();
+        var liveRouteStyle = function (feature) {
+          var coords = feature.getGeometry().getCoordinates();
+          var styles = [
+            new ol.style.Style({
+              stroke: new ol.style.Stroke({ color: '#22c55e', width: 4, lineCap: 'round' })
+            })
+          ];
+          if (coords.length > 0) {
+            var tail = coords[coords.length - 1];
+            styles.push(
+              new ol.style.Style({
+                geometry: new ol.geom.Point(tail),
+                image: new ol.style.Circle({
+                  radius: 6,
+                  fill: new ol.style.Fill({ color: '#22c55e' }),
+                  stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+                })
+              })
+            );
+          }
+          return styles;
+        };
+        var liveRouteLayer = new ol.layer.Vector({
+          source: liveRouteSource,
+          style: liveRouteStyle
+        });
+        liveRouteLayer.set('name', 'live_route');
+        map.addLayer(liveRouteLayer);
+
         console.log('[map] buildMap done, activeBaseLayer=', initialBaseId, 'layerCount=', map.getLayers().getArray().length);
         map.on('click',function(e){var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]})});
         map.on('moveend',function(){var v=map.getView();var c=ol.proj.toLonLat(v.getCenter());postToRN({type:'moveEnd',center:c,zoom:v.getZoom()})});
@@ -353,6 +388,25 @@ function buildMapHtml(
             if(window.olBridge && typeof window.olBridge.exitDrawMode === 'function'){
               window.olBridge.exitDrawMode();
             }
+          }else if(m === 'setLiveRoute' && a){
+            if(!map || !liveRouteSource) return;
+            var coords = a.coordinates || [];
+            if(coords.length < 2){
+              liveRouteSource.clear();
+              return;
+            }
+            var projected = coords.map(function(c){return ol.proj.fromLonLat(c)});
+            var line = new ol.geom.LineString(projected);
+            liveRouteSource.clear();
+            liveRouteSource.addFeature(new ol.Feature({geometry: line}));
+            if(typeof a.followLon === 'number' && typeof a.followLat === 'number'){
+              map.getView().animate({
+                center: ol.proj.fromLonLat([a.followLon, a.followLat]),
+                duration: 250
+              });
+            }
+          }else if(m === 'clearLiveRoute'){
+            if(liveRouteSource) liveRouteSource.clear();
           }
         }catch(err){
           postToRN({type:'error', message: 'onHostMessage: ' + (err && err.message || String(err))});
@@ -512,7 +566,19 @@ function buildMapHtml(
           if(dragBox){map.removeInteraction(dragBox);dragBox=null}
           if(dragLayer){map.removeLayer(dragLayer);dragLayer=null}
           if(savedDragPan){map.addInteraction(savedDragPan);savedDragPan=null}
-        }
+        },
+        setLiveRoute:function(a){
+          if(!map||!liveRouteSource)return;
+          var coords=(a&&a.coordinates)||[];
+          if(coords.length<2){liveRouteSource.clear();return}
+          var projected=coords.map(function(c){return ol.proj.fromLonLat(c)});
+          liveRouteSource.clear();
+          liveRouteSource.addFeature(new ol.Feature({geometry:new ol.geom.LineString(projected)}));
+          if(typeof a.followLon==='number'&&typeof a.followLat==='number'){
+            map.getView().animate({center:ol.proj.fromLonLat([a.followLon,a.followLat]),duration:250});
+          }
+        },
+        clearLiveRoute:function(){if(liveRouteSource)liveRouteSource.clear()}
       };
       window.addEventListener('error',function(e){postToRN({type:'error',message:e.message})});
       // Replay any commands the host sent before the bridge was installed.
@@ -536,6 +602,7 @@ export default function MapContainer({
   drawMode,
   onDrawEnd,
   onMapRef,
+  liveRoute,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
@@ -555,6 +622,7 @@ export default function MapContainer({
   const baseLayerRef = useRef<string | undefined>(undefined);
   const offlineModeRef = useRef<boolean | undefined>(undefined);
   const offlineBaseLayerRef = useRef<MapContainerProps["offlineBaseLayer"] | undefined>(undefined);
+  const liveRouteRef = useRef<MapContainerProps["liveRoute"] | undefined>(undefined);
 
   const initialCenter = merged.initialCenter ?? defaultMapConfig.initialCenter;
   const initialZoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
@@ -700,6 +768,9 @@ export default function MapContainer({
         args: { ...offlineBaseLayerRef.current, active: !!offlineModeRef.current },
       });
     }
+    if (liveRouteRef.current) {
+      send({ method: "setLiveRoute", args: liveRouteRef.current });
+    }
   }, [send]);
 
   // Expose send function to parent
@@ -751,6 +822,22 @@ export default function MapContainer({
       send({ method: "exitDrawMode", args: {} });
     }
   }, [drawMode, send]);
+
+  // Sync live route polyline. We track the latest route in a ref so
+  // that high-frequency updates (every GPS event) don't re-trigger
+  // the useEffect's send — instead the recording screen calls the
+  // `send` ref directly via `onMapRef`. The effect is still useful
+  // for the initial mount and for state changes (e.g. clearing on
+  // submit).
+  useEffect(() => {
+    liveRouteRef.current = liveRoute ?? undefined;
+    if (!initSentRef.current) return;
+    if (!liveRoute || liveRoute.coordinates.length < 2) {
+      send({ method: "clearLiveRoute", args: {} });
+    } else {
+      send({ method: "setLiveRoute", args: liveRoute });
+    }
+  }, [liveRoute, send]);
 
   // Track the last flyTo values so we only re-send when the target actually
   // changes (not when the parent passes a new object ref with same values).

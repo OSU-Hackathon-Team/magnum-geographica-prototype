@@ -286,12 +286,11 @@ systemMoveRoute.post("/:id/move", authRequired(), async (c) => {
     const actorKarma = Number(actorRow[0]?.karma ?? 0);
     const actorRole = actorRow[0]?.role ?? null;
     const protRow = await db
-      .select({ c: systemsTable })
+      .select({ createdByUserId: systemsTable.createdByUserId })
       .from(systemsTable)
       .where(eq(systemsTable.id, sourceSystemId))
       .limit(1);
-    void protRow;
-    const isCreator = protRow[0]?.c?.id === authUser.id;
+    const isCreator = protRow[0]?.createdByUserId === authUser.id;
     const { countChildren } = await import("../services/protection.js");
     const children = await countChildren("system", sourceSystemId);
     const del = canDelete(
@@ -335,7 +334,7 @@ systemMoveRoute.post("/:id/move", authRequired(), async (c) => {
 
 export const systemTreeRoute = new Hono();
 
-systemTreeRoute.get("/", async (c) => {
+systemTreeRoute.get("/tree", async (c) => {
   const nodes = await getHierarchyTree();
   return c.json({ nodes, total: nodes.length });
 });

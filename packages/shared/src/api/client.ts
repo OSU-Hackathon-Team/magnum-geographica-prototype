@@ -25,7 +25,6 @@ export interface ApiClientConfig {
   baseUrl: string;
   fetch?: typeof fetch;
   getAdminSecret?: () => string | undefined;
-  getContributorName?: () => string | undefined;
   getAuthToken?: () => string | undefined;
 }
 
@@ -33,14 +32,12 @@ export class ApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly getAdminSecret: () => string | undefined;
-  private readonly getContributorName: () => string | undefined;
   private readonly getAuthToken: () => string | undefined;
 
   constructor(config: ApiClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, "");
     this.fetchImpl = config.fetch ?? fetch.bind(globalThis);
     this.getAdminSecret = config.getAdminSecret ?? (() => undefined);
-    this.getContributorName = config.getContributorName ?? (() => undefined);
     this.getAuthToken = config.getAuthToken ?? (() => undefined);
   }
 
@@ -70,9 +67,6 @@ export class ApiClient {
 
     const authToken = this.getAuthToken();
     if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
-
-    const contributor = this.getContributorName();
-    if (contributor) headers["x-contributor-name"] = contributor;
 
     const response = await this.fetchImpl(url.toString(), {
       method,

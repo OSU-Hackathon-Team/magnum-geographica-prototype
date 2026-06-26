@@ -51,7 +51,25 @@ export type BridgeCommand =
       };
     }
   | { method: "enterDrawMode"; args: {} }
-  | { method: "exitDrawMode"; args: {} };
+  | { method: "exitDrawMode"; args: {} }
+  | {
+      method: "setLiveRoute";
+      args: {
+        coordinates: Array<[number, number]>;
+        followLon?: number | null;
+        followLat?: number | null;
+      };
+    }
+  | { method: "clearLiveRoute"; args: {} }
+  | {
+      method: "setShape";
+      args: {
+        rings: Array<{ vertices: Array<[number, number]>; closed: boolean }>;
+        chords: Array<[number, number]>;
+        mode: "normal" | "delete";
+        connectFrom: number | null;
+      };
+    };
 
 export type BridgeEvent =
   | { type: "ready" }
@@ -66,6 +84,15 @@ export type BridgeEvent =
       name?: string | null;
     }
   | { type: "drawEnd"; minLon: number; minLat: number; maxLon: number; maxLat: number }
+  | {
+      type: "shapeHit";
+      kind: "vertex" | "edge" | "empty";
+      ringIndex: number;
+      vertexIndex: number;
+      lon: number;
+      lat: number;
+    }
+  | { type: "shapeDrag"; ringIndex: number; vertexIndex: number; lon: number; lat: number }
   | { type: "error"; message: string };
 
 export type BridgeMethod = BridgeCommand["method"];

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   createSystemInputSchema,
+  updateSystemInputSchema,
   createTrailInputSchema,
   createFeatureInputSchema,
   createWikiPageInputSchema,
@@ -21,6 +22,7 @@ import {
 } from "../schemas/index.js";
 
 export type CreateSystemInput = z.infer<typeof createSystemInputSchema>;
+export type UpdateSystemInput = z.infer<typeof updateSystemInputSchema>;
 export type CreateTrailInput = z.infer<typeof createTrailInputSchema>;
 export type CreateFeatureInput = z.infer<typeof createFeatureInputSchema>;
 export type UpdateFeatureInput = z.infer<typeof updateFeatureInputSchema>;

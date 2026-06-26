@@ -7,11 +7,32 @@ import {
   loginRequestSchema,
   userProfileSchema,
 } from "@magnum/shared/schemas";
-import { signToken, signRefreshToken, authRequired, type AuthUser } from "../middleware/auth.js";
+import {
+  signToken,
+  signRefreshToken,
+  authRequired,
+  type AuthUser,
+  type TrustTier,
+} from "../middleware/auth.js";
+import { readClientIp } from "../services/identity.js";
+import { tierFromKarma } from "../services/karma.js";
 
 type Variables = { user: AuthUser };
 
 export const authRoute = new Hono<{ Variables: Variables }>();
+
+/**
+ * Compute the JWT `tier` for a user. Admin/moderator roles always get
+ * the `moderator` tier so they pass the `moderatorRequired` gate; for
+ * everyone else, the tier is derived from karma. The previous
+ * implementation read `user.tier`, which doesn't exist on the users
+ * table, so admins were getting `tier: "new"` in their JWT and the
+ * synthesis/import/promote routes were 403ing for them.
+ */
+function tierForUser(role: string | null | undefined, karma: number): TrustTier {
+  if (role === "admin" || role === "moderator") return "moderator";
+  return tierFromKarma(karma);
+}
 
 function serializeUser(user: Record<string, unknown>) {
   const { passwordHash: _ph, createdAt, updatedAt, trustScore, displayName, ...rest } = user;
@@ -29,7 +50,14 @@ authRoute.post("/register", async (c) => {
   if (!body) return c.json({ error: "invalid_input", message: "request body required" }, 400);
   const parsed = registerRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "invalid_input", message: parsed.error.issues[0]?.message ?? "validation failed", details: parsed.error.issues }, 400);
+    return c.json(
+      {
+        error: "invalid_input",
+        message: parsed.error.issues[0]?.message ?? "validation failed",
+        details: parsed.error.issues,
+      },
+      400,
+    );
   }
   const { username, email, password, display_name } = parsed.data;
 
@@ -68,7 +96,7 @@ authRoute.post("/register", async (c) => {
     email: user.email,
     role: user.role ?? "contributor",
     karma: Number(user.trustScore ?? 0),
-    tier: ((user as { tier?: "new" | "established" | "trusted" | "moderator" }).tier ?? "new"),
+    tier: tierForUser(user.role, Number(user.trustScore ?? 0)),
   });
   const refreshToken = await signRefreshToken(user.id);
 
@@ -88,7 +116,10 @@ authRoute.post("/login", async (c) => {
   if (!body) return c.json({ error: "invalid_input", message: "request body required" }, 400);
   const parsed = loginRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "invalid_input", message: parsed.error.issues[0]?.message ?? "validation failed" }, 400);
+    return c.json(
+      { error: "invalid_input", message: parsed.error.issues[0]?.message ?? "validation failed" },
+      400,
+    );
   }
   const { email, password } = parsed.data;
 
@@ -113,7 +144,7 @@ authRoute.post("/login", async (c) => {
     email: user.email,
     role: user.role ?? "contributor",
     karma: Number(user.trustScore ?? 0),
-    tier: ((user as { tier?: "new" | "established" | "trusted" | "moderator" }).tier ?? "new"),
+    tier: tierForUser(user.role, Number(user.trustScore ?? 0)),
   });
   const refreshToken = await signRefreshToken(user.id);
 
@@ -134,7 +165,9 @@ authRoute.post("/refresh", async (c) => {
     const { payload } = await import("jose").then((j) =>
       j.jwtVerify(
         body.refresh_token,
-        new TextEncoder().encode(process.env.JWT_SECRET ?? process.env.ADMIN_SECRET ?? "dev-secret-change-me"),
+        new TextEncoder().encode(
+          process.env.JWT_SECRET ?? process.env.ADMIN_SECRET ?? "dev-secret-change-me",
+        ),
       ),
     );
     if (payload.type !== "refresh" || !payload.sub) {
@@ -142,7 +175,13 @@ authRoute.post("/refresh", async (c) => {
     }
 
     const results = await db
-      .select({ id: users.id, username: users.username, email: users.email, role: users.role })
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        role: users.role,
+        trustScore: users.trustScore,
+      })
       .from(users)
       .where(eq(users.id, payload.sub))
       .limit(1);
@@ -152,13 +191,14 @@ authRoute.post("/refresh", async (c) => {
       return c.json({ error: "unauthorized", message: "user not found" }, 401);
     }
 
+    const karma = Number(user.trustScore ?? 0);
     const accessToken = await signToken({
       id: user.id,
       username: user.username,
       email: user.email,
       role: user.role ?? "contributor",
-      karma: Number((user as { trustScore?: number }).trustScore ?? 0),
-      tier: ((user as { tier?: "new" | "established" | "trusted" | "moderator" }).tier ?? "new"),
+      karma,
+      tier: tierForUser(user.role, karma),
     });
     return c.json({ access_token: accessToken, expires_in: 900 });
   } catch {
@@ -174,4 +214,12 @@ authRoute.get("/me", authRequired(), async (c) => {
     return c.json({ error: "not_found", message: "user not found" }, 404);
   }
   return c.json(serializeUser(user as unknown as Record<string, unknown>));
+});
+
+// Returns the client's public IP as seen by the server. Used by the app
+// to attribute anonymous edits to a Wikipedia-style "IP:<address>"
+// contributor name. Prefers x-forwarded-for (first hop), then x-real-ip,
+// then falls back to 0.0.0.0 (no proxy headers). Unauthenticated by design.
+authRoute.get("/client-ip", (c) => {
+  return c.json({ ip: readClientIp(c) });
 });

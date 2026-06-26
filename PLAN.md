@@ -770,7 +770,7 @@ packages/app/src/components/
 
 ### Phase 9: Attestation System — Superseded
 
-**Status:** Superseded by the UI Redux (see §21). The original "GPS verifies a trail" attestation model is replaced by a tiered trail-trust model: GPS traces now _create and maintain_ synthesized trails (with wiki-style segment→trail marking and downvote-weighting), and karma/voting drives trust rather than attestation quorums. The existing `users.trust_score` field is reused as the karma total. The `ATTESTATION_*` constants in `packages/shared/src/constants.ts` are retained only until §21 lands.
+**Status:** Superseded by the UI Redux (see §21) and the recording UX redesign (see §22). The original "GPS verifies a trail" attestation model is replaced by a tiered trail-trust model: GPS traces now _create and maintain_ synthesized trails (with wiki-style segment→trail marking and downvote-weighting), and karma/voting drives trust rather than attestation quorums. The existing `users.trust_score` field is reused as the karma total. The `ATTESTATION_*` constants in `packages/shared/src/constants.ts` are retained only until §21 lands. The recording-side UX (the focus of this phase) was redesigned in §22 to make the Record tab a first-class home-screen entry point with a kill-safe SQLite mirror.
 
 ---
 
@@ -882,7 +882,7 @@ npx expo run:android --variant release
 
 Known issues:
 
-- Expo autolinker may generate `expo.core.ExpoModulesPackage` import instead of `expo.modules.ExpoModulesPackage` — create a delegating `expo/core/ExpoModulesPackage.java` wrapper class in the expo module's android source directory as a workaround.
+- Expo autolinker may generate `expo.core.ExpoModulesPackage` import instead of `expo.modules.ExpoModulesPackage`. Root cause: the `expo` package's Android module sets its Gradle `namespace` to `expo.core` (for BuildConfig/R-class), but the actual `ExpoModulesPackage` class is in package `expo.modules`. `expo-modules-autolinking` derives the import from the namespace when no explicit `packageImportPath` is provided. The expo package's own `react-native.config.js` would correct this, but only when `useExpoModules` is detected at the monorepo root (this project's `settings.gradle` lives under `packages/app/`). Fix: `packages/app/react-native.config.js` pins `dependencies.expo.platforms.android.packageImportPath` to `import expo.modules.ExpoModulesPackage;`. This survives `bun install` and `expo prebuild --clean` (unlike a wrapper class in `node_modules`).
 - Gradle needs Java 21 (OpenJDK 26+ not supported).
 - If you start an emulator via the back_background tool, leave OUT the timeout param. This way the default timeout of 'infinity' is chosen
 
@@ -1988,7 +1988,7 @@ magnum/
 
 ---
 
-_Last updated: 2026-06-24_
+_Last updated: 2026-06-26_
 _Phase 0 starts with: monorepo scaffold, Docker Compose, DB schema, API skeleton, RN app shell._
 
 ---
@@ -2617,3 +2617,164 @@ Presets already carry `osm_tags` and an `upstreamable` flag so the data model is
 6. **Eligibility** — only `upstreamable=true` presets with a photo are queued. Features with net-negative votes are excluded.
 
 The admin review queue (`admin/upstream`) surfaces eligible features, grouped by preset, with photo + proposed tags + dedup status.
+
+---
+
+## 22. Recording UX — "Trace Mode" (redesigned §21.3.2 / Phase 9)
+
+A redesign of the contributor recording flow to make capturing a GPS trace a **first-class** action: a single tap from the home screen, a persistent indicator while recording, and a kill-safe buffer so no data is lost to process death.
+
+### 22.1 Design Principles
+
+- **One tap to start, one tap to return.** The Record tab sits between Explore and Systems, so a hiker is at most one tap from the active trace view from any screen. The persistent banner is the back-channel: tap it from any tab to jump back into the recording.
+- **No data loss to kills.** Every location event is written to the SQLite mirror *as it arrives*, inside the same callback. If the OS terminates the process, the SQLite row is the source of truth and the recovery modal offers to continue, end & save, or discard.
+- **Background tracking with foreground controls.** The library (`react-native-background-geolocation`) runs a foreground service so tracking continues with the screen off. The user-visible controls — pause, submit, discard — live on the Record tab, which is the only place with enough space for the map preview + stats + three big buttons.
+- **Submit follows the offline pattern.** Online: `POST /api/traces`. Offline: queue in `pending_contributions` and the next sync upload picks it up. The status indicator in the header reflects the queued state.
+
+### 22.2 Information Architecture
+
+| Surface | What it does |
+| --- | --- |
+| **Record tab (idle)** | Big "Start recording" CTA, "Import a file" link, recent traces list. |
+| **Record tab (active)** | Status pill (Recording/Paused/Submitting), live map with growing polyline + tail dot, three stats (Duration, Distance, Points), Pause/Resume + Submit buttons, Discard link. |
+| **Persistent banner** | Red (recording) or amber (paused) bar across the top of every screen, shows duration and tap-target to return to the Record tab. |
+| **Recovery modal** | On app launch with an unfinished session, modal offers Continue / End & Save / Discard. |
+| **Explore FAB** | Continues to expose "Upload Trace" (file import) — the Record tab is the home for recording, the FAB is the home for file imports. |
+
+### 22.3 Library Choice: `react-native-background-geolocation`
+
+We use the Transistorsoft background-geolocation library for native Android/iOS. Rationale:
+
+- **High accuracy + motion-aware power management** out of the box.
+- **Foreground service** with a persistent notification (required on modern Android for "always" tracking).
+- **Persists its own location log** to a local SQLite, which we can use for kill-recovery backfill in addition to our own mirror.
+- **Survives reboot** (`startOnBoot: true`) — a hiker on a multi-day trip can reboot the phone without losing the trace.
+- **iOS Always authorization** is handled by the library's built-in flow.
+
+Web fallback: the same Record tab runs in the browser dev build using `navigator.geolocation.watchPosition`. Points are held in-memory only (no SQLite mirror on web) and submitted as a single trace on tap. This is for dev convenience — the production target is the native app.
+
+### 22.4 Configuration
+
+`app.json` configures the library via the official Transistorsoft Expo config plugin:
+
+```jsonc
+{
+  "plugins": [
+    "expo-router",
+    "expo-asset",
+    "expo-font",
+    "@config-plugins/detox",
+    [
+      "react-native-background-geolocation",
+      {
+        "license": {
+          "appId": "com.licensetest",
+          "entitlements": ["core"]
+        }
+      }
+    ]
+  ]
+}
+```
+
+The license option is what injects the manifest meta-data:
+
+```xml
+<meta-data
+    android:name="com.transistorsoft.locationmanager.license"
+    android:value='{"app_id":"com.licensetest","entitlements":["core"]}' />
+```
+
+The Transistorsoft config plugin emits this in the release variant (it gates the meta-data on the build type). Replace the test `appId` with the production license issued by Transistorsoft for the real app.
+
+The runtime config (high accuracy, foreground service, notification text, etc.) lives in `backgroundGeolocationService.ts` and is passed to `BackgroundGeolocation.ready()` when a session starts. See that file for the exact values.
+
+### 22.5 SQLite Mirror (v4)
+
+Two new tables back the live recording buffer:
+
+```sql
+CREATE TABLE trace_sessions (
+  id TEXT PRIMARY KEY,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  status TEXT NOT NULL DEFAULT 'recording',  -- recording | paused | submitted | discarded
+  source TEXT NOT NULL DEFAULT 'recorded',   -- recorded (import lives in pending_contributions)
+  total_points INTEGER NOT NULL DEFAULT 0,
+  total_meters REAL NOT NULL DEFAULT 0,
+  server_trace_id TEXT,                       -- assigned after a successful submit
+  pending_contribution_id INTEGER,            -- FK to pending_contributions when offline-queued
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE trace_points (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,                       -- monotonic per-session ordinal
+  lon REAL NOT NULL,
+  lat REAL NOT NULL,
+  elevation REAL,
+  accuracy REAL,
+  speed REAL,
+  heading REAL,
+  recorded_at TEXT NOT NULL,                  -- when the GPS sample was taken
+  received_at TEXT NOT NULL,                  -- when we wrote it to SQLite
+  FOREIGN KEY (session_id) REFERENCES trace_sessions(id) ON DELETE CASCADE
+);
+```
+
+Schema version bumped to 4. The migration is additive (CREATE IF NOT EXISTS) so existing v3 installations keep their data and gain the new tables.
+
+### 22.6 Recovery Flow (Kill-Safe)
+
+1. On every `onLocation` event the service writes to `trace_points` (with a fresh `seq`) and bumps `total_points` on the session row. Both writes happen inside the same JS tick so a kill between them leaves either the previous state (correct) or the new state (correct) — never a half-written row.
+2. On app launch, `TraceRecoveryModal` calls `checkForRecoverableSession()` which runs `SELECT * FROM trace_sessions WHERE status IN ('recording','paused')`. If a row exists, the modal renders.
+3. **Continue** — `resumeTraceRecording(session)` re-invokes the library with the existing `extras.session_id` and re-attaches the onLocation callback. The library's own on-disk log is used to backfill any points we missed into our mirror.
+4. **End & Save** — `submitTraceSession(id)` reads the points from SQLite, builds a `LineString`, and either POSTs to `/api/traces` or queues in `pending_contributions` (offline). The session row flips to `submitted`.
+5. **Discard** — `discardTraceSessionById(id)` calls `BackgroundGeolocation.stop()` and marks the row `discarded`. The points stay in the DB for audit but the session is excluded from "recent" listings.
+
+### 22.7 Files Added / Changed
+
+**New:**
+- `packages/app/app/(tabs)/record.tsx` — the Record tab (idle + active states)
+- `packages/app/app/trace/import.tsx` — file-import wrapper route
+- `packages/app/src/components/trace/RecordingBanner.tsx` — persistent recording indicator
+- `packages/app/src/components/trace/TraceRecoveryModal.tsx` — kill-recovery modal
+- `packages/app/src/services/backgroundGeolocationService.ts` — wraps the library, owns the SQLite mirror
+- `packages/app/src/stores/traceStore.ts` — Zustand store for live recording state
+- `packages/app/src/types/react-native-background-geolocation.d.ts` — minimal type stubs
+
+**Changed:**
+- `packages/app/app.json` — adds the Transistorsoft config plugin
+- `packages/app/app/_layout.tsx` — mounts `RecordingBanner` and `TraceRecoveryModal`
+- `packages/app/app/(tabs)/_layout.tsx` — adds the Record tab
+- `packages/app/app/trace/record.tsx` — **deleted** (replaced by the tab)
+- `packages/app/src/components/trace/UploadTraceSheet.tsx` — "Record a trace" entry points to the Record tab
+- `packages/app/src/db/schema.ts` — `SCHEMA_VERSION = 4`, adds `trace_sessions` + `trace_points`
+- `packages/app/src/services/offlineDataService.ts` — session/point helpers + `addPendingContribution` now returns the row id
+- `packages/map/src/MapContainer.native.tsx` — accepts `liveRoute` prop, handles `setLiveRoute`/`clearLiveRoute` bridge commands
+- `packages/map/src/bridge/types.ts` — adds the two new commands
+- `packages/map/src/bridge/ol-bridge.ts` — adds them to the script bridge
+- `packages/map/src/webview-html/index.html` — adds a top-most `liveRoute` vector layer
+- `packages/map/src/types.ts` — adds the `liveRoute` prop
+- `packages/app/package.json` — `react-native-background-geolocation` + `@transistorsoft/config-plugin-background-geolocation`
+
+### 22.8 Two-Clicks-from-Home UX
+
+| User intent | Path | Clicks |
+| --- | --- | --- |
+| Start a trace | tap Record tab → tap "Start recording" | 2 |
+| Return to active recording from another tab | tap the persistent banner | 1 |
+| Submit a trace | tap Submit on the Record tab (or on the banner → Record tab → Submit) | 1–2 |
+| Pause / resume | tap Pause/Resume on the Record tab | 1 |
+| Discard | tap Discard → confirm | 2 |
+| Recover from a kill | open the app → tap Continue / End & Save / Discard | 1 |
+
+The user-never-loses-data promise is the recovery modal: even on a hard kill, the next app launch surfaces the unfinished trace and offers one-tap resolution.
+
+### 22.9 Future Work
+
+- **Live trail synthesis preview.** Overlay the user's existing `synthesized` trails (faded) under the live route so they can see which trail they're extending.
+- **Voice prompts.** "Half a mile to the next trail intersection" — driven by proximity queries against the live route + nearby trails.
+- **Photo attachments.** Long-press on the map during a recording to drop a geo-tagged photo into the trace as a feature.
+- **Multi-day recordings.** The schema supports indefinite session length (50k point cap is the only hard limit). Multi-day traces would split into segments by day.

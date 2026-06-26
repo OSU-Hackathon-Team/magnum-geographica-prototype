@@ -79,6 +79,10 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'org.webkit:android-jsc:+'
+// @generated begin react-native-background-geolocation-project - expo prebuild (DO NOT MODIFY) sync-451bbca0f2f08c9fc8b21a201ef5b476b165ba21
+Project background_geolocation = project(':react-native-background-geolocation')
+apply from: "${background_geolocation.projectDir}/app.gradle"
+// @generated end react-native-background-geolocation-project
 
 android {
     ndkVersion rootProject.ext.ndkVersion

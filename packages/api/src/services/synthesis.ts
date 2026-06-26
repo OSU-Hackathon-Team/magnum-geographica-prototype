@@ -80,6 +80,7 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
       traceId: gpsTraceSegments.traceId,
     })
     .from(gpsTraceSegments)
+    .innerJoin(gpsTraces, eq(gpsTraces.id, gpsTraceSegments.traceId))
     .innerJoin(traceSystems, eq(traceSystems.traceId, gpsTraceSegments.traceId))
     .where(and(eq(traceSystems.systemId, systemId), eq(gpsTraces.status, "active")));
   void segRows;

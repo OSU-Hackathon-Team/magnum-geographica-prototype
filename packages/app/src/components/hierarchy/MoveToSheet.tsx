@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient, type HierarchyTreeNode } from "@magnum/shared";
+import { useAuthStore } from "../../stores/authStore";
 import { Button } from "../ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -56,6 +57,7 @@ export function MoveToSheet({
   onMoved,
   testID,
 }: MoveToSheetProps) {
+  const token = useAuthStore((s) => s.token);
   const [tree, setTree] = useState<HierarchyTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -65,20 +67,20 @@ export function MoveToSheet({
     if (!visible) return;
     setLoading(true);
     setError(null);
-    const client = createMagnumClient(API_URL);
+    const client = createMagnumClient(API_URL, { getAuthToken: () => token ?? undefined });
     client
       .getHierarchyTree()
       .then((res) => setTree(res.nodes as HierarchyTreeNode[]))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load tree"))
       .finally(() => setLoading(false));
-  }, [visible]);
+  }, [visible, token]);
 
   const performMove = useCallback(
     async (action: MoveToAction, targetSuperId?: string, targetSystemId?: string) => {
       if (!sourceSystemId && !sourceSubSystemId) return;
       setSubmitting(true);
       try {
-        const client = createMagnumClient(API_URL);
+        const client = createMagnumClient(API_URL, { getAuthToken: () => token ?? undefined });
         const body: Record<string, unknown> = { action };
         if (targetSuperId) body.target_super_id = targetSuperId;
         if (targetSystemId) body.target_system_id = targetSystemId;
@@ -94,7 +96,7 @@ export function MoveToSheet({
         setSubmitting(false);
       }
     },
-    [onClose, onMoved, sourceSubSystemId, sourceSystemId],
+    [onClose, onMoved, sourceSubSystemId, sourceSystemId, token],
   );
 
   if (!visible) return null;

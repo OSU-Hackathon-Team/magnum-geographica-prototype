@@ -109,6 +109,13 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isOnline) return;
+    // If the user opens the app offline, the IP fetch on auth-load
+    // fails and the contributor stays "anonymous". Re-attempt on every
+    // transition back to online so the IP attribution kicks in as soon
+    // as the network is available.
+    if (!useAuthStore.getState().isAuthenticated) {
+      void useAuthStore.getState().fetchIpContributor();
+    }
     let cancelled = false;
     const lastSyncedKey = "magnum.lastSyncedAt";
 

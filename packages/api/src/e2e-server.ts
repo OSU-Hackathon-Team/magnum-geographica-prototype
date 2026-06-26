@@ -62,6 +62,8 @@ app.use("*", corsMiddleware({ origins: "*" }));
 app.use("*", rateLimit({ max: 100_000, windowMs: 60_000 }));
 
 app.route("/api/health", healthRoute);
+app.route("/api/systems", systemTreeRoute);
+app.route("/api/systems", systemContainsRoute);
 app.route("/api/systems", systemsRoute);
 app.route("/api/trails", trailsRoute);
 app.route("/api/search", searchRoute);
@@ -84,8 +86,6 @@ app.route("/api/presets", presetsRoute);
 app.route("/api/super-systems", superSystemsRoute);
 app.route("/api/sub-systems", subSystemsRoute);
 app.route("/api/systems", systemMoveRoute);
-app.route("/api/systems", systemTreeRoute);
-app.route("/api/systems", systemContainsRoute);
 app.route("/api/traces", tracesRoute);
 app.route("/api/trace-segments", traceSegmentsRoute);
 app.route("/api/admin", adminRoute);

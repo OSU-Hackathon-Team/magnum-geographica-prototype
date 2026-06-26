@@ -9,6 +9,7 @@ import {
   wikiPageQuerySchema,
 } from "@magnum/shared";
 import { adminOnly, type AuthUser } from "../middleware/auth.js";
+import { resolveContributorName } from "../services/identity.js";
 
 type Variables = { user?: AuthUser };
 
@@ -88,8 +89,9 @@ wikiRoute.post("/", async (c) => {
     );
   }
 
-  const { target_type, target_id, title, content_md, contributor_name, edit_summary } = parsed.data;
+  const { target_type, target_id, title, content_md, edit_summary } = parsed.data;
   const authUser = c.get("user");
+  const contributorName = resolveContributorName(c);
 
   const existing = await db
     .select({ id: wikiPages.id })
@@ -125,7 +127,7 @@ wikiRoute.post("/", async (c) => {
       wikiPageId: wikiPage.id,
       contentMd: content_md,
       action: "create",
-      contributorName: contributor_name,
+      contributorName,
       authorId: authUser?.id ?? null,
       editSummary: edit_summary ?? null,
     });
@@ -145,8 +147,9 @@ wikiRoute.put("/:id", async (c) => {
     );
   }
 
-  const { title, content_md, contributor_name, edit_summary, base_revision_id } = parsed.data;
+  const { title, content_md, edit_summary, base_revision_id } = parsed.data;
   const authUser = c.get("user");
+  const contributorName = resolveContributorName(c);
 
   const existing = await db
     .select({ id: wikiPages.id })
@@ -186,7 +189,7 @@ wikiRoute.put("/:id", async (c) => {
     wikiPageId,
     contentMd: content_md,
     action: "update",
-    contributorName: contributor_name,
+    contributorName,
     authorId: authUser?.id ?? null,
     editSummary: edit_summary ?? null,
   });
@@ -254,8 +257,9 @@ wikiRoute.post("/:id/revert", async (c) => {
     );
   }
 
-  const { revision_id, contributor_name, edit_summary } = parsed.data;
+  const { revision_id, edit_summary } = parsed.data;
   const authUser = c.get("user");
+  const contributorName = resolveContributorName(c);
 
   const wikiExists = await db
     .select({ id: wikiPages.id })
@@ -287,7 +291,7 @@ wikiRoute.post("/:id/revert", async (c) => {
     wikiPageId,
     contentMd: rev.contentMd,
     action: "revert",
-    contributorName: contributor_name,
+    contributorName,
     authorId: authUser?.id ?? null,
     editSummary: edit_summary ?? `Reverted to revision ${revision_id}`,
   });

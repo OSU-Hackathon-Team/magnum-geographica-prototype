@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
@@ -10,6 +10,7 @@ import {
 } from "@magnum/shared/schemas";
 import { castVote, getScore, retractVote, onVoteChange } from "../services/votes.js";
 import { tierFromKarma } from "../services/karma.js";
+import { resolveContributorName } from "../services/identity.js";
 import { authRequired, type AuthUser } from "../middleware/auth.js";
 
 type Variables = { user?: AuthUser };
@@ -17,9 +18,14 @@ type Variables = { user?: AuthUser };
 export const votesRoute = new Hono<{ Variables: Variables }>();
 
 async function loadActorContext(
+  c: { req: Context["req"]; get: Context["get"] },
   user: AuthUser | undefined,
-  contributorName: string | undefined,
-): Promise<{ userId: string | null; karma: number; tier: ReturnType<typeof tierFromKarma>; contributorName: string }> {
+): Promise<{
+  userId: string | null;
+  karma: number;
+  tier: ReturnType<typeof tierFromKarma>;
+  contributorName: string;
+}> {
   if (user) {
     const rows = await db
       .select({ karma: users.trustScore, username: users.username })
@@ -38,7 +44,10 @@ async function loadActorContext(
     userId: null,
     karma: 0,
     tier: "new",
-    contributorName: contributorName ?? "anonymous",
+    // Never trust the `x-contributor-name` header the client may send —
+    // resolve the name from the request IP so anonymous votes can't be
+    // spoofed to look like a different user.
+    contributorName: resolveContributorName(c),
   };
 }
 
@@ -53,7 +62,7 @@ votesRoute.post("/", async (c) => {
     );
   }
   const authUser = c.get("user");
-  const actor = await loadActorContext(authUser, c.req.header("x-contributor-name") ?? undefined);
+  const actor = await loadActorContext(c, authUser);
   if (!actor.userId && !actor.contributorName) {
     return c.json({ error: "unauthorized", message: "login or set contributor name" }, 401);
   }
@@ -109,7 +118,9 @@ votesRoute.get("/:targetType/:targetId", async (c) => {
   const targetId = c.req.param("targetId");
   const authUser = c.get("user");
   const score = await getScore(targetTypeParsed.data, targetId, authUser?.id ?? null);
-  return c.json(entityScoreSchema.parse({ ...score, target_type: targetTypeParsed.data, target_id: targetId }));
+  return c.json(
+    entityScoreSchema.parse({ ...score, target_type: targetTypeParsed.data, target_id: targetId }),
+  );
 });
 
 // Generic entity score shortcut (used by the UI for any votable surface).
@@ -121,7 +132,9 @@ votesRoute.get("/score/:targetType/:targetId", async (c) => {
   const targetId = c.req.param("targetId");
   const authUser = c.get("user");
   const score = await getScore(targetTypeParsed.data, targetId, authUser?.id ?? null);
-  return c.json(entityScoreSchema.parse({ ...score, target_type: targetTypeParsed.data, target_id: targetId }));
+  return c.json(
+    entityScoreSchema.parse({ ...score, target_type: targetTypeParsed.data, target_id: targetId }),
+  );
 });
 
 // Per-user karma lookup (used by Profile page).
@@ -141,7 +154,13 @@ votesRoute.get("/users/:id/karma", async (c) => {
   if (!u) return c.json({ error: "not_found", message: "user not found" }, 404);
   const tier = tierFromKarma(Number(u.karma));
   // Tally contributions received across votable targets.
-  const received = await db.execute<{ up: number; down: number; traces: number; features: number; revisions: number }>(
+  const received = await db.execute<{
+    up: number;
+    down: number;
+    traces: number;
+    features: number;
+    revisions: number;
+  }>(
     sql`SELECT
       COALESCE((SELECT sum(upvotes) FROM entity_stats es
                 JOIN features f ON f.id = es.target_id AND es.target_type = 'feature'

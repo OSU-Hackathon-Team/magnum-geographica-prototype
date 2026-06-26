@@ -8,7 +8,11 @@ interface RateLimitEntry {
 const store = new Map<string, RateLimitEntry>();
 
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS = 60;
+// Tuned for the mobile app's typical "open the screen, render the
+// list" burst plus a small headroom for retries. The app is offline-
+// first, so genuine users rarely exceed this; a hitting client is
+// usually a polling loop or a runaway script.
+const MAX_REQUESTS = 30;
 
 setInterval(() => {
   const now = Date.now();
@@ -52,7 +56,10 @@ export function rateLimit(opts?: {
 
     if (entry.count > max) {
       return c.json(
-        { error: "rate_limited", message: `Too many requests. Try again in ${Math.ceil((entry.resetAt - now) / 1000)}s` },
+        {
+          error: "rate_limited",
+          message: `Too many requests. Try again in ${Math.ceil((entry.resetAt - now) / 1000)}s`,
+        },
         429,
       );
     }
@@ -61,5 +68,5 @@ export function rateLimit(opts?: {
 }
 
 export function strictRateLimit(): MiddlewareHandler {
-  return rateLimit({ max: 20, windowMs: 60_000 });
+  return rateLimit({ max: 10, windowMs: 60_000 });
 }

@@ -13,12 +13,14 @@ test("user opens Profile and sees status sections", async ({ page }) => {
   await expect(page.getByTestId("profile-screen")).toBeVisible();
   await expect(page.getByTestId("profile-contributor")).toBeVisible();
   await expect(page.getByTestId("profile-status")).toBeVisible();
-  await expect(page.getByTestId("profile-reset")).toBeVisible();
 });
 
-test("contributor name defaults to 'anonymous'", async ({ page }) => {
+test("contributor name defaults to the caller's IP (Wikipedia-style)", async ({ page }) => {
   await page.goto(`${BASE}/profile`);
-  await expect(page.getByTestId("profile-contributor")).toHaveText("anonymous");
+  // The e2e API has no proxy in front, so the server reports the loopback
+  // address; we only assert the "IP:" prefix + shape, not the exact value.
+  await expect(page.getByTestId("profile-contributor")).toHaveText(/^IP:[\d.:a-fA-F]+$/);
+  await expect(page.getByTestId("profile-ip-note")).toBeVisible();
 });
 
 test("status reflects online by default", async ({ page }) => {
@@ -46,17 +48,8 @@ test("authenticated user sees the karma card on profile", async ({ page }) => {
   await expect(page.getByTestId("profile-tier-badge")).toBeVisible();
 });
 
-test("contributor name can be reset to anonymous via the hint link", async ({ page }) => {
-  await page.goto(`${BASE}/profile`);
-  // The hint is always visible for anonymous users. Clicking it
-  // shouldn't throw.
-  await page.getByTestId("profile-reset").click();
-  await expect(page.getByTestId("profile-contributor")).toHaveText("anonymous");
-});
-
 test("login and register buttons are visible when not authenticated", async ({ page }) => {
   await page.goto(`${BASE}/profile`);
   await expect(page.getByTestId("profile-login")).toBeVisible();
   await expect(page.getByTestId("profile-register")).toBeVisible();
 });
-

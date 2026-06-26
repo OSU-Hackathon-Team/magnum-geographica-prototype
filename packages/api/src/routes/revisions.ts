@@ -2,10 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
-import {
-  revisionQuerySchema,
-  revertRevisionInputSchema,
-} from "@magnum/shared/schemas";
+import { revisionQuerySchema, revertRevisionInputSchema } from "@magnum/shared/schemas";
 import {
   getRevisionById,
   listRevisionsForTarget,
@@ -15,6 +12,7 @@ import {
 import { authRequired, type AuthUser } from "../middleware/auth.js";
 import { canWrite, getProtection, refreshProtection } from "../services/protection.js";
 import { evaluateAction } from "../services/patrol.js";
+import { resolveContributorName } from "../services/identity.js";
 import type { RevisionTargetType, RevisionAction } from "@magnum/shared/constants";
 
 type Variables = { user: AuthUser };
@@ -35,7 +33,10 @@ revisionsRoute.get("/", async (c) => {
     pageSize: c.req.query("pageSize") ?? undefined,
   });
   if (!parsed.success) {
-    return c.json({ error: "invalid_input", message: parsed.error.issues[0]?.message ?? "validation failed" }, 400);
+    return c.json(
+      { error: "invalid_input", message: parsed.error.issues[0]?.message ?? "validation failed" },
+      400,
+    );
   }
   const { target_type, target_id, author_id, page, pageSize } = parsed.data;
   const { items, total } = await queryRevisions({
@@ -76,7 +77,10 @@ revisionsRoute.post("/:id/revert", authRequired(), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = revertRevisionInputSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ error: "invalid_input", message: parsed.error.issues[0]?.message ?? "validation failed" }, 400);
+    return c.json(
+      { error: "invalid_input", message: parsed.error.issues[0]?.message ?? "validation failed" },
+      400,
+    );
   }
 
   const source = await getRevisionById(id);
@@ -123,9 +127,8 @@ revisionsRoute.post("/:id/revert", authRequired(), async (c) => {
     targetId: source.targetId,
     action: "revert" as RevisionAction,
     actorId: authUser.id,
-    contributorName: parsed.data.contributor_name,
-    editSummary:
-      parsed.data.edit_summary ?? `Revert to revision ${id}`,
+    contributorName: resolveContributorName(c),
+    editSummary: parsed.data.edit_summary ?? `Revert to revision ${id}`,
     revertedFromId: id,
     payloadBefore: { revertedFrom: id },
   });

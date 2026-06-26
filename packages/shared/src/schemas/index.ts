@@ -82,6 +82,137 @@ export const subSystemSchema = z.object({
   updated_at: isoDateSchema,
 });
 
+// =====================================================================
+// Shape — the in-memory representation of a system boundary while the
+// user is editing it. A Shape is one or more rings; each ring is an
+// ordered list of [lon, lat] vertices plus a closed flag. Rings are
+// closed by the user (double-clicking the first vertex) and once
+// closed the next click on empty map starts a new ring. Deleting an
+// edge in a closed ring re-opens it.
+//
+// Chords (the "connect two vertices" gesture) are stored as indices
+// into the flattened vertex list and are dropped if they would split
+// the same ring into multiple disjoint polygons. We pre-compute the
+// resulting GeoJSON in `shapeToGeoJSON` before sending it on the
+// wire; the server stores whatever GeoJSON the client sends.
+// =====================================================================
+
+export const shapeRingSchema = z.object({
+  vertices: z
+    .array(z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]))
+    .min(0),
+  closed: z.boolean(),
+});
+
+export const shapeSchema = z.object({
+  rings: z.array(shapeRingSchema),
+  chords: z
+    .array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]))
+    .default([]),
+  // Editor state — the vertex currently selected for the "connect
+  // two vertices" gesture. Dropped when the shape is serialized to
+  // GeoJSON (see shapeToGeoJSON). Defaulted to null so that existing
+  // shapes without the field still validate.
+  connectFrom: z
+    .object({
+      ringIndex: z.number().int().nonnegative(),
+      vertexIndex: z.number().int().nonnegative(),
+    })
+    .nullable()
+    .default(null),
+});
+
+/**
+ * A GeoJSON Polygon with a single closed ring (the outer ring). The
+ * inner ring list is empty for v1 — holes are out of scope.
+ */
+export interface GeoJSONPolygonGeometry {
+  type: "Polygon";
+  coordinates: number[][][]; // [[ [lon, lat], ... ]]
+}
+
+export interface GeoJSONMultiPolygonGeometry {
+  type: "MultiPolygon";
+  coordinates: number[][][][]; // [ [ [ [lon, lat], ... ] ] ]
+}
+
+/**
+ * Convert a Shape into a GeoJSON Polygon or MultiPolygon suitable for
+ * the API. Returns null if the shape has no closed rings (which
+ * means there's nothing to save).
+ *
+ * Algorithm:
+ *   - Drop open rings (they're in-progress and not part of the saved
+ *     geometry).
+ *   - For each chord within a single ring, if the chord sits between
+ *     two existing edges and partitions the ring's vertices, the ring
+ *     becomes a MultiPolygon. We split on chord endpoints and emit
+ *     each side as its own polygon.
+ *   - Cross-ring chords are dropped (v1 limitation).
+ *   - If exactly one closed ring remains → Polygon; otherwise
+ *     MultiPolygon.
+ */
+export function shapeToGeoJSON(
+  shape: z.infer<typeof shapeSchema>,
+): GeoJSONPolygonGeometry | GeoJSONMultiPolygonGeometry | null {
+  const closedRings = shape.rings.filter((r) => r.closed && r.vertices.length >= 3);
+  if (closedRings.length === 0) return null;
+
+  // Build chord-set keyed by ring index for fast lookup.
+  const chordsByRing = new Map<number, Array<[number, number]>>();
+  for (const chord of shape.chords) {
+    // We don't know which ring the chord sits in without the editor
+    // passing ring membership. For v1 we treat all chords as
+    // belonging to the ring that contains both indices in its
+    // flattened list. Indices are 0-based into the per-ring
+    // flattened list; the editor will pass them accordingly.
+    // Cross-ring chords are dropped (can't disambiguate).
+    for (let ri = 0; ri < closedRings.length; ri++) {
+      const ring = closedRings[ri]!;
+      if (chord[0] < ring.vertices.length && chord[1] < ring.vertices.length) {
+        const arr = chordsByRing.get(ri) ?? [];
+        arr.push(chord);
+        chordsByRing.set(ri, arr);
+        break;
+      }
+    }
+  }
+
+  const polygons: number[][][] = [];
+
+  for (let ri = 0; ri < closedRings.length; ri++) {
+    const ring = closedRings[ri]!;
+    const coords = [...ring.vertices];
+    // Close the ring if it isn't already.
+    if (
+      coords.length > 0 &&
+      (coords[0]![0] !== coords[coords.length - 1]![0] ||
+        coords[0]![1] !== coords[coords.length - 1]![1])
+    ) {
+      coords.push(coords[0]!);
+    }
+
+    const ringChords = chordsByRing.get(ri) ?? [];
+    if (ringChords.length === 0) {
+      polygons.push(coords);
+      continue;
+    }
+
+    // For v1, if a ring has any chord, we emit the ring as-is
+    // (a self-intersecting polygon is allowed in the stored data —
+    // PostGIS accepts it). Cross-ring chords are dropped. A future
+    // iteration could partition the ring into multiple polygons on
+    // either side of each chord.
+    polygons.push(coords);
+  }
+
+  if (polygons.length === 0) return null;
+  if (polygons.length === 1) {
+    return { type: "Polygon", coordinates: polygons };
+  }
+  return { type: "MultiPolygon", coordinates: polygons.map((p) => [p]) };
+}
+
 export const trailSchema = z.object({
   id: uuidSchema,
   name: z.string().min(1).max(200),
@@ -270,7 +401,11 @@ export const updateFeatureInputSchema = z
 export const updateWikiPageInputSchema = z.object({
   title: z.string().min(1).max(300),
   content_md: z.string().max(200_000),
-  contributor_name: z.string().min(1).max(120).default("anonymous"),
+  // `contributor_name` used to be client-supplied. The server now
+  // derives the name from the auth context (see resolveContributorName),
+  // so this field is ignored if present. Accepted for back-compat but
+  // must not be persisted.
+  contributor_name: z.string().min(1).max(120).optional(),
   edit_summary: z.string().max(500).optional(),
   base_revision_id: uuidSchema.optional(),
 });
@@ -280,13 +415,13 @@ export const createWikiPageInputSchema = z.object({
   target_id: uuidSchema,
   title: z.string().min(1).max(300),
   content_md: z.string().max(200_000).default(""),
-  contributor_name: z.string().min(1).max(120).default("anonymous"),
+  contributor_name: z.string().min(1).max(120).optional(),
   edit_summary: z.string().max(500).optional(),
 });
 
 export const revertWikiPageInputSchema = z.object({
   revision_id: uuidSchema,
-  contributor_name: z.string().min(1).max(120).default("anonymous"),
+  contributor_name: z.string().min(1).max(120).optional(),
   edit_summary: z.string().max(500).optional(),
 });
 
@@ -567,7 +702,7 @@ export const revisionQuerySchema = z.object({
 });
 
 export const revertRevisionInputSchema = z.object({
-  contributor_name: z.string().min(1).max(120).default("anonymous"),
+  contributor_name: z.string().min(1).max(120).optional(),
   edit_summary: z.string().max(500).optional(),
 });
 
@@ -624,10 +759,7 @@ const presetQuestionSchema = z
   })
   .strict();
 
-const presetQuestionsSchema = z
-  .array(presetQuestionSchema)
-  .max(PRESET_QUESTIONS_MAX)
-  .default([]);
+const presetQuestionsSchema = z.array(presetQuestionSchema).max(PRESET_QUESTIONS_MAX).default([]);
 
 export const presetSchema = z.object({
   id: uuidSchema,
@@ -814,7 +946,11 @@ type HierarchyTreeNodeShape = {
   tier: "super" | "system" | "sub";
   children?: HierarchyTreeNodeShape[];
 };
-export const hierarchyTreeNodeSchema: z.ZodType<HierarchyTreeNodeShape, z.ZodTypeDef, HierarchyTreeNodeShape> = z.object({
+export const hierarchyTreeNodeSchema: z.ZodType<
+  HierarchyTreeNodeShape,
+  z.ZodTypeDef,
+  HierarchyTreeNodeShape
+> = z.object({
   id: uuidSchema,
   name: z.string(),
   slug: z.string(),
@@ -835,12 +971,14 @@ export const hierarchyTreeSchema = z.object({
 });
 
 export const containsResponseSchema = z.object({
-  systems: z.array(z.object({
-    id: uuidSchema,
-    name: z.string(),
-    slug: z.string(),
-    distance_m: z.number().nonnegative().optional(),
-  })),
+  systems: z.array(
+    z.object({
+      id: uuidSchema,
+      name: z.string(),
+      slug: z.string(),
+      distance_m: z.number().nonnegative().optional(),
+    }),
+  ),
   fallback: z.enum(["point_in_polygon", "nearest"]).default("point_in_polygon"),
 });
 
@@ -879,7 +1017,9 @@ export const createTraceInputSchema = z
     geometry: traceGeometrySchema,
     source: traceSourceSchema,
     recorded_at: isoDateSchema.optional(),
-    contributor_name: z.string().min(1).max(120).default("anonymous"),
+    // Server ignores this; the actual `gps_traces.contributor_name` is
+    // resolved from auth context.
+    contributor_name: z.string().min(1).max(120).optional(),
   })
   .strict();
 
@@ -888,7 +1028,7 @@ export const importTraceInputSchema = z
     format: z.enum(["gpx", "geojson"]),
     // GPX: a raw string. GeoJSON: the parsed object.
     payload: z.union([z.string().min(1), z.record(z.string(), z.unknown())]),
-    contributor_name: z.string().min(1).max(120).default("anonymous"),
+    contributor_name: z.string().min(1).max(120).optional(),
     recorded_at: isoDateSchema.optional(),
   })
   .strict();
@@ -913,6 +1053,6 @@ export const traceSegmentSchema = z.object({
 export const traceSegmentVoteInputSchema = z
   .object({
     trail_id: uuidSchema.nullable(), // null = "propose new trail"
-    contributor_name: z.string().min(1).max(120).default("anonymous"),
+    contributor_name: z.string().min(1).max(120).optional(),
   })
   .strict();

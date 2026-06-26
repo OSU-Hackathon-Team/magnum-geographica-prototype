@@ -43,21 +43,27 @@ test.describe("System Move-To sheet (§21.5)", () => {
     await expect(page.getByTestId("move-to-super-ohio-erie-trail")).toBeVisible();
   });
 
-  test("clicking a super-system row fires the move request", async ({ page }) => {
-    // The MoveToSheet currently calls the API without an auth token
-    // (an app-side bug — the createMagnumClient call doesn't pass
-    // getAuthToken). The endpoint will 401 and the sheet shows an
-    // Alert. This test exercises the row click and verifies the row
-    // is at least registered as interactive.
+  test("clicking a super-system row fires the move request as the logged-in user", async ({
+    page,
+  }) => {
+    // The MoveToSheet reads the auth token from useAuthStore and
+    // passes it to createMagnumClient, so the POST /api/systems/:id/move
+    // request is authorized. As hiker1 (low trust), the request
+    // returns 403 with the protection message; the sheet surfaces
+    // that in an Alert and stays open.
+    await page.goto(`${BASE}/auth/login`);
+    await page.getByTestId("login-email").fill("hiker1@example.com");
+    await page.getByTestId("login-password").fill("password123");
+    await page.getByTestId("login-submit").click();
+    await expect(page).toHaveURL(/\/explore$/);
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
     await page.getByTestId("system-move-to").click();
     const row = page.getByTestId("move-to-super-us-bike-route-50");
     await expect(row).toBeVisible();
-    // The row is a pressable; clicking it should be accepted.
     await row.click();
-    // The sheet stays open (because the request 401s) — verify it's
-    // still visible. The actual move round-trip is covered by the
-    // /api/systems/:id/move API tests below.
+    // The row is a pressable; clicking it should be accepted. The
+    // server responds 403 (low trust can't edit a semi-protected
+    // system) and the sheet stays open while the Alert is shown.
     await expect(page.getByTestId("system-move-to-sheet")).toBeVisible();
   });
 

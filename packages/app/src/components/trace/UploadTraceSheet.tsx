@@ -53,14 +53,11 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
     setError(null);
   }, []);
 
-  const enterImport = useCallback(
-    (format: ImportFormat, payload: string) => {
-      setImportFormat(format);
-      setTextPayload(payload);
-      setMode("import");
-    },
-    [],
-  );
+  const enterImport = useCallback((format: ImportFormat, payload: string) => {
+    setImportFormat(format);
+    setTextPayload(payload);
+    setMode("import");
+  }, []);
 
   const handleClose = useCallback(() => {
     reset();
@@ -116,13 +113,10 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
       });
       const format: "gpx" | "geojson" = importFormat;
       const payload: string | Record<string, unknown> =
-        format === "gpx"
-          ? textPayload
-          : (JSON.parse(textPayload) as Record<string, unknown>);
+        format === "gpx" ? textPayload : (JSON.parse(textPayload) as Record<string, unknown>);
       const res = await client.importTrace({
         format,
         payload,
-        contributor_name: useAuthStore.getState().user?.username ?? "anonymous",
       });
       onImported?.(res.trace.id as string);
       handleClose();
@@ -169,10 +163,10 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
             <ActionCard
               icon="navigate-outline"
               title="Record a trace"
-              subtitle="Live GPS — distance, duration, current track"
+              subtitle="Live GPS — go to the Record tab"
               onPress={() => {
                 handleClose();
-                router.push("/trace/record" as never);
+                router.push("/record" as never);
               }}
               testID="upload-trace-record"
             />
@@ -180,8 +174,8 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
         ) : mode === "manual-paste" ? (
           <View style={{ gap: 10 }}>
             <Text style={styles.hint}>
-              Paste a GPX file's contents (the &lt;trkpt&gt; entries are extracted) or a
-              GeoJSON LineString. Pick the format, paste, then Import.
+              Paste a GPX file's contents (the &lt;trkpt&gt; entries are extracted) or a GeoJSON
+              LineString. Pick the format, paste, then Import.
             </Text>
             <View style={styles.toggleRow}>
               <Pressable
@@ -189,16 +183,29 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
                 onPress={() => setImportFormat("gpx")}
                 testID="upload-trace-mode-gpx"
               >
-                <Text style={[styles.toggleText, importFormat === "gpx" ? styles.toggleTextActive : null]}>
+                <Text
+                  style={[
+                    styles.toggleText,
+                    importFormat === "gpx" ? styles.toggleTextActive : null,
+                  ]}
+                >
                   GPX
                 </Text>
               </Pressable>
               <Pressable
-                style={[styles.toggleBtn, importFormat === "geojson" ? styles.toggleBtnActive : null]}
+                style={[
+                  styles.toggleBtn,
+                  importFormat === "geojson" ? styles.toggleBtnActive : null,
+                ]}
                 onPress={() => setImportFormat("geojson")}
                 testID="upload-trace-mode-geojson"
               >
-                <Text style={[styles.toggleText, importFormat === "geojson" ? styles.toggleTextActive : null]}>
+                <Text
+                  style={[
+                    styles.toggleText,
+                    importFormat === "geojson" ? styles.toggleTextActive : null,
+                  ]}
+                >
                   GeoJSON
                 </Text>
               </Pressable>
@@ -223,7 +230,11 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
               </Text>
             ) : null}
             <View style={styles.footer}>
-              <Button variant="secondary" onPress={() => setMode("menu")} testID="upload-trace-back">
+              <Button
+                variant="secondary"
+                onPress={() => setMode("menu")}
+                testID="upload-trace-back"
+              >
                 Back
               </Button>
               <Button
@@ -247,7 +258,8 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
               </Text>
             ) : null}
             <Text style={styles.hint}>
-              Loaded {textPayload.length} chars ({importFormat.toUpperCase()}). Tap Import to upload.
+              Loaded {textPayload.length} chars ({importFormat.toUpperCase()}). Tap Import to
+              upload.
             </Text>
             <TextInput
               style={[styles.input, styles.textArea, { minHeight: 160 }]}
@@ -259,7 +271,11 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
               testID="upload-trace-text"
             />
             <View style={styles.footer}>
-              <Button variant="secondary" onPress={() => setMode("menu")} testID="upload-trace-back">
+              <Button
+                variant="secondary"
+                onPress={() => setMode("menu")}
+                testID="upload-trace-back"
+              >
                 Back
               </Button>
               {submitting ? (

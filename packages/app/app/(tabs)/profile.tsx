@@ -33,7 +33,7 @@ interface UserKarma {
 
 export default function ProfileScreen() {
   const contributor = useAuthStore((s) => s.contributorName);
-  const setContributor = useAuthStore((s) => s.setContributorName);
+  const isIpContributor = useAuthStore((s) => s.isIpContributor);
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isAdmin = useAuthStore((s) => s.isAdmin);
@@ -54,6 +54,36 @@ export default function ProfileScreen() {
   useEffect(() => {
     void refreshPending();
   }, [refreshPending, pending]);
+
+  // Validate the cached session against the server. The access token's JWT
+  // is self-contained and remains signature-valid until expiry, so a stale
+  // cache (e.g. after a database reset that deleted the user) is invisible
+  // until we hit an endpoint that checks the DB — `/api/auth/me` is that
+  // endpoint. If the user is gone or the token is no longer accepted,
+  // clear the stored auth and route to the login screen.
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    let cancelled = false;
+    const client = createMagnumClient(API_URL, {
+      getAuthToken: () => useAuthStore.getState().token ?? undefined,
+    });
+    client.getMe().catch(async (e: unknown) => {
+      if (cancelled) return;
+      const status =
+        e && typeof e === "object" && "status" in e ? (e as { status: number }).status : 0;
+      if (status === 401 || status === 404) {
+        await logout();
+        router.replace("/auth/login");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-validate only on user-identity or auth-state changes; `logout` is
+    // a stable zustand action and the full `user` object is intentionally
+    // excluded so we don't refetch /me on every field update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isAuthenticated, logout]);
 
   // Fetch karma + tier for the current user.
   useEffect(() => {
@@ -111,7 +141,12 @@ export default function ProfileScreen() {
             </Text>
             <Text style={styles.sub}>{user.email}</Text>
             <View style={styles.buttonRow}>
-              <Button onPress={handleLogout} variant="secondary" size="small" testID="profile-logout">
+              <Button
+                onPress={handleLogout}
+                variant="secondary"
+                size="small"
+                testID="profile-logout"
+              >
                 Log Out
               </Button>
               {isAdmin && (
@@ -128,7 +163,9 @@ export default function ProfileScreen() {
             <Text style={styles.value} testID="profile-contributor">
               {contributor}
             </Text>
-            <Text style={styles.sub}>Editing anonymously</Text>
+            <Text style={styles.sub}>
+              {isIpContributor ? "Editing as your IP address" : "Editing anonymously"}
+            </Text>
             <View style={styles.buttonRow}>
               <Link href="/auth/login" asChild>
                 <Button variant="primary" size="small" testID="profile-login">
@@ -141,13 +178,12 @@ export default function ProfileScreen() {
                 </Button>
               </Link>
             </View>
-            <Text
-              style={styles.hint}
-              onPress={() => setContributor("anonymous")}
-              testID="profile-reset"
-            >
-              Tap to reset contributor name
-            </Text>
+            {isIpContributor ? (
+              <Text style={styles.hint} testID="profile-ip-note">
+                Your edits are publicly attributed to your IP address. Create an account to use a
+                username instead.
+              </Text>
+            ) : null}
           </View>
         )}
       </Card>
@@ -217,7 +253,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, color: "#888", marginBottom: 4 },
   value: { fontSize: 16, fontWeight: "600" },
   sub: { fontSize: 12, color: "#888", marginTop: 4 },
-  hint: { fontSize: 12, color: "#22c55e", marginTop: 8 },
+  hint: { fontSize: 12, color: "#0a0a0a", marginTop: 8, fontStyle: "italic" },
   buttonRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   karmaRow: {
     flexDirection: "row",

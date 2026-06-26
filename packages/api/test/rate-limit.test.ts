@@ -15,10 +15,7 @@ import { rateLimit, strictRateLimit } from "../src/middleware/rate-limit.js";
 describe("rateLimit middleware (custom config)", () => {
   test("passes through requests under the limit and sets headers", async () => {
     const app = new Hono();
-    app.use(
-      "*",
-      rateLimit({ max: 3, windowMs: 60_000, keyFn: () => "test:basic" }),
-    );
+    app.use("*", rateLimit({ max: 3, windowMs: 60_000, keyFn: () => "test:basic" }));
     app.get("/x", (c) => c.json({ ok: true }));
 
     const res = await app.request("/x");
@@ -30,10 +27,7 @@ describe("rateLimit middleware (custom config)", () => {
 
   test("returns 429 once the limit is exceeded", async () => {
     const app = new Hono();
-    app.use(
-      "*",
-      rateLimit({ max: 2, windowMs: 60_000, keyFn: () => "test:overlimit" }),
-    );
+    app.use("*", rateLimit({ max: 2, windowMs: 60_000, keyFn: () => "test:overlimit" }));
     app.get("/x", (c) => c.json({ ok: true }));
 
     await app.request("/x"); // 1
@@ -113,10 +107,7 @@ describe("rateLimit middleware (custom config)", () => {
 
   test("remaining count decreases monotonically", async () => {
     const app = new Hono();
-    app.use(
-      "*",
-      rateLimit({ max: 5, windowMs: 60_000, keyFn: () => "test:monotonic" }),
-    );
+    app.use("*", rateLimit({ max: 5, windowMs: 60_000, keyFn: () => "test:monotonic" }));
     app.get("/x", (c) => c.json({ ok: true }));
 
     const rems: number[] = [];
@@ -129,7 +120,7 @@ describe("rateLimit middleware (custom config)", () => {
 });
 
 describe("strictRateLimit middleware", () => {
-  test("uses a 20-per-minute budget by default", async () => {
+  test("uses a 10-per-minute budget by default", async () => {
     const app = new Hono();
     app.use("*", strictRateLimit());
     app.get("/x", (c) => c.json({ ok: true }));
@@ -138,7 +129,22 @@ describe("strictRateLimit middleware", () => {
       headers: { "x-forwarded-for": "192.168.99.99" },
     });
     expect(res.status).toBe(200);
-    expect(res.headers.get("x-ratelimit-limit")).toBe("20");
-    expect(res.headers.get("x-ratelimit-remaining")).toBe("19");
+    expect(res.headers.get("x-ratelimit-limit")).toBe("10");
+    expect(res.headers.get("x-ratelimit-remaining")).toBe("9");
+  });
+});
+
+describe("rateLimit middleware (default config)", () => {
+  test("uses a 30-per-minute budget by default", async () => {
+    const app = new Hono();
+    app.use("*", rateLimit());
+    app.get("/x", (c) => c.json({ ok: true }));
+
+    const res = await app.request("/x", {
+      headers: { "x-forwarded-for": "192.168.99.100" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-ratelimit-limit")).toBe("30");
+    expect(res.headers.get("x-ratelimit-remaining")).toBe("29");
   });
 });

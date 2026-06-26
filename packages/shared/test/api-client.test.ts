@@ -60,7 +60,7 @@ describe("ApiClient", () => {
     expect(captured!.init.body).toBe('{"hello":"world"}');
   });
 
-  test("attaches x-admin-secret and x-contributor-name when configured", async () => {
+  test("attaches x-admin-secret when configured", async () => {
     let captured: RequestInit | null = null;
     const client = new ApiClient({
       baseUrl: "http://api.test",
@@ -69,13 +69,14 @@ describe("ApiClient", () => {
         return new Response("{}", { status: 200 });
       }),
       getAdminSecret: () => "topsecret",
-      getContributorName: () => "alice",
     });
 
     await client.get("/api/x");
     const headers = captured!.headers as Record<string, string>;
     expect(headers["x-admin-secret"]).toBe("topsecret");
-    expect(headers["x-contributor-name"]).toBe("alice");
+    // The client no longer sends `x-contributor-name` — the server
+    // derives the name from auth context (JWT user or IP).
+    expect(headers["x-contributor-name"]).toBeUndefined();
   });
 
   test("throws ApiClientError with parsed body on non-2xx", async () => {

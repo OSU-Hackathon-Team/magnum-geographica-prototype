@@ -12,7 +12,7 @@
     <div id="map"></div>
     <script src="https://cdn.jsdelivr.net/npm/ol@10.3.1/dist/ol.js"></script>
     <script>
-      var map, vectorLayers, vectorSources, highlightedId = null;
+      var map, vectorLayers, vectorSources, highlightedId = null, liveRouteSource = null;
 
       function postToRN(event) {
         if (window.ReactNativeWebView) {
@@ -75,6 +75,41 @@
           view: new ol.View({ center: ol.proj.fromLonLat(initialCenter), zoom: initialZoom })
         });
 
+        // Live recording route — a separate vector layer that the
+        // recording screen drives via setLiveRoute. Stays on top so
+        // the in-progress polyline is always visible above the base
+        // map. Style: 4px green line with a small dot at the tail.
+        liveRouteSource = new ol.source.Vector();
+        var liveRouteStyle = function (feature) {
+          var coords = feature.getGeometry().getCoordinates();
+          var styles = [
+            new ol.style.Style({
+              stroke: new ol.style.Stroke({ color: '#22c55e', width: 4, lineCap: 'round' })
+            })
+          ];
+          if (coords.length > 0) {
+            var tail = coords[coords.length - 1];
+            styles.push(
+              new ol.style.Style({
+                geometry: new ol.geom.Point(tail),
+                image: new ol.style.Circle({
+                  radius: 6,
+                  fill: new ol.style.Fill({ color: '#22c55e' }),
+                  stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+                })
+              })
+            );
+          }
+          return styles;
+        };
+        vectorLayers.liveRoute = new ol.layer.Vector({
+          source: liveRouteSource,
+          style: liveRouteStyle
+        });
+        // Insert just above the base layer so the line is always
+        // visible but doesn't cover feature pins.
+        map.addLayer(vectorLayers.liveRoute);
+
         map.on('click', function (evt) {
           var c = ol.proj.toLonLat(evt.coordinate);
           postToRN({ type: 'mapClick', lon: c[0], lat: c[1] });
@@ -133,6 +168,33 @@
         highlightTrail: function (args) {
           highlightedId = args && args.id;
           applyHighlight();
+        },
+        setLiveRoute: function (args) {
+          if (!map || !liveRouteSource) return;
+          var coords = (args && args.coordinates) || [];
+          if (coords.length < 2) {
+            liveRouteSource.clear();
+            return;
+          }
+          var projected = coords.map(function (c) { return ol.proj.fromLonLat(c); });
+          var line = new ol.geom.LineString(projected);
+          var feature = new ol.Feature({ geometry: line });
+          liveRouteSource.clear();
+          liveRouteSource.addFeature(feature);
+          // Follow mode: pan the map so the tail of the polyline is
+          // visible. We don't auto-zoom — the recorder picks the
+          // zoom. If the user pans manually we honor that until a
+          // new follow point arrives; this is the same "soft follow"
+          // pattern most GPS apps use.
+          if (typeof args.followLon === 'number' && typeof args.followLat === 'number') {
+            map.getView().animate({
+              center: ol.proj.fromLonLat([args.followLon, args.followLat]),
+              duration: 250
+            });
+          }
+        },
+        clearLiveRoute: function () {
+          if (liveRouteSource) liveRouteSource.clear();
         }
       };
 

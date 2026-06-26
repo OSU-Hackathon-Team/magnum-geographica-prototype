@@ -116,6 +116,31 @@ describe("POST /api/wiki-pages", () => {
     expect(res.status).toBe(201);
     expect(state.insertCalls.length).toBeGreaterThanOrEqual(1);
   });
+
+  test("ignores contributor_name from body and uses auth context (IP)", async () => {
+    state.wikiPages.length = 0;
+    state.insertCalls.length = 0;
+    const res = await buildApp().request("/api/wiki-pages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "203.0.113.5",
+      },
+      body: JSON.stringify({
+        target_type: "trail",
+        target_id: TARGET_UUID,
+        title: "Anon Wiki",
+        content_md: "# Hi",
+        contributor_name: "spoofed-name",
+      }),
+    });
+    expect(res.status).toBe(201);
+    // The revision insert must NOT carry the spoofed name from the body.
+    const revInsert = state.insertCalls.find((c) => c.table === "revisions");
+    expect(revInsert).toBeDefined();
+    const values = (revInsert?.values ?? {}) as { contributorName?: string };
+    expect(values.contributorName).toBe("IP:203.0.113.5");
+  });
 });
 
 describe("PUT /api/wiki-pages/:id", () => {
@@ -160,6 +185,39 @@ describe("PUT /api/wiki-pages/:id", () => {
     });
     expect(res.status).toBe(200);
     expect(state.updateCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("ignores contributor_name from body on PUT and uses IP from headers", async () => {
+    state.wikiPages.length = 0;
+    state.wikiPages.push({
+      id: WIKI_UUID,
+      target_type: "trail",
+      target_id: TARGET_UUID,
+      title: "Old",
+      content_md: "old",
+      rendered_html: "",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    state.insertCalls.length = 0;
+
+    const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}`, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "198.51.100.7",
+      },
+      body: JSON.stringify({
+        title: "New",
+        content_md: "new",
+        contributor_name: "spoofed",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const revInsert = state.insertCalls.find((c) => c.table === "revisions");
+    expect(revInsert).toBeDefined();
+    const values = (revInsert?.values ?? {}) as { contributorName?: string };
+    expect(values.contributorName).toBe("IP:198.51.100.7");
   });
 });
 
@@ -308,6 +366,46 @@ describe("POST /api/wiki-pages/:id/revert", () => {
     });
     expect(res.status).toBe(200);
     expect(state.updateCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("ignores contributor_name from body on revert and uses IP from headers", async () => {
+    state.wikiPages.length = 0;
+    state.wikiPages.push({
+      id: WIKI_UUID,
+      target_type: "trail",
+      target_id: TARGET_UUID,
+      title: "Wiki",
+      content_md: "new content",
+      rendered_html: "",
+    });
+    state.revisions.length = 0;
+    state.revisions.push({
+      id: REV_UUID,
+      wiki_page_id: WIKI_UUID,
+      content_md: "old content",
+      contributor_name: "user",
+      author_id: null,
+      edit_summary: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+    });
+    state.insertCalls.length = 0;
+
+    const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}/revert`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "192.0.2.42",
+      },
+      body: JSON.stringify({
+        revision_id: REV_UUID,
+        contributor_name: "spoofed-reverter",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const revInsert = state.insertCalls.find((c) => c.table === "revisions");
+    expect(revInsert).toBeDefined();
+    const values = (revInsert?.values ?? {}) as { contributorName?: string };
+    expect(values.contributorName).toBe("IP:192.0.2.42");
   });
 });
 

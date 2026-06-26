@@ -24,7 +24,8 @@ test("profile shows contributor name and online status", async ({ page }) => {
   await page.goto("/profile");
   await expect(page.getByTestId("profile-screen")).toBeVisible();
   await expect(page.getByTestId("profile-contributor")).toBeVisible();
-  await expect(page.getByTestId("profile-contributor")).toContainText("anonymous");
+  // Anonymous users are attributed to their public IP (Wikipedia-style).
+  await expect(page.getByTestId("profile-contributor")).toHaveText(/^IP:[\d.:a-fA-F]+$/);
   await expect(page.getByTestId("profile-status")).toBeVisible();
 });
 

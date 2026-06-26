@@ -11,8 +11,6 @@ import type { Revision, Citation } from "@magnum/shared";
 export interface WikiPageEditorProps {
   wikiPage?: WikiPage | null;
   isLoading?: boolean;
-  contributorName: string;
-  onContributorNameChange: (name: string) => void;
   onSave: (data: { title: string; content_md: string; edit_summary: string }) => void;
   canSave?: boolean;
   revisions?: Revision[];
@@ -26,8 +24,6 @@ export interface WikiPageEditorProps {
 export function WikiPageEditor({
   wikiPage,
   isLoading,
-  contributorName,
-  onContributorNameChange,
   onSave,
   canSave = true,
   revisions,
@@ -66,17 +62,6 @@ export function WikiPageEditor({
 
   return (
     <ScrollView style={styles.container} testID="wiki-editor">
-      <View style={styles.section}>
-        <Text style={styles.label}>Contributor Name</Text>
-        <TextInput
-          style={styles.input}
-          value={contributorName}
-          onChangeText={onContributorNameChange}
-          placeholder="anonymous"
-          testID="wiki-editor-contributor"
-        />
-      </View>
-
       {tab === "edit" ? (
         <>
           <View style={styles.section}>

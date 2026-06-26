@@ -134,6 +134,31 @@ export type UpdateSystemInput = z.infer<typeof updateSystemInputSchema>;
 export type MoveSystemInput = z.infer<typeof moveSystemInputSchema>;
 export type AssignTrailsInput = z.infer<typeof assignTrailsInputSchema>;
 export type PointInPolygonQuery = z.infer<typeof pointInPolygonQuerySchema>;
+
+// §21.5 — Shape: the in-memory representation of a system boundary
+// while the user is editing it. See shapeSchema / shapeToGeoJSON in
+// schemas/index.ts.
+export type ShapeRing = {
+  vertices: Array<[number, number]>;
+  closed: boolean;
+};
+export type Shape = {
+  rings: ShapeRing[];
+  /**
+   * Edges added via the "connect two vertices" gesture that don't sit
+   * on any ring's vertex sequence. Pairs of indices into each
+   * ring's flattened vertex list.
+   */
+  chords: Array<[number, number]>;
+  /**
+   * Position of the vertex the user double-clicked to start a
+   * "connect two vertices" gesture. Null when not connecting.
+   * Editor state — NOT persisted to the server (see
+   * shapeToGeoJSON).
+   */
+  connectFrom: { ringIndex: number; vertexIndex: number } | null;
+};
+
 export type HierarchyTreeNode = {
   id: string;
   name: string;

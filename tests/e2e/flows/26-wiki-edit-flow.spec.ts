@@ -28,7 +28,9 @@ test("user can create a wiki page and view its content", async ({ page }) => {
   }
 
   // 2. Fill in the editor and save.
-  await page.getByTestId("wiki-editor-contributor").fill("test-user");
+  // (The contributor name input was removed — the server derives it
+  //  from auth context.)
+  await expect(page.getByTestId("wiki-editor-contributor")).toHaveCount(0);
   await page.getByTestId("wiki-editor-title").fill("Buckeye Trail reference");
   await page
     .getByTestId("wiki-editor-content")

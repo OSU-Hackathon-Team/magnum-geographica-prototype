@@ -24,6 +24,7 @@ import { authRequired, type AuthUser } from "../middleware/auth.js";
 import { evaluateAction } from "../services/patrol.js";
 import { recordRevision } from "../services/revisions.js";
 import { tierFromKarma } from "../services/karma.js";
+import { resolveContributorName } from "../services/identity.js";
 
 type Variables = { user?: AuthUser };
 
@@ -81,10 +82,12 @@ tracesRoute.post("/", authRequired(), async (c) => {
     );
   }
   const coords = parsed.data.geometry.coordinates;
+  // `contributor_name` from the body is ignored — derive it from auth
+  // context so a malicious client can't spoof the trace attribution.
   const { trace, taggedSystemIds } = await createTrace({
     coordinates: coords,
     source: parsed.data.source,
-    contributorName: parsed.data.contributor_name,
+    contributorName: resolveContributorName(c),
     userId: authUser.id,
     recordedAt: parsed.data.recorded_at,
   });
@@ -116,7 +119,7 @@ tracesRoute.post("/import", authRequired(), async (c) => {
     );
   }
   const result = await importTrace(parsed.data.format, parsed.data.payload, {
-    contributorName: parsed.data.contributor_name,
+    contributorName: resolveContributorName(c),
     userId: authUser.id,
     recordedAt: parsed.data.recorded_at,
   });
@@ -134,7 +137,15 @@ tracesRoute.post("/import", authRequired(), async (c) => {
       tagged: result.taggedSystemIds,
     },
   });
-  return c.json({ trace: result.trace, tagged_system_ids: result.taggedSystemIds, points: result.points, length_meters: result.lengthMeters }, 201);
+  return c.json(
+    {
+      trace: result.trace,
+      tagged_system_ids: result.taggedSystemIds,
+      points: result.points,
+      length_meters: result.lengthMeters,
+    },
+    201,
+  );
 });
 
 tracesRoute.delete("/:id", authRequired(), async (c) => {
@@ -272,15 +283,19 @@ traceSegmentsRoute.post("/:id/vote", authRequired(), async (c) => {
   // "propose new" (implicit -1) and trail_id set mean "agrees" (+1).
   // The route stores the vote as +1/-1 in trace_segment_votes.
   const vote = parsed.data.trail_id ? 1 : -1;
+  // Attribute the segment vote to the authenticated user; never trust
+  // the body.
   await db
     .execute(
       sql`INSERT INTO trace_segment_votes (segment_id, user_id, trail_id, vote, contributor_name)
-         VALUES (${segmentId}, ${authUser.id}, ${parsed.data.trail_id}, ${vote}, ${parsed.data.contributor_name})
+         VALUES (${segmentId}, ${authUser.id}, ${parsed.data.trail_id}, ${vote}, ${resolveContributorName(c)})
          ON CONFLICT (segment_id, user_id)
          DO UPDATE SET trail_id = EXCLUDED.trail_id, vote = EXCLUDED.vote`,
     )
     .catch((e: unknown) => {
-      throw new Error(`failed to record segment vote: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error(
+        `failed to record segment vote: ${e instanceof Error ? e.message : String(e)}`,
+      );
     });
   return c.json({ ok: true, segment_id: segmentId, trail_id: parsed.data.trail_id, vote });
 });

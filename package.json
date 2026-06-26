@@ -46,6 +46,7 @@
     "detox:test-android:debug": "detox test --configuration android.emu.debug",
     "detox:test-android:release": "detox test --configuration android.emu.release",
     "detox:test-android:debug:ci": "CI=true detox test --configuration android.emu.debug --cleanup --artifacts-location e2e/.results/",
+    "set-role": "bun run --cwd packages/api set-role",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "type": "module",

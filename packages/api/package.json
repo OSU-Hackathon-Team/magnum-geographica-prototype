@@ -15,6 +15,7 @@
     "db:migrate": "bun run src/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "bun run src/seed.ts",
+    "set-role": "bun run src/set-role.ts",
     "clean": "rm -rf dist .turbo drizzle"
   },
   "dependencies": {

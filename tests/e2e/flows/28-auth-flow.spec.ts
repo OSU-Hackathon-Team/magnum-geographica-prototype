@@ -13,7 +13,9 @@ test.describe("Auth flow — navigation and UI", () => {
   test("profile shows login and register buttons when not authenticated", async ({ page }) => {
     await page.goto("/profile");
     await expect(page.getByTestId("profile-screen")).toBeVisible();
-    await expect(page.getByTestId("profile-contributor")).toHaveText("anonymous");
+    // Unauthenticated users are attributed to their public IP, Wikipedia-style.
+    await expect(page.getByTestId("profile-contributor")).toHaveText(/^IP:[\d.:a-fA-F]+$/);
+    await expect(page.getByTestId("profile-ip-note")).toBeVisible();
     await expect(page.getByTestId("profile-login")).toBeVisible();
     await expect(page.getByTestId("profile-register")).toBeVisible();
   });
@@ -193,8 +195,9 @@ test.describe("Auth flow — successful login", () => {
     await page.goto("/profile");
     await page.getByTestId("profile-logout").click();
 
-    // Should be back to anonymous
-    await expect(page.getByTestId("profile-contributor")).toHaveText("anonymous");
+    // Should be back to the IP-based contributor name
+    await expect(page.getByTestId("profile-contributor")).toHaveText(/^IP:[\d.:a-fA-F]+$/);
+    await expect(page.getByTestId("profile-ip-note")).toBeVisible();
     await expect(page.getByTestId("profile-login")).toBeVisible();
 
     // Log back in
