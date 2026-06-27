@@ -53,7 +53,7 @@ test.describe("Trace detail screen (§21.6)", () => {
 test.describe("Organize view trace link (§21.6)", () => {
   test("organize proposals have View button linking to trace", async ({ page }) => {
     // Register admin and run synthesis to create proposals.
-    const reg = await apiFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
         username: "organize_admin",

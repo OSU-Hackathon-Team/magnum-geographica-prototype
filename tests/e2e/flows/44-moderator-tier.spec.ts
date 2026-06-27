@@ -49,7 +49,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     page,
   }) => {
     // Register with role=admin which the mock treats as moderator-tier.
-    const reg = await apiFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
         username: "modadmin",
@@ -75,7 +75,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
   }) => {
     // Register with role=contributor but trust_score=600 — the mock
     // grants moderator access based on trust_score.
-    const reg = await apiFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
         username: "trustymod",

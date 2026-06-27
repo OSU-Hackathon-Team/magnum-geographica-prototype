@@ -28,7 +28,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     // Promote a real trail to synthesized via the admin endpoint.
     await page.goto(`${BASE}/explore`);
     // First, log in as admin to get a moderator-tier token.
-    const reg = await apiFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
         username: "mod_tier",
@@ -57,7 +57,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
   }) => {
     // Approve a synthesis proposal — that creates a synthesized trail
     // with derived_from_segments. Use the admin token to call the API.
-    const reg = await apiFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
         username: "mod_derive",
@@ -88,7 +88,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
   });
 
   test("promoting a synthesized trail to elevated swaps the badge", async ({ page }) => {
-    const reg = await apiFetch(page, "/api/auth/register", {
+    const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
         username: "mod_promote",
