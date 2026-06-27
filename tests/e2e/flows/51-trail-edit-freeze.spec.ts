@@ -1,6 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { installApi, resetApi, apiFetch } from "../helpers/api.js";
-import { FIXTURE_IDS } from "../fixtures/ids.js";
+import { installApi, resetApi } from "../helpers/api.js";
 
 test.beforeEach(async ({ page }) => {
   await installApi(page);
@@ -71,28 +70,13 @@ test.describe("Trail freeze / unfreeze (§21.6)", () => {
   });
 
   test("clicking Unfreeze demotes trail back to synthesized", async ({ page }) => {
-    const reg = await apiFetch(page, "/api/auth/register", {
-      method: "POST",
-      body: {
-        username: "freeze_admin",
-        email: "freeze@example.com",
-        password: "testpass123",
-        role: "admin",
-        trust_score: 999,
-      },
-    });
-    expect(reg.status).toBe(201);
-    const { access_token } = reg.body as { access_token: string };
-    const promote = await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
-      method: "POST",
-      token: access_token,
-      body: { to: "elevated" },
-    });
-    expect(promote.status).toBe(200);
-    await page.waitForTimeout(1000);
+    await loginAsAdmin(page);
     await page.goto("/trail/buckeye-trail");
+    // First freeze (synthesized → elevated)
+    await page.getByTestId("trail-freeze").click();
     await page.waitForTimeout(1000);
     await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
+    // Then unfreeze (elevated → synthesized)
     await page.getByTestId("trail-unfreeze").click();
     await page.waitForTimeout(1000);
     await expect(page.getByTestId("trail-tier-badge-synthesized")).toBeVisible();
