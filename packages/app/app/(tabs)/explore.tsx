@@ -68,7 +68,6 @@ export default function ExploreScreen() {
   const trailTileVersion = useMapStore((s) => s.trailTileVersion);
   const segmentTileVersion = useMapStore((s) => s.segmentTileVersion);
   const featureTileVersion = useMapStore((s) => s.featureTileVersion);
-  const heatmapTileVersion = useMapStore((s) => s.heatmapTileVersion);
   const superSystemTileVersion = useMapStore((s) => s.superSystemTileVersion);
   const showHeatmap = useMapStore((s) => s.showHeatmap);
   const toggleHeatmap = useMapStore((s) => s.toggleHeatmap);
@@ -132,6 +131,7 @@ export default function ExploreScreen() {
   const mapConfig = useMemo(
     () => ({
       martinTilesUrl: MARTIN_URL,
+      apiUrl: API_URL,
       baseLayers: baseLayerDefs,
       initialCenter: mapCenter,
       initialZoom: mapZoom,
@@ -488,7 +488,6 @@ export default function ExploreScreen() {
           trailTileVersion={trailTileVersion}
           segmentTileVersion={segmentTileVersion}
           featureTileVersion={featureTileVersion}
-          heatmapTileVersion={heatmapTileVersion}
           superSystemTileVersion={superSystemTileVersion}
           showHeatmap={showHeatmap}
         />

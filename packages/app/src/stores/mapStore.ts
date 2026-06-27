@@ -13,7 +13,6 @@ export interface MapState {
   trailTileVersion: number;
   segmentTileVersion: number;
   featureTileVersion: number;
-  heatmapTileVersion: number;
   superSystemTileVersion: number;
 
   setViewport: (center: [number, number], zoom: number) => void;
@@ -23,7 +22,6 @@ export interface MapState {
   incrementTrailTileVersion: () => void;
   incrementSegmentTileVersion: () => void;
   incrementFeatureTileVersion: () => void;
-  incrementHeatmapTileVersion: () => void;
   incrementSuperSystemTileVersion: () => void;
 }
 
@@ -36,7 +34,6 @@ export const useMapStore = create<MapState>((set) => ({
   trailTileVersion: 0,
   segmentTileVersion: 0,
   featureTileVersion: 0,
-  heatmapTileVersion: 0,
   superSystemTileVersion: 0,
 
   setViewport: (center, zoom) => set({ center, zoom }),
@@ -50,8 +47,6 @@ export const useMapStore = create<MapState>((set) => ({
     set((s) => ({ segmentTileVersion: s.segmentTileVersion + 1 })),
   incrementFeatureTileVersion: () =>
     set((s) => ({ featureTileVersion: s.featureTileVersion + 1 })),
-  incrementHeatmapTileVersion: () =>
-    set((s) => ({ heatmapTileVersion: s.heatmapTileVersion + 1 })),
   incrementSuperSystemTileVersion: () =>
     set((s) => ({ superSystemTileVersion: s.superSystemTileVersion + 1 })),
 }));

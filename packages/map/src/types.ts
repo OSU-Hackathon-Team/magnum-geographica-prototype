@@ -1,6 +1,7 @@
 export interface MapContainerProps {
   config?: {
     martinTilesUrl?: string;
+    apiUrl?: string;
     baseLayers?: import("./shared/config.js").BaseLayerDef[];
     defaultBaseLayerId?: string;
     initialCenter?: [number, number];
@@ -72,8 +73,8 @@ export interface MapContainerProps {
   fitGeometry?: unknown | null;
   /**
    * When true, the traces heatmap overlay is visible on the map.
-   * The heatmap shows GPS trace density as a color-coded overlay
-   * sourced from the Martin traces_heatmap tile endpoint.
+   * The heatmap shows GPS trace density as a smooth canvas overlay
+   * supplied by GET /api/traces/heat.
    */
   showHeatmap?: boolean;
   /**
@@ -86,6 +87,5 @@ export interface MapContainerProps {
   trailTileVersion?: number;
   segmentTileVersion?: number;
   featureTileVersion?: number;
-  heatmapTileVersion?: number;
   superSystemTileVersion?: number;
 }

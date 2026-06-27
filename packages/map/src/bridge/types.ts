@@ -27,6 +27,7 @@ export type BridgeCommand =
         center?: [number, number];
         zoom?: number;
         martinUrl?: string | null;
+        apiUrl?: string | null;
         baseLayers?: BaseLayerArgs[];
         baseLayerId?: string;
       };

@@ -22,6 +22,7 @@ export type BaseLayerDef = MvtBaseLayerDef | RasterBaseLayerDef;
 
 export interface MapConfig {
   martinTilesUrl?: string;
+  apiUrl?: string;
   baseLayers?: BaseLayerDef[];
   defaultBaseLayerId?: string;
   initialCenter: [number, number];
@@ -102,9 +103,4 @@ export function featuresTileUrl(cfg: MapConfig): string | undefined {
 export function superSystemsTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
   return `${cfg.martinTilesUrl}/super_systems/{z}/{x}/{y}`;
-}
-
-export function tracesHeatmapTileUrl(cfg: MapConfig): string | undefined {
-  if (!cfg.martinTilesUrl) return undefined;
-  return `${cfg.martinTilesUrl}/traces_heatmap/{z}/{x}/{y}`;
 }

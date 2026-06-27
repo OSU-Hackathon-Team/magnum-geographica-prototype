@@ -19,6 +19,7 @@ import {
   retractTraceVote,
   setTraceStatus,
   voteOnTrace,
+  getHeatmapPoints,
 } from "../services/traces.js";
 import { authRequired, type AuthUser } from "../middleware/auth.js";
 import { evaluateAction } from "../services/patrol.js";
@@ -56,6 +57,46 @@ tracesRoute.get("/", async (c) => {
     pageSize: parsed.data.pageSize,
   });
   return c.json({ items, total, page: parsed.data.page, pageSize: parsed.data.pageSize });
+});
+
+/**
+ * Heatmap — densified trace points for client-side canvas heatmap overlay.
+ * GET /api/traces/heat?bbox=minLon,minLat,maxLon,maxLat&zoom=14
+ * Returns a GeoJSON FeatureCollection of Point features sampled along
+ * active trace geometries within the bounding box.
+ */
+tracesRoute.get("/heat", async (c) => {
+  const bboxRaw = c.req.query("bbox");
+  if (!bboxRaw) {
+    return c.json({ error: "missing_bbox", message: "bbox=minLon,minLat,maxLon,maxLat required" }, 400);
+  }
+  const parts = bboxRaw.split(",").map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) {
+    return c.json({ error: "invalid_bbox", message: "bbox must be minLon,minLat,maxLon,maxLat as numbers" }, 400);
+  }
+  const bbox = parts as [number, number, number, number];
+  if (bbox[0] > bbox[2] || bbox[1] > bbox[3]) {
+    return c.json({ error: "invalid_bbox", message: "min must be <= max" }, 400);
+  }
+
+  const zoomRaw = c.req.query("zoom");
+  const zoom = zoomRaw ? Number(zoomRaw) : 12;
+  if (!Number.isFinite(zoom) || zoom < 2 || zoom > 18) {
+    return c.json({ error: "invalid_zoom", message: "zoom must be 2-18" }, 400);
+  }
+
+  // Segment length in meters: point every ~8 screen pixels at the given zoom.
+  // Cap at 2000m (low zoom) and floor at 15m (very high zoom).
+  const segLen = Math.max(15, Math.min(2000, Math.round((156543 / Math.pow(2, zoom)) * 8)));
+
+  try {
+    const result = await getHeatmapPoints(bbox, segLen);
+    return c.json(result as unknown as Record<string, unknown>);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "heatmap query failed";
+    console.error("heatmap error:", msg);
+    return c.json({ error: "heatmap_query_failed", message: msg }, 500);
+  }
 });
 
 tracesRoute.get("/:id", async (c) => {

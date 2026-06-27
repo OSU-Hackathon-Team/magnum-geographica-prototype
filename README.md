@@ -74,18 +74,11 @@ To change the zoom range or features included, edit `scripts/tilemaker-config.js
 
 ## Trace heatmap
 
-The Explore tab has a toggleable heatmap overlay showing where GPS traces have been recorded. It's served as MVT tiles by Martin from `/traces_heatmap/{z}/{x}/{y}` and reads from a pre-computed `trace_heatmap` summary table (tile-level counts at zoom 14, lower zooms aggregated up).
+The Explore tab has a toggleable heatmap overlay showing where GPS traces have been recorded. It renders as a smooth client-side canvas layer (gaussian-blurred points) — no tile grids, no morphing on zoom.
+
+The map fetches densified trace points from `GET /api/traces/heat?bbox=minLon,minLat,maxLon,maxLat&zoom=N` on every pan/zoom while the overlay is visible. The server densifies active trace geometries into point features using PostGIS `ST_Intersection` + `ST_Segmentize` + `ST_DumpPoints`, clipped to the current viewport.
 
 The overlay is *hidden by default*; tap the flame icon next to the base-layer switcher in the top-right of the Explore tab to toggle it on.
-
-After seeding or bulk-importing traces, regenerate the heatmap so the cache reflects the new data:
-
-```bash
-curl -X POST http://localhost:3000/api/admin/heatmap/regenerate \
-  -H "x-admin-secret: ${ADMIN_SECRET:-dev-secret-change-me}"
-```
-
-Response: `{ "ok": true, "cellsInserted": <n>, "durationMs": <ms> }`. Admin role only (requires either a valid admin JWT or the `x-admin-secret` header). The job truncates the cache, recomputes tile-level counts at zoom 14 from the trace bboxes, then aggregates up to zooms 5–13. For tens of thousands of traces this typically takes under a second; for ~1M traces expect ~10–30 seconds.
 
 ## Common commands
 

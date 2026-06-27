@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Map, View } from "ol";
 import type { Layer } from "ol/layer.js";
 import VectorLayer from "ol/layer/Vector.js";
-import VectorTileLayer from "ol/layer/VectorTile.js";
+import HeatmapLayer from "ol/layer/Heatmap.js";
 import VectorSource from "ol/source/Vector.js";
 import Feature, { type FeatureLike } from "ol/Feature.js";
 import { LineString, Point } from "ol/geom.js";
@@ -15,7 +15,7 @@ import { createTrailsLayer } from "./layers/TrailsLayer.js";
 import { createSystemsLayer } from "./layers/SystemsLayer.js";
 import { createFeaturesLayer } from "./layers/FeaturesLayer.js";
 import { createSuperSystemsLayer } from "./layers/SuperSystemsLayer.js";
-import { createTracesHeatmapLayer } from "./layers/TracesHeatmapLayer.js";
+import { createTracesHeatmapLayer, loadHeatmapPoints } from "./layers/TracesHeatmapLayer.js";
 import { applyBaseLayer } from "./layers/BaseLayer.js";
 import {
   createShapeLayer,
@@ -101,13 +101,14 @@ export default function MapContainer({
   trailTileVersion,
   segmentTileVersion,
   featureTileVersion,
-  heatmapTileVersion,
   superSystemTileVersion,
   liveRoute,
 }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const liveRouteSourceRef = useRef<VectorSource | null>(null);
+  const heatmapAbortRef = useRef<AbortController | null>(null);
+  const heatmapVisibleRef = useRef(false);
   const onReadyRef = useRef(onReady);
   const onClickRef = useRef(onClick);
   const onFeatureSelectRef = useRef(onFeatureSelect);
@@ -153,7 +154,7 @@ export default function MapContainer({
     const featuresLayer = createFeaturesLayer(merged);
     if (featuresLayer) layers.push(featuresLayer);
 
-    const heatmapLayer = createTracesHeatmapLayer(merged);
+    const heatmapLayer = createTracesHeatmapLayer(merged.apiUrl);
     if (heatmapLayer) layers.push(heatmapLayer);
 
     // Shape editor layer — only mounted when the host passes a shape.
@@ -171,7 +172,8 @@ export default function MapContainer({
     // Stash the shape context for later effects.
     (map as unknown as { __shapeCtx?: typeof shapeCtx; __systemsLayer?: typeof systemsLayer }).__shapeCtx = shapeCtx;
     (map as unknown as { __systemsLayer?: typeof systemsLayer }).__systemsLayer = systemsLayer;
-    (map as unknown as { __heatmapLayer?: typeof heatmapLayer }).__heatmapLayer = heatmapLayer;
+    (map as unknown as { __heatmapLayer?: typeof heatmapLayer; __heatmapApiUrl?: string }).__heatmapLayer = heatmapLayer;
+    (map as unknown as { __heatmapApiUrl?: string }).__heatmapApiUrl = merged.apiUrl;
 
     const liveRouteSource = new VectorSource();
     const liveRouteStyle = (feature: FeatureLike) => {
@@ -489,6 +491,18 @@ export default function MapContainer({
           containerRef.current.dataset.mapZoom = String(zoom);
         }
       }
+      // Refresh heatmap when visible
+      if (heatmapLayer && heatmapVisibleRef.current && merged.apiUrl) {
+        heatmapAbortRef.current?.abort();
+        const ctrl = new AbortController();
+        heatmapAbortRef.current = ctrl;
+        const ext = view.calculateExtent();
+        if (ext) {
+          const [minLon, minLat, maxLon, maxLat] = transformExtent(ext, "EPSG:3857", "EPSG:4326");
+          loadHeatmapPoints(heatmapLayer, merged.apiUrl, [minLon!, minLat!, maxLon!, maxLat!], zoom, ctrl.signal)
+            .catch(() => {});
+        }
+      }
     });
 
     const resizeObserver =
@@ -599,7 +613,6 @@ export default function MapContainer({
       { key: "trail",     version: trailTileVersion    ?? 0, regex: /\/trails\// },
       { key: "segment",   version: segmentTileVersion  ?? 0, regex: /\/segments\// },
       { key: "feature",   version: featureTileVersion  ?? 0, regex: /\/features\// },
-      { key: "heatmap",   version: heatmapTileVersion  ?? 0, regex: /\/traces_heatmap\// },
       { key: "super",     version: superSystemTileVersion ?? 0, regex: /\/super_systems\// },
     ];
 
@@ -624,15 +637,31 @@ export default function MapContainer({
     }
   }, [
     systemTileVersion, trailTileVersion, segmentTileVersion,
-    featureTileVersion, heatmapTileVersion, superSystemTileVersion,
+    featureTileVersion, superSystemTileVersion,
   ]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const heatmapLayer = (map as unknown as { __heatmapLayer?: VectorTileLayer }).__heatmapLayer;
+    const heatmapLayer = (map as unknown as { __heatmapLayer?: HeatmapLayer }).__heatmapLayer;
     if (heatmapLayer) {
       heatmapLayer.setVisible(!!showHeatmap);
+      heatmapVisibleRef.current = !!showHeatmap;
+      if (showHeatmap) {
+        const apiUrl = (map as unknown as { __heatmapApiUrl?: string }).__heatmapApiUrl;
+        if (apiUrl) {
+          heatmapAbortRef.current?.abort();
+          const ctrl = new AbortController();
+          heatmapAbortRef.current = ctrl;
+          const view = map.getView();
+          const ext = view.calculateExtent();
+          if (ext) {
+            const [minLon, minLat, maxLon, maxLat] = transformExtent(ext, "EPSG:3857", "EPSG:4326");
+            loadHeatmapPoints(heatmapLayer, apiUrl, [minLon!, minLat!, maxLon!, maxLat!], view.getZoom() ?? 0, ctrl.signal)
+              .catch(() => {});
+          }
+        }
+      }
     }
   }, [showHeatmap]);
 

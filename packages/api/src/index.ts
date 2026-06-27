@@ -30,7 +30,6 @@ import {
 } from "./routes/hierarchy.js";
 import { tracesRoute, traceSegmentsRoute } from "./routes/traces.js";
 import { synthesisRoute } from "./routes/synthesis.js";
-import { heatmapRoute } from "./routes/heatmap.js";
 import { metroProxy } from "./middleware/metro-proxy.js";
 
 const app = new Hono();
@@ -66,7 +65,6 @@ app.route("/api/systems", systemMoveRoute);
 app.route("/api/traces", tracesRoute);
 app.route("/api/trace-segments", traceSegmentsRoute);
 app.route("/api/admin", adminRoute);
-app.route("/api/admin/heatmap", heatmapRoute);
 app.route("/api", synthesisRoute);
 
 app.get("/", (c) => c.json({ name: "magnum-api", version: "0.0.1" }));

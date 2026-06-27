@@ -34,6 +34,7 @@ import olCssAssetModule from "../assets/ol-styles.bin";
 
 function buildMapHtml(
   martinUrl: string | null,
+  apiUrl: string | null,
   offline: boolean,
   baseLayers: BaseLayerDef[],
   baseLayerId: string,
@@ -41,6 +42,7 @@ function buildMapHtml(
   zoom: number,
 ): string {
   const safeMartin = JSON.stringify(martinUrl);
+  const safeApiUrl = JSON.stringify(apiUrl);
   const safeBaseLayers = JSON.stringify(baseLayers);
   const safeBaseLayerId = JSON.stringify(baseLayerId);
   const safeCenter = JSON.stringify(center);
@@ -258,30 +260,20 @@ function buildMapHtml(
           allLayers.push(tileLayers.features);
           tileLayers.features.on('click',function(e){var f=e.feature;if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'features',slug:f.get('slug'),name:f.get('name')})});
 
-          // Traces heatmap — color-coded density overlay, hidden by default.
-          var hmSrc = new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/traces_heatmap/{z}/{x}/{y}'});
-          vectorSources.tracesHeatmap = hmSrc;
-          tileLayers.tracesHeatmap = new ol.layer.VectorTile({
-            source: hmSrc,
-            minZoom: 5,
-            maxZoom: 14,
-            style: function(f){
-              var density = Number(f.get('density'))||0;
-              if (density <= 0) return new ol.style.Style({});
-              var color;
-              if (density <= 1) color = 'rgba(34,197,94,0.12)';
-              else if (density <= 2) color = 'rgba(34,197,94,0.22)';
-              else if (density <= 5) color = 'rgba(132,204,22,0.32)';
-              else if (density <= 10) color = 'rgba(250,204,21,0.42)';
-              else if (density <= 20) color = 'rgba(249,115,22,0.52)';
-              else if (density <= 50) color = 'rgba(239,68,68,0.58)';
-              else color = 'rgba(168,85,247,0.65)';
-              return new ol.style.Style({fill:new ol.style.Fill({color:color})});
-            },
-            visible: false
-          });
-          tileLayers.tracesHeatmap.set('name','traces_heatmap');
-          allLayers.push(tileLayers.tracesHeatmap);
+          // Traces heatmap — client-side canvas heatmap, hidden by default.
+          if(apiUrl){
+            heatmapSource = new ol.source.Vector();
+            heatmapLayer = new ol.layer.Heatmap({
+              source: heatmapSource,
+              radius: 18,
+              blur: 14,
+              gradient: ['rgba(0,0,0,0)','rgba(34,197,94,0.35)','rgba(132,204,22,0.55)','rgba(250,204,21,0.7)','rgba(249,115,22,0.85)','rgba(239,68,68,0.95)'],
+              weight: function(f){ var w = Number(f.get('weight')); return isFinite(w) ? Math.max(0, Math.min(1, w)) : 0; },
+              visible: false
+            });
+            heatmapLayer.set('name','traces_heatmap');
+            allLayers.push(heatmapLayer);
+          }
         }
 
         // Offline vector layers (hidden by default, shown when offline)
@@ -427,7 +419,7 @@ function buildMapHtml(
           }
           var c=ol.proj.toLonLat(e.coordinate);postToRN({type:'mapClick',lon:c[0],lat:c[1]});
         });
-        map.on('moveend',function(){var v=map.getView();var c=ol.proj.toLonLat(v.getCenter());postToRN({type:'moveEnd',center:c,zoom:v.getZoom()})});
+        map.on('moveend',function(){var v=map.getView();var c=ol.proj.toLonLat(v.getCenter());postToRN({type:'moveEnd',center:c,zoom:v.getZoom()});if(heatmapVisible)refreshHeatmap()});
 
         // Long-press-to-drag for shape vertices.
         var dragTimer=null;
@@ -440,7 +432,11 @@ function buildMapHtml(
             if(!features)return;
             for(var fi=0;fi<features.length;fi++){
               if(features[fi].get('shapeKind')==='vertex'){
-                dragFired=false;
+           dragFired=false,
+           heatmapLayer=null,
+           heatmapSource=null,
+           heatmapVisible=false,
+           apiUrl=${safeApiUrl};
                 var ringIdx=features[fi].get('ringIndex')||0;
                 var vertIdx=features[fi].get('vertexIndex')||0;
                 ev.preventDefault();
@@ -494,6 +490,17 @@ function buildMapHtml(
       // The handler is hoisted to a top-level function so it closes over
       // enterDrawMode, setActiveBaseLayer, etc. (the olBridge methods are
       // not in scope from a sibling function defined inside the object).
+      function refreshHeatmap(){
+        if(!heatmapLayer || !heatmapVisible || !apiUrl || !map) return;
+        var ext = ol.proj.transformExtent(map.getView().calculateExtent(), 'EPSG:3857', 'EPSG:4326');
+        var z = Math.round(map.getView().getZoom());
+        var url = apiUrl + '/api/traces/heat?bbox=' + ext.join(',') + '&zoom=' + z;
+        fetch(url).then(function(r){ return r.json(); }).then(function(geojson){
+          var features = (new ol.format.GeoJSON()).readFeatures(geojson, {featureProjection:'EPSG:3857'});
+          if(heatmapSource){ heatmapSource.clear(); heatmapSource.addFeatures(features); }
+        }).catch(function(){});
+      }
+
       function onHostMessage(payload){
         if(!payload || typeof payload !== 'object') return;
         try{
@@ -504,7 +511,9 @@ function buildMapHtml(
           }else if(m === 'setOfflineMode' && a){
             offlineMode = !!a.offline; updateLayerVisibility();
           }else if(m === 'setHeatmapVisible' && a){
-            if(tileLayers.tracesHeatmap) tileLayers.tracesHeatmap.setVisible(!!a.visible);
+            heatmapVisible = !!(a && a.visible);
+            if(heatmapLayer) heatmapLayer.setVisible(heatmapVisible);
+            if(heatmapVisible) refreshHeatmap();
           }else if(m === 'setOfflineData' && a){
             if(a.superSystems && vectorLayers.superSystems){
               var ssf = (new ol.format.GeoJSON()).readFeatures(a.superSystems, {featureProjection:'EPSG:3857'});
@@ -795,7 +804,9 @@ function buildMapHtml(
         },
         clearLiveRoute:function(){if(liveRouteSource)liveRouteSource.clear()},
         setHeatmapVisible:function(a){
-          if(tileLayers.tracesHeatmap) tileLayers.tracesHeatmap.setVisible(!!(a && a.visible));
+          heatmapVisible = !!(a && a.visible);
+          if(heatmapLayer) heatmapLayer.setVisible(heatmapVisible);
+          if(heatmapVisible) refreshHeatmap();
         },
         fitBounds:function(a){
           if(!map)return;
@@ -857,7 +868,6 @@ export default function MapContainer({
   trailTileVersion,
   segmentTileVersion,
   featureTileVersion,
-  heatmapTileVersion,
   superSystemTileVersion,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
@@ -888,6 +898,7 @@ export default function MapContainer({
 
   const initCfgRef = useRef<{
     martinTilesUrl: string | null;
+    apiUrl: string | null;
     baseLayerDefs: BaseLayerDef[];
     baseLayerId: string;
     center: [number, number];
@@ -896,6 +907,7 @@ export default function MapContainer({
   if (!initCfgRef.current) {
     initCfgRef.current = {
       martinTilesUrl: merged.martinTilesUrl ?? null,
+      apiUrl: merged.apiUrl ?? null,
       baseLayerDefs,
       baseLayerId: defaultBaseLayerId,
       center: initialCenter,
@@ -944,6 +956,7 @@ export default function MapContainer({
         // Write map HTML (with basemap info baked in).
         const html = buildMapHtml(
           initCfg.martinTilesUrl,
+          initCfg.apiUrl,
           false,
           initCfg.baseLayerDefs,
           initCfg.baseLayerId,
@@ -966,6 +979,7 @@ export default function MapContainer({
     () =>
       buildMapHtml(
         initCfg.martinTilesUrl,
+        initCfg.apiUrl,
         false,
         initCfg.baseLayerDefs,
         initCfg.baseLayerId,
@@ -1208,7 +1222,6 @@ export default function MapContainer({
       trailTileVersion ?? 0,
       segmentTileVersion ?? 0,
       featureTileVersion ?? 0,
-      heatmapTileVersion ?? 0,
       superSystemTileVersion ?? 0,
     );
     tileVersionRef.current = combined;
@@ -1216,7 +1229,7 @@ export default function MapContainer({
     send({ method: "refreshTiles", args: { version: combined } });
   }, [
     systemTileVersion, trailTileVersion, segmentTileVersion,
-    featureTileVersion, heatmapTileVersion, superSystemTileVersion,
+    featureTileVersion, superSystemTileVersion,
     send,
   ]);
 

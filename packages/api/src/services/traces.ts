@@ -94,6 +94,7 @@ export async function createTrace(
   if (!trace) throw new Error("failed to insert trace");
 
   const tagged = await autoTagTrace(trace.id);
+
   return { trace, taggedSystemIds: tagged };
 }
 
@@ -385,4 +386,69 @@ export async function importTrace(
     points: coords.length,
     lengthMeters: traceLengthMeters(coords),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Heatmap — densified trace points for client-side canvas layer       */
+/* ------------------------------------------------------------------ */
+
+export interface HeatmapPointsResult {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: { type: "Point"; coordinates: [number, number] };
+    properties: { weight: number };
+  }>;
+}
+
+/**
+ * Return a GeoJSON FeatureCollection of Point features sampled along
+ * every active trace's geometry within the given bounding box. The
+ * segment length controls the density (in meters at the equator in
+ * EPSG:3857). A smaller value produces more points → smoother heatmap
+ * but higher load.
+ */
+export async function getHeatmapPoints(
+  bbox: [number, number, number, number],
+  segLenMeters: number,
+): Promise<HeatmapPointsResult> {
+  const [minLon, minLat, maxLon, maxLat] = bbox;
+
+  const rows = await db.execute<{ geojson: string }>(sql`
+    SELECT jsonb_build_object(
+      'type', 'FeatureCollection',
+      'features', COALESCE(jsonb_agg(
+        jsonb_build_object(
+          'type', 'Feature',
+          'geometry', ST_AsGeoJSON(ST_Transform(pt.geom, 4326))::jsonb,
+          'properties', jsonb_build_object('weight', 1.0::double precision)
+        )
+      ), '[]'::jsonb)
+    )::text AS geojson
+    FROM gps_traces t
+    CROSS JOIN LATERAL ST_DumpPoints(
+      ST_Segmentize(
+        ST_Transform(
+          ST_Intersection(t.geometry,
+            ST_MakeEnvelope(${minLon}, ${minLat}, ${maxLon}, ${maxLat}, 4326)
+          ), 3857
+        ), ${segLenMeters}
+      )
+    ) AS pt
+    WHERE t.status = 'active'
+      AND t.geometry IS NOT NULL
+      AND t.geometry && ST_MakeEnvelope(
+        ${minLon}, ${minLat}, ${maxLon}, ${maxLat}, 4326
+      )
+      AND ST_Intersects(t.geometry,
+        ST_MakeEnvelope(${minLon}, ${minLat}, ${maxLon}, ${maxLat}, 4326)
+      )
+    LIMIT 30000
+  `);
+
+  const raw = rows.rows[0]?.geojson;
+  if (!raw) {
+    return { type: "FeatureCollection", features: [] };
+  }
+  return JSON.parse(raw) as HeatmapPointsResult;
 }
