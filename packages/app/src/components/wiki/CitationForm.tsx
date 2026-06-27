@@ -3,6 +3,8 @@ import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-nat
 import { Ionicons } from "@expo/vector-icons";
 import type { Citation } from "@magnum/shared";
 import { Button } from "../ui/Button";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing } from "../../theme/tokens";
 
 export interface CitationFormProps {
   citations: Citation[];
@@ -11,6 +13,7 @@ export interface CitationFormProps {
 }
 
 export function CitationForm({ citations, onAdd, onDelete }: CitationFormProps) {
+  const { colors } = useTheme();
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,17 +34,21 @@ export function CitationForm({ citations, onAdd, onDelete }: CitationFormProps) 
       <Text style={styles.heading}>Citations</Text>
 
       {citations.length === 0 ? (
-        <Text style={styles.empty} testID="citations-empty">
+        <Text style={[styles.empty, { color: colors.textMuted }]} testID="citations-empty">
           No citations yet.
         </Text>
       ) : (
         citations.map((c) => (
-          <View key={c.id} style={styles.citationRow} testID={`citation-${c.id}`}>
+          <View
+            key={c.id}
+            style={[styles.citationRow, { borderBottomColor: colors.divider }]}
+            testID={`citation-${c.id}`}
+          >
             <View style={styles.citationInfo}>
               <Text style={styles.citationTitle}>{c.title}</Text>
               {c.url ? (
                 <Pressable onPress={() => Linking.openURL(c.url!)}>
-                  <Text style={styles.citationUrl}>{c.url}</Text>
+                  <Text style={[styles.citationUrl, { color: colors.primary }]}>{c.url}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -51,23 +58,37 @@ export function CitationForm({ citations, onAdd, onDelete }: CitationFormProps) 
               onPress={() => onDelete(c.id)}
               testID={`citation-delete-${c.id}`}
             >
-              <Ionicons name="trash-outline" size={14} color="#ef4444" />
+              <Ionicons name="trash-outline" size={14} color={colors.danger} />
             </Button>
           </View>
         ))
       )}
 
-      <View style={styles.addForm}>
-        <Text style={styles.label}>Add Citation</Text>
+      <View style={[styles.addForm, { borderTopColor: colors.divider }]}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Add Citation</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.surfaceMuted,
+            },
+          ]}
           value={title}
           onChangeText={setTitle}
           placeholder="Title (required)"
           testID="citation-input-title"
         />
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.surfaceMuted,
+            },
+          ]}
           value={url}
           onChangeText={setUrl}
           placeholder="URL (optional)"
@@ -75,7 +96,9 @@ export function CitationForm({ citations, onAdd, onDelete }: CitationFormProps) 
           autoCapitalize="none"
           testID="citation-input-url"
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+        ) : null}
         <Button
           variant="secondary"
           size="small"
@@ -93,33 +116,28 @@ export function CitationForm({ citations, onAdd, onDelete }: CitationFormProps) 
 const styles = StyleSheet.create({
   container: { gap: 10 },
   heading: { fontSize: 16, fontWeight: "600" },
-  empty: { fontSize: 13, color: "#aaa", fontStyle: "italic" },
+  empty: { fontSize: 13, fontStyle: "italic" },
   citationRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
-  citationInfo: { flex: 1, gap: 2 },
+  citationInfo: { flex: 1, gap: spacing.xxs },
   citationTitle: { fontSize: 13, fontWeight: "500" },
-  citationUrl: { fontSize: 11, color: "#22c55e", textDecorationLine: "underline" },
+  citationUrl: { fontSize: 11, textDecorationLine: "underline" },
   addForm: {
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    paddingTop: 12,
-    gap: 8,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
   },
-  label: { fontSize: 13, fontWeight: "600", color: "#444" },
+  label: { fontSize: 13, fontWeight: "600" },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 6,
-    padding: 8,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
     fontSize: 13,
-    color: "#222",
-    backgroundColor: "#fafafa",
   },
-  error: { color: "#ef4444", fontSize: 12 },
+  error: { fontSize: 12 },
 });

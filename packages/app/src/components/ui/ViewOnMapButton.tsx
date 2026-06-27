@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { buildExploreDeepLink, type MapCenter } from "@magnum/shared";
+import { useTheme } from "../../providers/ThemeProvider";
 
 export interface ViewOnMapButtonProps {
   center: MapCenter | null | undefined;
@@ -12,6 +13,7 @@ export interface ViewOnMapButtonProps {
 
 export function ViewOnMapButton({ center, zoom, label, testID }: ViewOnMapButtonProps) {
   const router = useRouter();
+  const { colors } = useTheme();
 
   if (!center) return null;
 
@@ -24,12 +26,16 @@ export function ViewOnMapButton({ center, zoom, label, testID }: ViewOnMapButton
   return (
     <Pressable
       onPress={handlePress}
-      style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
+      style={({ pressed }) => [
+        styles.btn,
+        { backgroundColor: colors.primary },
+        pressed && styles.btnPressed,
+      ]}
       testID={testID ?? "view-on-map"}
     >
       <View style={styles.row}>
-        <Ionicons name="map-outline" size={14} color="#fff" />
-        <Text style={styles.text}>{label ?? "View on map"}</Text>
+        <Ionicons name="map-outline" size={14} color={colors.textInverse} />
+        <Text style={[styles.text, { color: colors.textInverse }]}>{label ?? "View on map"}</Text>
       </View>
     </Pressable>
   );
@@ -38,12 +44,11 @@ export function ViewOnMapButton({ center, zoom, label, testID }: ViewOnMapButton
 const styles = StyleSheet.create({
   btn: {
     alignSelf: "flex-start",
-    backgroundColor: "#22c55e",
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 8,
   },
   btnPressed: { opacity: 0.85 },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
-  text: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  text: { fontSize: 13, fontWeight: "600" },
 });

@@ -16,6 +16,9 @@ import {
 } from "@magnum/shared";
 import { Button } from "../ui/Button";
 import { usePresetStore, groupPresetsByCategory } from "../../stores/presetStore";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing, text as textTokens } from "../../theme/tokens";
+import type { ThemeColors } from "../../theme/colors";
 
 export interface AddFeatureSheetResult {
   preset_id: string;
@@ -48,6 +51,121 @@ export interface AddFeatureSheetProps {
   testID?: string;
 }
 
+const createStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: c.surface,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      maxHeight: "90%",
+      shadowColor: c.shadow,
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 8,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: c.divider,
+    },
+    headerTitle: { fontSize: 16, fontWeight: "700" },
+    body: { flex: 1 },
+    centered: { alignItems: "center", justifyContent: "center", padding: 24, gap: 8 },
+    search: {
+      margin: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      borderRadius: 8,
+      fontSize: 14,
+    },
+    chipsRow: { flexDirection: "row", gap: 6, paddingHorizontal: 12, paddingBottom: 8 },
+    chip: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 14,
+      backgroundColor: c.surfaceMuted,
+    },
+    chipActive: { backgroundColor: c.primary },
+    chipText: { fontSize: 12, color: c.textSecondary },
+    chipTextActive: { color: c.textInverse, fontWeight: "600" },
+    gridContent: { padding: 12, gap: 12, paddingBottom: 32 },
+    section: { gap: 6 },
+    sectionLabel: { fontSize: 12, fontWeight: "700", color: c.textMuted, textTransform: "uppercase" },
+    grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    tile: {
+      width: 88,
+      paddingVertical: 12,
+      paddingHorizontal: 6,
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 8,
+      backgroundColor: c.surfaceMuted,
+    },
+    tileLabel: { fontSize: 11, textAlign: "center", color: c.text },
+
+    questionsContent: { padding: 16, gap: 12, paddingBottom: 32 },
+    row: { flexDirection: "row", alignItems: "center", gap: 12 },
+    presetTitle: { fontSize: 18, fontWeight: "700" },
+    field: { gap: 6 },
+    label: { fontSize: 13, fontWeight: "600", color: c.textSecondary },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 6,
+      padding: 10,
+      fontSize: 14,
+      color: c.text,
+      backgroundColor: c.surfaceMuted,
+    },
+    textArea: { minHeight: 80, textAlignVertical: "top" },
+    booleanRow: { flexDirection: "row", gap: 8 },
+    booleanBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: "center",
+      borderRadius: 8,
+      backgroundColor: c.surfaceMuted,
+    },
+    booleanActive: { backgroundColor: c.primary },
+    booleanText: { fontSize: 14, color: c.textSecondary, fontWeight: "600" },
+    booleanTextActive: { color: c.textInverse },
+    selectRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    selectBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 14,
+      backgroundColor: c.surfaceMuted,
+    },
+    selectActive: { backgroundColor: c.primary },
+    selectText: { fontSize: 13, color: c.textSecondary },
+    selectTextActive: { color: c.textInverse, fontWeight: "600" },
+
+    photoPrompt: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      padding: 10,
+      backgroundColor: c.successMuted,
+      borderRadius: 6,
+    },
+    photoPromptText: { fontSize: 12, color: c.textOnTint, flex: 1 },
+
+    footerRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 8 },
+    hint: { color: c.textMuted, fontSize: 12 },
+    errorText: { color: c.danger, fontSize: 12 },
+  });
+
 /**
  * §21.3.1 — the Add-Feature bottom sheet.
  *
@@ -69,6 +187,9 @@ export function AddFeatureSheet({
   submitting,
   testID,
 }: AddFeatureSheetProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const presets = usePresetStore((s) => s.presets);
   const loading = usePresetStore((s) => s.loading);
   const error = usePresetStore((s) => s.error);
@@ -163,7 +284,7 @@ export function AddFeatureSheet({
           {step === "preset" ? "Add Feature" : selectedPreset?.label}
         </Text>
         <Pressable onPress={onClose} testID="add-feature-close" hitSlop={12}>
-          <Ionicons name="close" size={24} color="#666" />
+          <Ionicons name="close" size={24} color={colors.textMuted} />
         </Pressable>
       </View>
 
@@ -174,7 +295,7 @@ export function AddFeatureSheet({
             value={search}
             onChangeText={setSearch}
             placeholder="Search presets…"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textMuted}
             testID="add-feature-search"
           />
 
@@ -202,7 +323,7 @@ export function AddFeatureSheet({
 
           {loading && presets.length === 0 ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="small" color="#22c55e" />
+              <ActivityIndicator size="small" color={colors.primary} />
               <Text style={styles.hint}>Loading presets…</Text>
             </View>
           ) : error && presets.length === 0 ? (
@@ -244,7 +365,7 @@ export function AddFeatureSheet({
             <Ionicons
               name={(selectedPreset?.icon_name as never) ?? "ellipse"}
               size={32}
-              color={selectedPreset?.icon_color ?? "#9ca3af"}
+              color={selectedPreset?.icon_color ?? colors.textMuted}
             />
             <Text style={styles.presetTitle}>{selectedPreset?.label}</Text>
           </View>
@@ -282,7 +403,7 @@ export function AddFeatureSheet({
           </View>
 
           <View style={styles.photoPrompt}>
-            <Ionicons name="camera" size={20} color="#22c55e" />
+            <Ionicons name="camera" size={20} color={colors.primary} />
             <Text style={styles.photoPromptText}>
               Add a photo after saving — it helps others find this feature.
             </Text>
@@ -322,6 +443,9 @@ function Chip({
   onPress: () => void;
   testID?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Pressable
       onPress={onPress}
@@ -342,6 +466,9 @@ function PresetTile({
   onPress: () => void;
   testID?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Pressable style={styles.tile} onPress={onPress} testID={testID}>
       <Ionicons
@@ -365,6 +492,9 @@ function QuestionField({
   value: string | boolean | undefined;
   onChange: (v: string | boolean) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (question.type === "boolean") {
     const v = value === true;
     return (
@@ -413,117 +543,3 @@ function QuestionField({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: "90%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  headerTitle: { fontSize: 16, fontWeight: "700" },
-  body: { flex: 1 },
-  centered: { alignItems: "center", justifyContent: "center", padding: 24, gap: 8 },
-  search: {
-    margin: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#e5e5e5",
-    borderRadius: 8,
-    fontSize: 14,
-  },
-  chipsRow: { flexDirection: "row", gap: 6, paddingHorizontal: 12, paddingBottom: 8 },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: "#f1f1f1",
-  },
-  chipActive: { backgroundColor: "#22c55e" },
-  chipText: { fontSize: 12, color: "#444" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
-  gridContent: { padding: 12, gap: 12, paddingBottom: 32 },
-  section: { gap: 6 },
-  sectionLabel: { fontSize: 12, fontWeight: "700", color: "#666", textTransform: "uppercase" },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tile: {
-    width: 88,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 8,
-    backgroundColor: "#f9fafb",
-  },
-  tileLabel: { fontSize: 11, textAlign: "center", color: "#222" },
-
-  questionsContent: { padding: 16, gap: 12, paddingBottom: 32 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12 },
-  presetTitle: { fontSize: 18, fontWeight: "700" },
-  field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: "600", color: "#444" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 6,
-    padding: 10,
-    fontSize: 14,
-    color: "#222",
-    backgroundColor: "#fafafa",
-  },
-  textArea: { minHeight: 80, textAlignVertical: "top" },
-  booleanRow: { flexDirection: "row", gap: 8 },
-  booleanBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 8,
-    backgroundColor: "#f1f1f1",
-  },
-  booleanActive: { backgroundColor: "#22c55e" },
-  booleanText: { fontSize: 14, color: "#444", fontWeight: "600" },
-  booleanTextActive: { color: "#fff" },
-  selectRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  selectBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: "#f1f1f1",
-  },
-  selectActive: { backgroundColor: "#22c55e" },
-  selectText: { fontSize: 13, color: "#444" },
-  selectTextActive: { color: "#fff", fontWeight: "600" },
-
-  photoPrompt: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 10,
-    backgroundColor: "#f0fdf4",
-    borderRadius: 6,
-  },
-  photoPromptText: { fontSize: 12, color: "#166534", flex: 1 },
-
-  footerRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 8 },
-  hint: { color: "#888", fontSize: 12 },
-  errorText: { color: "#ef4444", fontSize: 12 },
-});

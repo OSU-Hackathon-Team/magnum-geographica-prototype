@@ -1,14 +1,24 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusIndicator } from "../../src/components/offline/StatusIndicator";
+import { useTheme } from "../../src/providers/ThemeProvider";
+import { lightColors, darkColors } from "../../src/theme/colors";
 
 export default function TabsLayout() {
+  const { colors, isDark } = useTheme();
+  const tabBarStyle = {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.divider,
+  };
   return (
     <Tabs
       screenOptions={{
         headerRight: () => <StatusIndicator />,
-        tabBarActiveTintColor: "#22c55e",
-        tabBarInactiveTintColor: "#888",
+        headerStyle: { backgroundColor: colors.bg },
+        headerTintColor: colors.text,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle,
       }}
     >
       <Tabs.Screen

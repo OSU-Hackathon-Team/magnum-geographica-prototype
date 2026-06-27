@@ -1,4 +1,5 @@
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useTheme } from "../../providers/ThemeProvider";
 
 export interface MediaItem {
   id: string;
@@ -21,10 +22,12 @@ export function MediaGallery({
   emptyText = "No photos yet.",
   testID,
 }: MediaGalleryProps) {
+  const { colors } = useTheme();
+
   if (items.length === 0) {
     return (
       <View style={styles.empty} testID={testID}>
-        <Text style={styles.emptyText}>{emptyText}</Text>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>{emptyText}</Text>
       </View>
     );
   }
@@ -46,14 +49,24 @@ export function MediaGallery({
               testID={`media-item-${item.id}`}
             >
               {uri ? (
-                <Image source={{ uri }} style={styles.image} />
+                <Image
+                  source={{ uri }}
+                  style={[styles.image, { backgroundColor: colors.border }]}
+                />
               ) : (
-                <View style={styles.placeholder}>
-                  <Text style={styles.placeholderText}>No image</Text>
+                <View
+                  style={[styles.placeholder, { backgroundColor: colors.surfaceMuted }]}
+                >
+                  <Text style={[styles.placeholderText, { color: colors.textMuted }]}>
+                    No image
+                  </Text>
                 </View>
               )}
               {item.caption ? (
-                <Text style={styles.caption} numberOfLines={1}>
+                <Text
+                  style={[styles.caption, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                >
                   {item.caption}
                 </Text>
               ) : null}
@@ -67,23 +80,21 @@ export function MediaGallery({
 
 const styles = StyleSheet.create({
   empty: { padding: 16 },
-  emptyText: { fontSize: 13, color: "#aaa", fontStyle: "italic" },
+  emptyText: { fontSize: 13, fontStyle: "italic" },
   list: { gap: 10, paddingHorizontal: 16 },
   item: { width: 120, gap: 4 },
   image: {
     width: 120,
     height: 90,
     borderRadius: 6,
-    backgroundColor: "#e8e8e8",
   },
   placeholder: {
     width: 120,
     height: 90,
     borderRadius: 6,
-    backgroundColor: "#f1f1f1",
     alignItems: "center",
     justifyContent: "center",
   },
-  placeholderText: { fontSize: 11, color: "#999" },
-  caption: { fontSize: 11, color: "#666" },
+  placeholderText: { fontSize: 11 },
+  caption: { fontSize: 11 },
 });

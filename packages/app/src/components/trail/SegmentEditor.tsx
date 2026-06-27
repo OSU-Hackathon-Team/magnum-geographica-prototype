@@ -6,6 +6,8 @@ import {
   type TrailSegment,
   type UpdateSegmentInput,
 } from "@magnum/shared";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing, text as textTokens } from "../../theme/tokens";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { SegmentTypeBadge } from "../ui/SegmentTypeBadge";
@@ -40,6 +42,7 @@ export function SegmentEditor({
   deleting,
   testID,
 }: SegmentEditorProps) {
+  const { colors } = useTheme();
   const [name, setName] = useState(segment.name ?? "");
   const [surfaceType, setSurfaceType] = useState<SurfaceType | null>(
     (segment.surface_type as SurfaceType | null) ?? null,
@@ -86,14 +89,19 @@ export function SegmentEditor({
     <View testID={testID ?? `segment-editor-${segment.id}`}>
       <Card>
         <View style={styles.headerRow}>
-          <Text style={styles.label}>Segment {segment.sort_order + 1}</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Segment {segment.sort_order + 1}
+          </Text>
           {surfaceType ? <SegmentTypeBadge surface={surfaceType} /> : null}
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Name</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Name</Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted },
+            ]}
             value={name}
             onChangeText={setName}
             placeholder="Optional"
@@ -103,20 +111,26 @@ export function SegmentEditor({
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Surface</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Surface</Text>
           <View style={styles.surfaceRow}>
             {SURFACE_TYPES.map((s) => (
               <Pressable
                 key={s}
                 onPress={() => setSurfaceType(surfaceType === s ? null : s)}
-                style={[styles.surfaceOption, surfaceType === s && styles.surfaceOptionActive]}
+                style={[
+                  styles.surfaceOption,
+                  surfaceType === s
+                    ? { backgroundColor: "#fff7ed", borderColor: "#ea580c" }
+                    : { backgroundColor: colors.divider, borderColor: "transparent" },
+                ]}
                 testID={`segment-editor-surface-${s}-${segment.id}`}
                 disabled={!canSave}
               >
                 <Text
                   style={[
                     styles.surfaceOptionText,
-                    surfaceType === s && styles.surfaceOptionTextActive,
+                    { color: colors.textSecondary },
+                    surfaceType === s && { color: "#9a3412", fontWeight: "600" },
                   ]}
                 >
                   {s.replace("_", " ")}
@@ -127,7 +141,7 @@ export function SegmentEditor({
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Hazards</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Hazards</Text>
           <View style={styles.hazardRow}>
             {HAZARD_OPTIONS.map((h) => {
               const active = hazards.includes(h);
@@ -135,11 +149,22 @@ export function SegmentEditor({
                 <Pressable
                   key={h}
                   onPress={() => toggleHazard(h)}
-                  style={[styles.hazardChip, active && styles.hazardChipActive]}
+                  style={[
+                    styles.hazardChip,
+                    active
+                      ? { backgroundColor: colors.dangerMuted }
+                      : { backgroundColor: colors.divider },
+                  ]}
                   testID={`segment-editor-hazard-${h}-${segment.id}`}
                   disabled={!canSave}
                 >
-                  <Text style={[styles.hazardChipText, active && styles.hazardChipTextActive]}>
+                  <Text
+                    style={[
+                      styles.hazardChipText,
+                      { color: colors.textSecondary },
+                      active && { color: colors.danger, fontWeight: "600" },
+                    ]}
+                  >
                     {h.replace("_", " ")}
                   </Text>
                 </Pressable>
@@ -149,7 +174,7 @@ export function SegmentEditor({
         </View>
 
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Steep grade</Text>
+          <Text style={[styles.toggleLabel, { color: colors.text }]}>Steep grade</Text>
           <Switch
             value={steepGrade}
             onValueChange={setSteepGrade}
@@ -158,7 +183,7 @@ export function SegmentEditor({
           />
         </View>
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Road connector</Text>
+          <Text style={[styles.toggleLabel, { color: colors.text }]}>Road connector</Text>
           <Switch
             value={isRoadConnector}
             onValueChange={setIsRoadConnector}
@@ -167,7 +192,7 @@ export function SegmentEditor({
           />
         </View>
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>One-way</Text>
+          <Text style={[styles.toggleLabel, { color: colors.text }]}>One-way</Text>
           <Switch
             value={oneWay}
             onValueChange={setOneWay}
@@ -177,9 +202,13 @@ export function SegmentEditor({
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Description</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Description</Text>
           <TextInput
-            style={[styles.input, styles.textarea]}
+            style={[
+              styles.input,
+              styles.textarea,
+              { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted },
+            ]}
             value={description}
             onChangeText={setDescription}
             placeholder="Notes about this section..."
@@ -220,18 +249,32 @@ export function SegmentEditor({
         </View>
 
         {showSplit ? (
-          <View style={styles.splitPanel} testID={`segment-editor-split-panel-${segment.id}`}>
-            <Text style={styles.fieldLabel}>Split position (0.0 – 1.0)</Text>
+          <View
+            style={[styles.splitPanel, { borderTopColor: colors.border }]}
+            testID={`segment-editor-split-panel-${segment.id}`}
+          >
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+              Split position (0.0 – 1.0)
+            </Text>
             <View style={styles.splitPositionRow}>
               {[0.25, 0.5, 0.75].map((v) => (
                 <Pressable
                   key={v}
                   onPress={() => setSplitAt(v)}
-                  style={[styles.splitPreset, splitAt === v && styles.splitPresetActive]}
+                  style={[
+                    styles.splitPreset,
+                    splitAt === v
+                      ? { backgroundColor: "#1d4ed8" }
+                      : { backgroundColor: colors.divider },
+                  ]}
                   testID={`segment-editor-split-preset-${v}-${segment.id}`}
                 >
                   <Text
-                    style={[styles.splitPresetText, splitAt === v && styles.splitPresetTextActive]}
+                    style={[
+                      styles.splitPresetText,
+                      { color: colors.textSecondary },
+                      splitAt === v && { color: colors.textInverse, fontWeight: "600" },
+                    ]}
                   >
                     {v}
                   </Text>
@@ -239,7 +282,10 @@ export function SegmentEditor({
               ))}
             </View>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted },
+              ]}
               value={String(splitAt)}
               onChangeText={(v) => {
                 const n = Number(v);
@@ -249,14 +295,20 @@ export function SegmentEditor({
               testID={`segment-editor-split-value-${segment.id}`}
             />
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted },
+              ]}
               value={nameA}
               onChangeText={setNameA}
               placeholder="Name for first half (optional)"
               testID={`segment-editor-split-name-a-${segment.id}`}
             />
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted },
+              ]}
               value={nameB}
               onChangeText={setNameB}
               placeholder="Name for second half (optional)"
@@ -310,6 +362,7 @@ export function SegmentEditList({
   reordering,
   testID,
 }: SegmentEditListProps) {
+  const { colors } = useTheme();
   const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set());
 
   const toggleMergeSelect = (id: string) => {
@@ -357,8 +410,14 @@ export function SegmentEditList({
         </Button>
       </View>
 
-      <View style={styles.mergeBar} testID="segment-merge-bar">
-        <Text style={styles.mergeHint} testID="segment-merge-count">
+      <View
+        style={[styles.mergeBar, { backgroundColor: colors.warningMuted }]}
+        testID="segment-merge-bar"
+      >
+        <Text
+          style={[styles.mergeHint, { color: colors.warning }]}
+          testID="segment-merge-count"
+        >
           Select two segments to merge ({selectedForMerge.size}/2)
         </Text>
         <Button
@@ -377,29 +436,34 @@ export function SegmentEditList({
           <View style={styles.itemHeader}>
             <Pressable
               onPress={() => toggleMergeSelect(s.id)}
-              style={[styles.mergeToggle, selectedForMerge.has(s.id) && styles.mergeToggleActive]}
+              style={[
+                styles.mergeToggle,
+                selectedForMerge.has(s.id)
+                  ? { backgroundColor: "#1d4ed8" }
+                  : { backgroundColor: colors.divider },
+              ]}
               testID={`segment-merge-toggle-${s.id}`}
             >
-              <Text style={styles.mergeToggleText}>
+              <Text style={[styles.mergeToggleText, { color: colors.textSecondary }]}>
                 {selectedForMerge.has(s.id) ? "✓" : "Merge"}
               </Text>
             </Pressable>
             <View style={styles.reorderRow}>
               <Pressable
                 onPress={() => moveUp(idx)}
-                style={styles.reorderButton}
+                style={[styles.reorderButton, { backgroundColor: colors.divider }]}
                 testID={`segment-reorder-up-${s.id}`}
                 disabled={idx === 0 || reordering}
               >
-                <Text style={styles.reorderText}>↑</Text>
+                <Text style={[styles.reorderText, { color: colors.textSecondary }]}>↑</Text>
               </Pressable>
               <Pressable
                 onPress={() => moveDown(idx)}
-                style={styles.reorderButton}
+                style={[styles.reorderButton, { backgroundColor: colors.divider }]}
                 testID={`segment-reorder-down-${s.id}`}
                 disabled={idx === segments.length - 1 || reordering}
               >
-                <Text style={styles.reorderText}>↓</Text>
+                <Text style={[styles.reorderText, { color: colors.textSecondary }]}>↓</Text>
               </Pressable>
             </View>
           </View>
@@ -412,13 +476,17 @@ export function SegmentEditList({
             deleting={deletingId === s.id}
             testID={`segment-editor-${s.id}`}
           />
-          {pendingId === s.id ? <Text style={styles.pendingHint}>Pending sync…</Text> : null}
-          {splittingId === s.id ? <Text style={styles.pendingHint}>Splitting…</Text> : null}
+          {pendingId === s.id ? (
+            <Text style={[styles.pendingHint, { color: colors.warning }]}>Pending sync…</Text>
+          ) : null}
+          {splittingId === s.id ? (
+            <Text style={[styles.pendingHint, { color: colors.warning }]}>Splitting…</Text>
+          ) : null}
         </View>
       ))}
 
       {segments.length === 0 ? (
-        <Text style={styles.empty} testID="segment-edit-empty">
+        <Text style={[styles.empty, { color: colors.textMuted }]} testID="segment-edit-empty">
           No segments yet. Add a segment to describe this trail.
         </Text>
       ) : null}
@@ -427,19 +495,16 @@ export function SegmentEditList({
 }
 
 const styles = StyleSheet.create({
-  field: { gap: 4, marginBottom: 10 },
-  fieldLabel: { fontSize: 12, fontWeight: "600", color: "#555" },
+  field: { gap: spacing.xs, marginBottom: 10 },
+  fieldLabel: { fontSize: 12, fontWeight: "600" },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 6,
-    padding: 8,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
     fontSize: 13,
-    color: "#222",
-    backgroundColor: "#fafafa",
   },
   textarea: { minHeight: 60, textAlignVertical: "top" },
-  label: { fontSize: 12, fontWeight: "600", color: "#555" },
+  label: { fontSize: 12, fontWeight: "600" },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -449,100 +514,81 @@ const styles = StyleSheet.create({
   surfaceRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   surfaceOption: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: spacing.xs,
     borderRadius: 12,
-    backgroundColor: "#f0f0f0",
     borderWidth: 1,
-    borderColor: "transparent",
   },
-  surfaceOptionActive: {
-    backgroundColor: "#fff7ed",
-    borderColor: "#ea580c",
-  },
-  surfaceOptionText: { fontSize: 11, color: "#666", textTransform: "capitalize" },
-  surfaceOptionTextActive: { color: "#9a3412", fontWeight: "600" },
+  surfaceOptionText: { fontSize: 11, textTransform: "capitalize" },
   hazardRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   hazardChip: {
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: 10,
-    backgroundColor: "#f0f0f0",
   },
-  hazardChipActive: { backgroundColor: "#fee2e2" },
-  hazardChipText: { fontSize: 11, color: "#666", textTransform: "capitalize" },
-  hazardChipTextActive: { color: "#991b1b", fontWeight: "600" },
+  hazardChipText: { fontSize: 11, textTransform: "capitalize" },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 6,
   },
-  toggleLabel: { fontSize: 13, color: "#333" },
-  actionRow: { flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" },
-  splitPanel: { marginTop: 10, gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#eee" },
+  toggleLabel: { fontSize: 13 },
+  actionRow: { flexDirection: "row", gap: spacing.sm, marginTop: 10, flexWrap: "wrap" },
+  splitPanel: { marginTop: 10, gap: spacing.sm, paddingTop: 10, borderTopWidth: 1 },
   splitPositionRow: { flexDirection: "row", gap: 6 },
   splitPreset: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: "#f0f0f0",
+    borderRadius: radii.sm,
   },
-  splitPresetActive: { backgroundColor: "#1d4ed8" },
-  splitPresetText: { fontSize: 12, color: "#666" },
-  splitPresetTextActive: { color: "#fff", fontWeight: "600" },
+  splitPresetText: { fontSize: 12 },
   listHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   listTitle: { fontSize: 18, fontWeight: "600" },
   mergeBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 10,
-    backgroundColor: "#fef9c3",
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 6,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.sm,
+    borderRadius: radii.sm,
   },
-  mergeHint: { fontSize: 12, color: "#854d0e", flexShrink: 1, marginRight: 8 },
-  itemWrapper: { marginHorizontal: 16, marginBottom: 12 },
+  mergeHint: { fontSize: 12, flexShrink: 1, marginRight: spacing.sm },
+  itemWrapper: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
   itemHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   mergeToggle: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: "#f0f0f0",
+    paddingVertical: spacing.xs,
+    borderRadius: radii.xs,
   },
-  mergeToggleActive: { backgroundColor: "#1d4ed8" },
-  mergeToggleText: { fontSize: 11, color: "#666", fontWeight: "600" },
+  mergeToggleText: { fontSize: 11, fontWeight: "600" },
   reorderRow: { flexDirection: "row", gap: 6 },
   reorderButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: "#f0f0f0",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radii.xs,
   },
-  reorderText: { fontSize: 14, color: "#666" },
+  reorderText: { fontSize: 14 },
   empty: {
     textAlign: "center",
-    color: "#888",
     fontStyle: "italic",
-    padding: 16,
+    padding: spacing.lg,
   },
   pendingHint: {
     fontSize: 11,
-    color: "#854d0e",
     textAlign: "right",
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
 });

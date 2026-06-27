@@ -23,6 +23,7 @@ import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useBaseLayerStore } from "../../src/stores/baseLayerStore";
 import { useAuthStore } from "../../src/stores/authStore";
 import { usePresetStore } from "../../src/stores/presetStore";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import {
   loadOfflineMapData,
   getDownloadedRegionIds,
@@ -59,10 +60,13 @@ function parseDeepLink(
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{ lat?: string; lon?: string; zoom?: string }>();
   const mapCenter = useMapStore((s) => s.center);
   const mapZoom = useMapStore((s) => s.zoom);
   const tileVersion = useMapStore((s) => s.tileVersion);
+  const showHeatmap = useMapStore((s) => s.showHeatmap);
+  const toggleHeatmap = useMapStore((s) => s.toggleHeatmap);
   const setViewport = useMapStore((s) => s.setViewport);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const offlineRegions = useOfflineStore((s) => s.offlineRegions);
@@ -429,7 +433,7 @@ export default function ExploreScreen() {
   }, []);
 
   return (
-    <View style={styles.container} testID="explore-screen">
+    <View style={[styles.container, { backgroundColor: colors.bg }]} testID="explore-screen">
       <View style={styles.searchRow}>
         <View style={styles.searchWrap}>
           <SearchBar
@@ -445,7 +449,7 @@ export default function ExploreScreen() {
               testID="explore-search-clear"
               accessibilityLabel="Clear search"
             >
-              <Text style={styles.clearText}>×</Text>
+              <Text style={[styles.clearText, { color: colors.textMuted }]}>×</Text>
             </Pressable>
           ) : null}
           {showResults && query.length >= MIN_QUERY_LENGTH ? (
@@ -476,8 +480,21 @@ export default function ExploreScreen() {
           drawMode={isDrawing}
           onDrawEnd={handleDrawEnd}
           tileVersion={tileVersion}
+          showHeatmap={showHeatmap}
         />
         <BaseLayerSwitcher layers={baseLayerDefs} testID="explore-base-layer-switcher" />
+        <Pressable
+          style={[styles.heatmapToggle, showHeatmap && styles.heatmapToggleActive]}
+          onPress={toggleHeatmap}
+          testID="explore-heatmap-toggle"
+          accessibilityLabel="Toggle trace heatmap"
+        >
+          <Ionicons
+            name={showHeatmap ? "flame" : "flame-outline"}
+            size={18}
+            color={showHeatmap ? "#f97316" : "#6b7280"}
+          />
+        </Pressable>
       </View>
 
       {deepLink ? (
@@ -490,18 +507,18 @@ export default function ExploreScreen() {
 
       {selectedSystemSlug ? (
         <View style={styles.systemPopupOverlay} testID="explore-system-popup">
-          <View style={styles.systemPopup}>
+          <View style={[styles.systemPopup, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
             <View style={styles.systemPopupHeader}>
               <View style={styles.systemPopupTitleRow}>
                 {selectedSystem?.color ? (
                   <View
-                    style={[styles.systemColorDot, { backgroundColor: selectedSystem.color }]}
+                    style={[styles.systemColorDot, { backgroundColor: selectedSystem.color, borderColor: colors.border }]}
                   />
                 ) : null}
                 {systemLoading ? (
-                  <ActivityIndicator size="small" />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text style={styles.systemPopupTitle}>
+                  <Text style={[styles.systemPopupTitle, { color: colors.text }]}>
                     {selectedSystem?.name ?? selectedSystemSlug}
                   </Text>
                 )}
@@ -512,11 +529,11 @@ export default function ExploreScreen() {
                 testID="system-popup-close"
                 accessibilityLabel="Close"
               >
-                <Text style={styles.systemPopupCloseText}>×</Text>
+                <Text style={[styles.systemPopupCloseText, { color: colors.textMuted }]}>×</Text>
               </Pressable>
             </View>
             {selectedSystem?.description ? (
-              <Text style={styles.systemPopupDesc} numberOfLines={4}>
+              <Text style={[styles.systemPopupDesc, { color: colors.textSecondary }]} numberOfLines={4}>
                 {selectedSystem.description}
               </Text>
             ) : null}
@@ -529,7 +546,7 @@ export default function ExploreScreen() {
                 }}
                 testID="system-popup-detail"
               >
-                <Text style={styles.systemPopupLinkText}>View details →</Text>
+                <Text style={[styles.systemPopupLinkText, { color: colors.primary }]}>View details →</Text>
               </Pressable>
             </View>
           </View>
@@ -627,7 +644,7 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   searchRow: { flexDirection: "row", alignItems: "flex-start", paddingRight: 12, zIndex: 10 },
   searchWrap: { flex: 1, position: "relative" },
   clearBtn: {
@@ -639,7 +656,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  clearText: { fontSize: 18, color: "#888", lineHeight: 20 },
+  clearText: { fontSize: 18, lineHeight: 20 },
   mapContainer: { flex: 1 },
   coordsBadge: {
     position: "absolute",
@@ -659,10 +676,8 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   systemPopup: {
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -685,12 +700,10 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.15)",
   },
   systemPopupTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#111",
     flexShrink: 1,
   },
   systemPopupClose: {
@@ -702,12 +715,10 @@ const styles = StyleSheet.create({
   },
   systemPopupCloseText: {
     fontSize: 22,
-    color: "#888",
     lineHeight: 26,
   },
   systemPopupDesc: {
     fontSize: 13,
-    color: "#555",
     lineHeight: 18,
   },
   systemPopupActions: {
@@ -722,7 +733,6 @@ const styles = StyleSheet.create({
   systemPopupLinkText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#22c55e",
   },
   placingBanner: {
     position: "absolute",
@@ -808,4 +818,27 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   downloadAreaFabText: { fontSize: 20, color: "#fff", lineHeight: 24 },
+  heatmapToggle: {
+    position: "absolute",
+    top: 56,
+    right: 12,
+    zIndex: 50,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
+  heatmapToggleActive: {
+    backgroundColor: "rgba(255,237,213,0.95)",
+    borderColor: "rgba(249,115,22,0.3)",
+  },
 });

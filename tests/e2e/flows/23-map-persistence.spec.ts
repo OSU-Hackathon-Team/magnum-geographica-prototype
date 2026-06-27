@@ -17,6 +17,7 @@ test("map canvas is NOT recreated when returning to explore via 'View on map'", 
   await page.getByRole("tab", { name: "Systems" }).click();
   await page.getByTestId("system-card-cuyahoga-valley-national-park").click();
   await expect(page).toHaveURL(/\/system\/cuyahoga-valley-national-park$/);
+  await page.getByTestId("system-tab-trails").click();
   await page.getByTestId("system-trail-card-towpath-trail").click();
   await expect(page).toHaveURL(/\/trail\/towpath-trail$/);
 

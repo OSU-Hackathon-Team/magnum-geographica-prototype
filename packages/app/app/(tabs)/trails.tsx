@@ -6,13 +6,16 @@ import { SearchBar } from "../../src/components/ui/SearchBar";
 import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import type { Trail } from "@magnum/shared";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { getAllDownloadedTrails } from "../../src/services/offlineDataService";
+import { spacing, text as textTokens } from "../../src/theme/tokens";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export default function TrailsScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [items, setItems] = useState<Trail[]>([]);
   const [q, setQ] = useState("");
   const isOnline = useOfflineStore((s) => s.isOnline);
@@ -49,7 +52,7 @@ export default function TrailsScreen() {
   }, [q, isOnline]);
 
   return (
-    <View style={styles.container} testID="trails-screen">
+    <View style={[styles.container, { backgroundColor: colors.bg }]} testID="trails-screen">
       <SearchBar
         value={q}
         onChangeText={setQ}
@@ -62,7 +65,10 @@ export default function TrailsScreen() {
         contentContainerStyle={styles.list}
         testID="trails-list"
         ListEmptyComponent={
-          <Text style={styles.empty} testID="trails-empty">
+          <Text
+            style={[textTokens.body, { color: colors.textMuted, textAlign: "center", marginTop: spacing.xxl }]}
+            testID="trails-empty"
+          >
             No trails yet.
           </Text>
         }
@@ -73,12 +79,22 @@ export default function TrailsScreen() {
           >
             <Card>
               <View style={styles.row}>
-                <Text style={styles.name}>{item.name}</Text>
+                <Text style={[textTokens.bodyStrong, { color: colors.text, flex: 1 }]}>
+                  {item.name}
+                </Text>
                 {item.difficulty ? <DifficultyBadge difficulty={item.difficulty} /> : null}
               </View>
-              {item.description ? <Text style={styles.desc}>{item.description}</Text> : null}
+              {item.description ? (
+                <Text
+                  style={[textTokens.meta, { color: colors.textSecondary, marginTop: spacing.xxs }]}
+                >
+                  {item.description}
+                </Text>
+              ) : null}
               {item.length_meters ? (
-                <Text style={styles.meta}>
+                <Text
+                  style={[textTokens.meta, { color: colors.textMuted, marginTop: spacing.xxs }]}
+                >
                   {(item.length_meters / 1000).toFixed(1)} km
                   {item.elevation_gain_meters
                     ? ` · ${item.elevation_gain_meters.toFixed(0)} m gain`
@@ -94,11 +110,7 @@ export default function TrailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  list: { padding: 16, gap: 12 },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  empty: { textAlign: "center", color: "#888", marginTop: 24 },
-  name: { fontSize: 16, fontWeight: "600" },
-  desc: { fontSize: 13, color: "#555", marginTop: 4 },
-  meta: { fontSize: 12, color: "#888", marginTop: 4 },
+  container: { flex: 1 },
+  list: { padding: spacing.lg, gap: spacing.md },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
 });

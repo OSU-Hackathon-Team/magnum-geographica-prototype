@@ -1,6 +1,8 @@
 import { StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ClientOnly } from "./ClientOnly";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing, text as textTokens } from "../../theme/tokens";
 
 export interface SearchBarProps extends Omit<TextInputProps, "style"> {
   onChangeText?: (text: string) => void;
@@ -8,16 +10,22 @@ export interface SearchBarProps extends Omit<TextInputProps, "style"> {
 }
 
 export function SearchBar({ testID, ...props }: SearchBarProps) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.surfaceMuted },
+      ]}
+    >
       <ClientOnly fallback={<View style={styles.icon} />}>
-        <Ionicons name="search" size={18} color="#888" style={styles.icon} />
+        <Ionicons name="search" size={18} color={colors.textMuted} style={styles.icon} />
       </ClientOnly>
       <TextInput
         {...props}
         testID={testID}
-        style={styles.input}
-        placeholderTextColor="#999"
+        style={[styles.input, { color: colors.text }]}
+        placeholderTextColor={colors.textMuted}
         autoCorrect={false}
         autoCapitalize="none"
       />
@@ -29,12 +37,11 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f1f1f1",
-    margin: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    margin: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.lg,
     height: 40,
   },
-  icon: { marginRight: 8 },
-  input: { flex: 1, fontSize: 14, color: "#111" },
+  icon: { marginRight: spacing.sm },
+  input: { flex: 1, ...textTokens.body },
 });

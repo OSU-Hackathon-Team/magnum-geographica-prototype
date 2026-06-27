@@ -1,10 +1,12 @@
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from "react-native";
 import type { ReactNode } from "react";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing, text as textTokens } from "../../theme/tokens";
 
 export interface ButtonProps {
   title?: string;
   onPress?: () => void;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "small" | "medium";
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -16,6 +18,13 @@ function nodeIsString(node: ReactNode): node is string {
   return typeof node === "string";
 }
 
+/**
+ * Button — the app's primary control. Variants map to visual roles:
+ * - primary  : brand green; the page's main call to action
+ * - secondary: light grey surface; the secondary action
+ * - ghost    : transparent; tertiary actions (Edit, Move to, etc.)
+ * - danger   : red; destructive actions (Delete, Remove)
+ */
 export function Button({
   title,
   onPress,
@@ -26,10 +35,11 @@ export function Button({
   testID,
   children,
 }: ButtonProps) {
+  const { colors } = useTheme();
+  const isDisabled = disabled || !onPress;
   const textStyle = [
-    styles.text,
-    styles[`${variant}Text` as keyof typeof styles],
-    styles[`${size}Text` as keyof typeof styles],
+    size === "small" ? textTokens.buttonSmall : textTokens.button,
+    { color: textColor(variant, colors) },
   ];
 
   let content: ReactNode;
@@ -41,9 +51,6 @@ export function Button({
     Array.isArray(children) &&
     children.some((c) => nodeIsString(c))
   ) {
-    // Mixed children (e.g. icon + text) — wrap in a row and ensure
-    // every string child gets its own <Text> wrapper so React Native
-    // never sees a raw string outside of <Text>.
     content = (
       <>
         {children.map((child, i) =>
@@ -64,13 +71,16 @@ export function Button({
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled || !onPress}
+      disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        styles[size],
-        styles[variant],
-        pressed && !disabled ? styles.pressed : null,
-        disabled ? styles.disabled : null,
+        size === "small" ? styles.small : styles.medium,
+        variant === "primary" && { backgroundColor: colors.primary },
+        variant === "secondary" && { backgroundColor: colors.surfaceMutedStrong },
+        variant === "ghost" && { backgroundColor: "transparent" },
+        variant === "danger" && { backgroundColor: colors.danger },
+        pressed && !isDisabled ? styles.pressed : null,
+        isDisabled ? styles.disabled : null,
         style,
       ]}
       testID={testID}
@@ -80,25 +90,33 @@ export function Button({
   );
 }
 
+function textColor(
+  variant: NonNullable<ButtonProps["variant"]>,
+  colors: ReturnType<typeof useTheme>["colors"],
+): string {
+  switch (variant) {
+    case "primary":
+      return colors.textInverse;
+    case "danger":
+      return colors.textInverse;
+    case "secondary":
+      return colors.text;
+    case "ghost":
+    default:
+      return colors.primary;
+  }
+}
+
 const styles = StyleSheet.create({
   base: {
-    borderRadius: 8,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 4,
+    gap: spacing.xs,
   },
-  small: { paddingVertical: 6, paddingHorizontal: 12 },
-  medium: { paddingVertical: 10, paddingHorizontal: 16 },
-  primary: { backgroundColor: "#22c55e" },
-  secondary: { backgroundColor: "#e5e5e5" },
-  ghost: { backgroundColor: "transparent" },
-  pressed: { opacity: 0.75 },
+  small: { paddingVertical: spacing.xs + 2, paddingHorizontal: spacing.md },
+  medium: { paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.lg },
+  pressed: { opacity: 0.78 },
   disabled: { opacity: 0.4 },
-  text: { fontSize: 14, fontWeight: "600" },
-  smallText: { fontSize: 12 },
-  mediumText: { fontSize: 14 },
-  primaryText: { color: "#fff" },
-  secondaryText: { color: "#111" },
-  ghostText: { color: "#22c55e" },
 });

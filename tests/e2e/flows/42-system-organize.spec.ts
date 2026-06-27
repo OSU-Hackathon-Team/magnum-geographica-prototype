@@ -20,18 +20,19 @@ async function loginAsAdmin(page: Page) {
   await expect(page).toHaveURL(/\/explore$/);
 }
 
-test.describe("System — Organize traces page (§21.6 phase 2)", () => {
-  test("system detail page has the Organize traces button", async ({ page }) => {
+test.describe("System — Organize traces page ($21.6 phase 2)", () => {
+  test("system detail page has the Organize traces action in the overflow menu", async ({
+    page,
+  }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await page.getByTestId("system-overflow").click();
     await expect(page.getByTestId("system-organize")).toBeVisible();
   });
 
   test("clicking Organize traces navigates to the organize page", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    // The buttons sit below the map preview; scroll the button into view
-    // before clicking so the map canvas doesn't absorb the click.
+    await page.getByTestId("system-overflow").click();
     const button = page.getByTestId("system-organize");
-    await button.scrollIntoViewIfNeeded();
     await button.click();
     await expect(page).toHaveURL(/\/system\/hocking-hills-state-park\/organize/);
   });
@@ -48,14 +49,12 @@ test.describe("System — Organize traces page (§21.6 phase 2)", () => {
   test("organize page foot shows the moderator role for an admin", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
-    // The foot text identifies the current role. Admins are moderators.
     await expect(page.getByTestId("organize-foot")).toContainText("moderator");
   });
 
   test("proposals list shows seeded rows when the system is loaded", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
-    // Wait for the proposals to load. The list is keyed on proposal.id.
     await expect(page.getByTestId("proposal-prop-1")).toBeVisible();
   });
 
@@ -78,7 +77,6 @@ test.describe("System — Organize traces page (§21.6 phase 2)", () => {
     await expect(page.getByTestId("proposal-prop-2")).toBeVisible();
     await page.getByTestId("proposal-prop-1").click();
     await page.getByTestId("proposal-sheet-reject").click();
-    // Modal closes; prop-1 disappears.
     await expect(page.getByTestId("proposal-sheet")).not.toBeVisible();
     await expect(page.getByTestId("proposal-prop-1")).not.toBeVisible();
     await expect(page.getByTestId("proposal-prop-2")).toBeVisible();
@@ -98,10 +96,6 @@ test.describe("System — Organize traces page (§21.6 phase 2)", () => {
   test("moderator role is surfaced in the foot for admin users", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/system/hocking-hills-state-park/organize`);
-    // The foot is a stable indicator of role. The header's
-    // "Run synthesis" button is rendered by expo-router's header
-    // mechanism and doesn't show up on web builds, so we test the
-    // foot text instead.
     await expect(page.getByTestId("organize-foot")).toContainText("moderator");
   });
 });

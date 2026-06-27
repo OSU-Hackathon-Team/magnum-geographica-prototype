@@ -16,6 +16,7 @@ test("user opens a system and sees its name, description, and external link", as
 
 test("user sees the trails listed under the system", async ({ page }) => {
   await page.goto("/system/hocking-hills-state-park");
+  await page.getByTestId("system-tab-trails").click();
 
   await expect(page.getByTestId("system-trail-card-buckeye-trail")).toBeVisible();
   await expect(page.getByTestId("system-trail-card-hocking-hills-indian-run")).toBeVisible();
@@ -23,11 +24,13 @@ test("user sees the trails listed under the system", async ({ page }) => {
 
 test("user sees an empty state for systems with no trails", async ({ page }) => {
   await page.goto("/system/wayne-national-forest");
+  await page.getByTestId("system-tab-trails").click();
   await expect(page.getByTestId("system-trails-empty")).toBeVisible();
 });
 
 test("user can navigate from a system to a trail", async ({ page }) => {
   await page.goto("/system/cuyahoga-valley-national-park");
+  await page.getByTestId("system-tab-trails").click();
   await page.getByTestId("system-trail-card-towpath-trail").click();
   await expect(page).toHaveURL(/\/trail\/towpath-trail$/);
   await expect(page.getByTestId("trail-detail-screen")).toBeVisible();

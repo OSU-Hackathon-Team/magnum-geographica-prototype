@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { WikiPage } from "@magnum/shared";
 import { Button } from "../ui/Button";
@@ -7,11 +14,17 @@ import { WikiPageView } from "./WikiPageView";
 import { RevisionHistory } from "./RevisionHistory";
 import { CitationForm } from "./CitationForm";
 import type { Revision, Citation } from "@magnum/shared";
+import { useTheme } from "../../providers/ThemeProvider";
+import { spacing, text as textTokens } from "../../theme/tokens";
 
 export interface WikiPageEditorProps {
   wikiPage?: WikiPage | null;
   isLoading?: boolean;
-  onSave: (data: { title: string; content_md: string; edit_summary: string }) => void;
+  onSave: (data: {
+    title: string;
+    content_md: string;
+    edit_summary: string;
+  }) => void;
   canSave?: boolean;
   revisions?: Revision[];
   onRevert?: (revisionId: string) => void;
@@ -33,6 +46,7 @@ export function WikiPageEditor({
   onDeleteCitation,
   defaultTitle,
 }: WikiPageEditorProps) {
+  const { colors } = useTheme();
   const [title, setTitle] = useState(wikiPage?.title ?? defaultTitle ?? "");
   const [content, setContent] = useState(wikiPage?.content_md ?? "");
   const [editSummary, setEditSummary] = useState("");
@@ -48,7 +62,7 @@ export function WikiPageEditor({
 
   if (isLoading) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { backgroundColor: colors.bg }]}>
         <ActivityIndicator />
       </View>
     );
@@ -61,13 +75,25 @@ export function WikiPageEditor({
   } as WikiPage;
 
   return (
-    <ScrollView style={styles.container} testID="wiki-editor">
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      testID="wiki-editor"
+    >
       {tab === "edit" ? (
         <>
           <View style={styles.section}>
-            <Text style={styles.label}>Title</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Title
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  borderColor: colors.border,
+                  color: colors.text,
+                  backgroundColor: colors.surfaceMuted,
+                },
+              ]}
               value={title}
               onChangeText={setTitle}
               placeholder="Wiki page title"
@@ -77,7 +103,9 @@ export function WikiPageEditor({
 
           <View style={styles.section}>
             <View style={styles.toolbarRow}>
-              <Text style={styles.label}>Content (Markdown)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                Content (Markdown)
+              </Text>
               <Button
                 variant="ghost"
                 size="small"
@@ -87,18 +115,37 @@ export function WikiPageEditor({
                 <Ionicons
                   name={showPreview ? "create-outline" : "eye-outline"}
                   size={14}
-                  color="#666"
+                  color={colors.textMuted}
                 />
-                <Text style={styles.btnLabel}>{showPreview ? "Edit" : "Preview"}</Text>
+                <Text style={[styles.btnLabel, { color: colors.textMuted }]}>
+                  {showPreview ? "Edit" : "Preview"}
+                </Text>
               </Button>
             </View>
             {showPreview ? (
-              <View style={styles.previewBox} testID="wiki-editor-preview">
+              <View
+                style={[
+                  styles.previewBox,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: colors.surfaceMuted,
+                  },
+                ]}
+                testID="wiki-editor-preview"
+              >
                 <WikiPageView wikiPage={previewPage} />
               </View>
             ) : (
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[
+                  styles.input,
+                  styles.textArea,
+                  {
+                    borderColor: colors.border,
+                    color: colors.text,
+                    backgroundColor: colors.surfaceMuted,
+                  },
+                ]}
                 value={content}
                 onChangeText={setContent}
                 placeholder="Write wiki content in Markdown..."
@@ -110,9 +157,18 @@ export function WikiPageEditor({
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Edit Summary (optional)</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Edit Summary (optional)
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  borderColor: colors.border,
+                  color: colors.text,
+                  backgroundColor: colors.surfaceMuted,
+                },
+              ]}
               value={editSummary}
               onChangeText={setEditSummary}
               placeholder="Describe your changes"
@@ -123,7 +179,13 @@ export function WikiPageEditor({
           <View style={styles.section}>
             <Button
               variant="primary"
-              onPress={() => onSave({ title, content_md: content, edit_summary: editSummary })}
+              onPress={() =>
+                onSave({
+                  title,
+                  content_md: content,
+                  edit_summary: editSummary,
+                })
+              }
               disabled={!canSave || !title.trim()}
               testID="wiki-editor-save"
               title={wikiPage ? "Save Changes" : "Create Page"}
@@ -134,11 +196,13 @@ export function WikiPageEditor({
 
       <View style={styles.section}>
         <View style={styles.tabBar}>
-          {[
-            { key: "edit" as const, label: "Edit", icon: "create-outline" as const },
-            { key: "revisions" as const, label: "History", icon: "time-outline" as const },
-            { key: "citations" as const, label: "Citations", icon: "link-outline" as const },
-          ].map((t) => (
+          {(
+            [
+              { key: "edit" as const, label: "Edit", icon: "create-outline" as const },
+              { key: "revisions" as const, label: "History", icon: "time-outline" as const },
+              { key: "citations" as const, label: "Citations", icon: "link-outline" as const },
+            ] as const
+          ).map((t) => (
             <Button
               key={t.key}
               variant={tab === t.key ? "primary" : "ghost"}
@@ -146,8 +210,19 @@ export function WikiPageEditor({
               onPress={() => setTab(t.key)}
               testID={`wiki-tab-${t.key}`}
             >
-              <Ionicons name={t.icon} size={14} color={tab === t.key ? "#fff" : "#666"} />
-              <Text style={[styles.btnLabel, tab === t.key ? styles.btnLabelActive : null]}>
+              <Ionicons
+                name={t.icon}
+                size={14}
+                color={tab === t.key ? colors.textInverse : colors.textMuted}
+              />
+              <Text
+                style={[
+                  styles.btnLabel,
+                  {
+                    color: tab === t.key ? colors.textInverse : colors.textMuted,
+                  },
+                ]}
+              >
                 {t.label}
               </Text>
             </Button>
@@ -175,29 +250,32 @@ export function WikiPageEditor({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
-  section: { padding: 16, gap: 8 },
-  label: { fontSize: 13, fontWeight: "600", color: "#444" },
+  container: { flex: 1 },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.huge,
+  },
+  section: { padding: spacing.lg, gap: spacing.sm },
+  label: { fontSize: 13, fontWeight: "600" },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 6,
     padding: 10,
     fontSize: 14,
-    color: "#222",
-    backgroundColor: "#fafafa",
   },
   textArea: { minHeight: 180 },
-  toolbarRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  toolbarRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   previewBox: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
     borderRadius: 6,
-    backgroundColor: "#fafafa",
     minHeight: 180,
   },
-  tabBar: { flexDirection: "row", gap: 8 },
-  btnLabel: { fontSize: 12, fontWeight: "600", color: "#666" },
-  btnLabelActive: { color: "#fff" },
+  tabBar: { flexDirection: "row", gap: spacing.sm },
+  btnLabel: { ...textTokens.small },
 });

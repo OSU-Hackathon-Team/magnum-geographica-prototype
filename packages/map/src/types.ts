@@ -71,6 +71,12 @@ export interface MapContainerProps {
    */
   fitGeometry?: unknown | null;
   /**
+   * When true, the traces heatmap overlay is visible on the map.
+   * The heatmap shows GPS trace density as a color-coded overlay
+   * sourced from the Martin traces_heatmap tile endpoint.
+   */
+  showHeatmap?: boolean;
+  /**
    * Incremented after server-side mutations to invalidate the
    * client-side vector tile cache. The map appends `?_v=$tileVersion`
    * to tile URLs, forcing re-fetches. Default 0.

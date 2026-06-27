@@ -3,6 +3,8 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Revision } from "@magnum/shared";
 import { Button } from "../ui/Button";
+import { useTheme } from "../../providers/ThemeProvider";
+import { spacing } from "../../theme/tokens";
 
 function formatDate(iso: string): string {
   try {
@@ -30,6 +32,7 @@ export interface RevisionHistoryProps {
 }
 
 export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
+  const { colors } = useTheme();
   const [pendingRevertId, setPendingRevertId] = useState<string | null>(null);
 
   const pending = pendingRevertId
@@ -44,7 +47,7 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
 
   if (revisions.length === 0) {
     return (
-      <Text style={styles.empty} testID="revisions-empty">
+      <Text style={[styles.empty, { color: colors.textMuted }]} testID="revisions-empty">
         No revisions yet.
       </Text>
     );
@@ -56,16 +59,20 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
       {revisions.map((rev, idx) => (
         <View
           key={rev.id}
-          style={[styles.revRow, idx === revisions.length - 1 ? styles.lastRow : null]}
+          style={[
+            styles.revRow,
+            { borderBottomColor: colors.divider },
+            idx === revisions.length - 1 ? styles.lastRow : null,
+          ]}
           testID={`revision-${rev.id}`}
         >
           <View style={styles.revInfo}>
             <Text style={styles.revContributor}>{rev.contributor_name}</Text>
-            <Text style={styles.revMeta}>
+            <Text style={[styles.revMeta, { color: colors.textMuted }]}>
               {formatDate(rev.created_at)} at {formatTime(rev.created_at)}
             </Text>
             {rev.edit_summary ? (
-              <Text style={styles.revSummary} testID={`revision-summary-${rev.id}`}>
+              <Text style={[styles.revSummary, { color: colors.textSecondary }]} testID={`revision-summary-${rev.id}`}>
                 {rev.edit_summary}
               </Text>
             ) : null}
@@ -76,7 +83,7 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
               style={styles.revertBtn}
               testID={`revision-revert-${rev.id}`}
             >
-              <Ionicons name="refresh-outline" size={14} color="#888" />
+              <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />
             </Pressable>
           ) : null}
         </View>
@@ -90,10 +97,10 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
         testID="revert-confirm-modal"
       >
         <View style={styles.backdrop}>
-          <View style={styles.dialog} testID="revert-confirm-dialog">
-            <Text style={styles.title}>Revert to this revision?</Text>
+          <View style={[styles.dialog, { backgroundColor: colors.surface }]} testID="revert-confirm-dialog">
+            <Text style={[styles.title, { color: colors.text }]}>Revert to this revision?</Text>
             {pending ? (
-              <Text style={styles.body}>
+              <Text style={[styles.body, { color: colors.textSecondary }]}>
                 By {pending.contributor_name} on {formatDate(pending.created_at)} at{" "}
                 {formatTime(pending.created_at)}.{"\n\n"}This will create a new revision with the
                 old content. The current content is not lost.
@@ -123,22 +130,21 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 8 },
+  container: { gap: spacing.sm },
   heading: { fontSize: 16, fontWeight: "600" },
-  empty: { fontSize: 13, color: "#aaa", fontStyle: "italic" },
+  empty: { fontSize: 13, fontStyle: "italic" },
   revRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
   lastRow: { borderBottomWidth: 0 },
-  revInfo: { flex: 1, gap: 2 },
+  revInfo: { flex: 1, gap: spacing.xxs },
   revContributor: { fontSize: 13, fontWeight: "600" },
-  revMeta: { fontSize: 11, color: "#888" },
-  revSummary: { fontSize: 12, color: "#555", marginTop: 2 },
+  revMeta: { fontSize: 11 },
+  revSummary: { fontSize: 12, marginTop: 2 },
   revertBtn: { padding: 6 },
   backdrop: {
     flex: 1,
@@ -148,14 +154,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   dialog: {
-    backgroundColor: "#fff",
     borderRadius: 10,
-    padding: 20,
-    gap: 12,
+    padding: spacing.xl,
+    gap: spacing.md,
     width: "100%",
     maxWidth: 400,
   },
-  title: { fontSize: 16, fontWeight: "700", color: "#222" },
-  body: { fontSize: 13, color: "#555", lineHeight: 19 },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 4 },
+  title: { fontSize: 16, fontWeight: "700" },
+  body: { fontSize: 13, lineHeight: 19 },
+  actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm, marginTop: spacing.xs },
 });

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Image, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "../ui/Button";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing } from "../../theme/tokens";
 
 export interface MediaUploaderProps {
   onSelect: (base64: string, mimeType: string) => void;
@@ -10,6 +12,7 @@ export interface MediaUploaderProps {
 }
 
 export function MediaUploader({ onSelect, uploading, testID }: MediaUploaderProps) {
+  const { colors } = useTheme();
   const [base64Input, setBase64Input] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +42,19 @@ export function MediaUploader({ onSelect, uploading, testID }: MediaUploaderProp
 
   return (
     <View style={styles.container} testID={testID}>
-      <Text style={styles.label}>Attach Photo</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>
+        Attach Photo
+      </Text>
       <View style={styles.inputRow}>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.surfaceMuted,
+            },
+          ]}
           value={base64Input}
           onChangeText={setBase64Input}
           placeholder="Paste base64 data URL..."
@@ -57,15 +69,18 @@ export function MediaUploader({ onSelect, uploading, testID }: MediaUploaderProp
           disabled={uploading || !base64Input.trim()}
           testID="media-uploader-attach"
         >
-          <Ionicons name="attach-outline" size={14} color="#fff" />
+          <Ionicons name="attach-outline" size={14} color={colors.textInverse} />
         </Button>
       </View>
 
       {preview ? (
         <View style={styles.previewRow}>
-          <Image source={{ uri: preview }} style={styles.thumbnail} />
-          <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-          <Text style={styles.attached}>Attached</Text>
+          <Image
+            source={{ uri: preview }}
+            style={[styles.thumbnail, { backgroundColor: colors.border }]}
+          />
+          <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+          <Text style={[styles.attached, { color: colors.primary }]}>Attached</Text>
           <Button
             variant="ghost"
             size="small"
@@ -74,37 +89,36 @@ export function MediaUploader({ onSelect, uploading, testID }: MediaUploaderProp
               setBase64Input("");
             }}
           >
-            <Ionicons name="close-outline" size={14} color="#888" />
+            <Ionicons name="close-outline" size={14} color={colors.textMuted} />
           </Button>
         </View>
       ) : null}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 8 },
-  label: { fontSize: 13, fontWeight: "600", color: "#444" },
-  inputRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
+  container: { gap: spacing.sm },
+  label: { fontSize: 13, fontWeight: "600" },
+  inputRow: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 6,
-    padding: 8,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
     fontSize: 12,
-    color: "#222",
-    backgroundColor: "#fafafa",
     minHeight: 60,
   },
   previewRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
-  thumbnail: { width: 48, height: 48, borderRadius: 6, backgroundColor: "#e8e8e8" },
-  attached: { fontSize: 12, color: "#22c55e" },
-  error: { color: "#ef4444", fontSize: 12 },
+  thumbnail: { width: 48, height: 48, borderRadius: radii.sm },
+  attached: { fontSize: 12 },
+  error: { fontSize: 12 },
 });

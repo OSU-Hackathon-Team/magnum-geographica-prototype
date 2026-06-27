@@ -2,6 +2,8 @@ import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Button } from "../ui/Button";
+import { useTheme } from "../../providers/ThemeProvider";
+import { spacing, text as textTokens } from "../../theme/tokens";
 
 export interface PendingItem {
   id: number;
@@ -22,21 +24,19 @@ export interface PendingQueueProps {
 }
 
 function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  } catch {
-    return iso;
-  }
+  try { return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+  catch { return iso; }
 }
 
 export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQueueProps) {
   const router = useRouter();
+  const { colors } = useTheme();
 
   if (items.length === 0) {
     return (
       <View style={styles.container} testID="pending-queue-empty">
-        <Text style={styles.heading}>Pending Changes</Text>
-        <Text style={styles.empty}>No unsynced changes.</Text>
+        <Text style={[textTokens.h3, { color: colors.textMuted }]}>Pending Changes</Text>
+        <Text style={[textTokens.meta, { color: colors.textMuted, fontStyle: "italic", marginTop: spacing.xs }]}>No unsynced changes.</Text>
       </View>
     );
   }
@@ -44,60 +44,30 @@ export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQue
   return (
     <View style={styles.container} testID="pending-queue">
       <View style={styles.headerRow}>
-        <Text style={styles.heading}>Pending Changes ({items.length})</Text>
-        <Button
-          variant="primary"
-          size="small"
-          onPress={onSyncAll}
-          disabled={syncing}
-          testID="pending-sync-all"
-        >
+        <Text style={[textTokens.h3, { color: colors.textMuted }]}>Pending Changes ({items.length})</Text>
+        <Button variant="primary" size="small" onPress={onSyncAll} disabled={syncing} testID="pending-sync-all">
           {syncing ? "Syncing..." : "Sync All"}
         </Button>
       </View>
-
       {items.map((item) => (
-        <View key={item.id} style={styles.itemRow} testID={`pending-item-${item.id}`}>
+        <View key={item.id} style={[styles.itemRow, { borderBottomColor: colors.divider }]} testID={`pending-item-${item.id}`}>
           <View style={styles.itemInfo}>
             <View style={styles.badgeRow}>
-              <View
-                style={[
-                  styles.actionBadge,
-                  item.action === "create"
-                    ? styles.createBadge
-                    : item.action === "update"
-                      ? styles.updateBadge
-                      : styles.deleteBadge,
-                ]}
-              >
-                <Text style={styles.actionText}>{item.action}</Text>
+              <View style={[styles.actionBadge, { backgroundColor: item.action === "create" ? colors.successMuted : item.action === "update" ? colors.surfaceMutedStrong : colors.dangerMuted }]}>
+                <Text style={[styles.actionText, { color: item.action === "create" ? colors.success : item.action === "update" ? colors.textSecondary : colors.danger }]}>{item.action}</Text>
               </View>
-              <Text style={styles.entityType}>{item.entity_type}</Text>
+              <Text style={[textTokens.meta, { color: colors.textMuted }]}>{item.entity_type}</Text>
             </View>
-            <Text style={styles.meta}>
-              {item.contributor_name} · {formatDate(item.created_at)}
-            </Text>
+            <Text style={[textTokens.meta, { color: colors.textMuted }]}>{item.contributor_name} · {formatDate(item.created_at)}</Text>
             {item.sync_status === "conflict" ? (
               <View style={styles.conflictRow}>
-                <Text style={styles.conflict}>Conflict — needs resolution</Text>
-                <Button
-                  variant="primary"
-                  size="small"
-                  onPress={() => router.push(`/conflict/${item.id}` as never)}
-                  testID={`pending-resolve-${item.id}`}
-                >
-                  Resolve
-                </Button>
+                <Text style={[textTokens.meta, { color: colors.danger, flex: 1 }]}>Conflict</Text>
+                <Button variant="primary" size="small" onPress={() => router.push(`/conflict/${item.id}` as never)} testID={`pending-resolve-${item.id}`}>Resolve</Button>
               </View>
             ) : null}
           </View>
-          <Button
-            variant="ghost"
-            size="small"
-            onPress={() => onDelete(item.id)}
-            testID={`pending-delete-${item.id}`}
-          >
-            <Ionicons name="close-outline" size={14} color="#888" />
+          <Button variant="ghost" size="small" onPress={() => onDelete(item.id)} testID={`pending-delete-${item.id}`}>
+            <Ionicons name="close-outline" size={14} color={colors.textMuted} />
           </Button>
         </View>
       ))}
@@ -106,36 +76,12 @@ export function PendingQueue({ items, onDelete, onSyncAll, syncing }: PendingQue
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 10 },
-  heading: { fontSize: 16, fontWeight: "600" },
+  container: { gap: spacing.sm },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  empty: { fontSize: 13, color: "#aaa", fontStyle: "italic" },
-  itemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  itemInfo: { flex: 1, gap: 4 },
-  badgeRow: { flexDirection: "row", gap: 6, alignItems: "center" },
-  actionBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  createBadge: { backgroundColor: "#dcfce7" },
-  updateBadge: { backgroundColor: "#dbeafe" },
-  deleteBadge: { backgroundColor: "#fee2e2" },
+  itemRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: spacing.sm, borderBottomWidth: 1 },
+  itemInfo: { flex: 1, gap: spacing.xxs },
+  badgeRow: { flexDirection: "row", gap: spacing.xs, alignItems: "center" },
+  actionBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 },
   actionText: { fontSize: 10, fontWeight: "600", textTransform: "uppercase" },
-  entityType: { fontSize: 12, color: "#666" },
-  meta: { fontSize: 11, color: "#999" },
-  conflict: { fontSize: 11, color: "#ef4444" },
-  conflictRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 4,
-  },
+  conflictRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xxs },
 });

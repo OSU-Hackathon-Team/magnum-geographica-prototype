@@ -257,6 +257,31 @@ function buildMapHtml(
           tileLayers.features.set('name','features');
           allLayers.push(tileLayers.features);
           tileLayers.features.on('click',function(e){var f=e.feature;if(f)postToRN({type:'featureSelect',id:f.get('id'),layer:'features',slug:f.get('slug'),name:f.get('name')})});
+
+          // Traces heatmap — color-coded density overlay, hidden by default.
+          var hmSrc = new ol.source.VectorTile({format:new ol.format.MVT(),url:martinUrl+'/traces_heatmap/{z}/{x}/{y}'});
+          vectorSources.tracesHeatmap = hmSrc;
+          tileLayers.tracesHeatmap = new ol.layer.VectorTile({
+            source: hmSrc,
+            minZoom: 5,
+            maxZoom: 14,
+            style: function(f){
+              var density = Number(f.get('density'))||0;
+              if (density <= 0) return new ol.style.Style({});
+              var color;
+              if (density <= 1) color = 'rgba(34,197,94,0.12)';
+              else if (density <= 2) color = 'rgba(34,197,94,0.22)';
+              else if (density <= 5) color = 'rgba(132,204,22,0.32)';
+              else if (density <= 10) color = 'rgba(250,204,21,0.42)';
+              else if (density <= 20) color = 'rgba(249,115,22,0.52)';
+              else if (density <= 50) color = 'rgba(239,68,68,0.58)';
+              else color = 'rgba(168,85,247,0.65)';
+              return new ol.style.Style({fill:new ol.style.Fill({color:color})});
+            },
+            visible: false
+          });
+          tileLayers.tracesHeatmap.set('name','traces_heatmap');
+          allLayers.push(tileLayers.tracesHeatmap);
         }
 
         // Offline vector layers (hidden by default, shown when offline)
@@ -478,6 +503,8 @@ function buildMapHtml(
             setActiveBaseLayer(a.id);
           }else if(m === 'setOfflineMode' && a){
             offlineMode = !!a.offline; updateLayerVisibility();
+          }else if(m === 'setHeatmapVisible' && a){
+            if(tileLayers.tracesHeatmap) tileLayers.tracesHeatmap.setVisible(!!a.visible);
           }else if(m === 'setOfflineData' && a){
             if(a.superSystems && vectorLayers.superSystems){
               var ssf = (new ol.format.GeoJSON()).readFeatures(a.superSystems, {featureProjection:'EPSG:3857'});
@@ -767,6 +794,9 @@ function buildMapHtml(
           }
         },
         clearLiveRoute:function(){if(liveRouteSource)liveRouteSource.clear()},
+        setHeatmapVisible:function(a){
+          if(tileLayers.tracesHeatmap) tileLayers.tracesHeatmap.setVisible(!!(a && a.visible));
+        },
         fitBounds:function(a){
           if(!map)return;
           var ext=[a.minLon,a.minLat,a.maxLon,a.maxLat];
@@ -823,6 +853,7 @@ export default function MapContainer({
   onShapeAction,
   fitGeometry,
   tileVersion,
+  showHeatmap,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
@@ -845,6 +876,7 @@ export default function MapContainer({
   const shapeRef = useRef<MapContainerProps["shape"] | undefined>(undefined);
   const fitGeometryRef = useRef<MapContainerProps["fitGeometry"] | undefined>(undefined);
   const tileVersionRef = useRef<number | undefined>(undefined);
+  const showHeatmapRef = useRef<boolean | undefined>(undefined);
 
   const initialCenter = merged.initialCenter ?? defaultMapConfig.initialCenter;
   const initialZoom = merged.initialZoom ?? defaultMapConfig.initialZoom;
@@ -1041,6 +1073,9 @@ export default function MapContainer({
     if (typeof tileVersionRef.current === "number") {
       send({ method: "refreshTiles", args: { version: tileVersionRef.current } });
     }
+    if (showHeatmapRef.current !== undefined) {
+      send({ method: "setHeatmapVisible", args: { visible: showHeatmapRef.current } });
+    }
   }, [send]);
 
   // Expose send function to parent
@@ -1092,6 +1127,13 @@ export default function MapContainer({
       send({ method: "exitDrawMode", args: {} });
     }
   }, [drawMode, send]);
+
+  // Sync heatmap visibility to WebView.
+  useEffect(() => {
+    showHeatmapRef.current = !!showHeatmap;
+    if (!initSentRef.current) return;
+    send({ method: "setHeatmapVisible", args: { visible: !!showHeatmap } });
+  }, [showHeatmap, send]);
 
   // Sync live route polyline. We track the latest route in a ref so
   // that high-frequency updates (every GPS event) don't re-trigger

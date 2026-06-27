@@ -12,6 +12,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient, type HierarchyTreeNode } from "@magnum/shared";
 import { useAuthStore } from "../../stores/authStore";
 import { Button } from "../ui/Button";
+import { useTheme } from "../../providers/ThemeProvider";
+import { elevation, radii, spacing, text as textTokens } from "../../theme/tokens";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -25,10 +27,6 @@ export type MoveToAction =
 export interface MoveToSheetProps {
   visible: boolean;
   onClose: () => void;
-  /**
-   * The "source" entity. For `move_to_super`/`move_out_of_super`/`merge_into`
-   * this is a system id; for `promote_to_system` it's a sub-system id.
-   */
   sourceSystemId?: string;
   sourceSubSystemId?: string;
   sourceName: string;
@@ -57,6 +55,7 @@ export function MoveToSheet({
   onMoved,
   testID,
 }: MoveToSheetProps) {
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const [tree, setTree] = useState<HierarchyTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -102,22 +101,33 @@ export function MoveToSheet({
   if (!visible) return null;
 
   return (
-    <View style={styles.container} testID={testID}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Move “{sourceName}”</Text>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        elevation.sheet,
+      ]}
+      testID={testID}
+    >
+      <View style={[styles.header, { borderBottomColor: colors.divider }]}>
+        <Text style={[textTokens.h2, { color: colors.text }]}>
+          Move &ldquo;{sourceName}&rdquo;
+        </Text>
         <Pressable onPress={onClose} testID="move-to-close" hitSlop={12}>
-          <Ionicons name="close" size={24} color="#666" />
+          <Ionicons name="close" size={24} color={colors.textSecondary} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.body}>
         {loading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="small" color="#22c55e" />
+            <ActivityIndicator size="small" color={colors.primary} />
           </View>
         ) : error ? (
-          <Text style={styles.error}>{error}</Text>
+          <Text style={[textTokens.meta, { color: colors.danger }]}>{error}</Text>
         ) : tree.length === 0 ? (
-          <Text style={styles.hint}>No destinations available.</Text>
+          <Text style={[textTokens.body, { color: colors.textMuted, fontStyle: "italic" }]}>
+            No destinations available.
+          </Text>
         ) : (
           <>
             {sourceSystemId ? (
@@ -161,8 +171,13 @@ export function MoveToSheet({
             ) : null}
             {sourceSubSystemId ? (
               <Section title="Promote this sub-system to a system">
-                <Text style={styles.hint}>
-                  A new system is created with this sub-system’s name. Trails assigned to
+                <Text
+                  style={[
+                    textTokens.meta,
+                    { color: colors.textMuted, fontStyle: "italic" },
+                  ]}
+                >
+                  A new system is created with this sub-system&rsquo;s name. Trails assigned to
                   the sub-system move to the new system; the original sub-system is kept.
                 </Text>
                 <Button
@@ -189,10 +204,11 @@ function Section({
   title: string;
   children: React.ReactNode;
 }) {
+  const { colors } = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={{ gap: 6 }}>{children}</View>
+      <Text style={[textTokens.h3, { color: colors.textMuted }]}>{title}</Text>
+      <View style={{ gap: spacing.xs }}>{children}</View>
     </View>
   );
 }
@@ -210,20 +226,35 @@ function ActionRow({
   testID?: string;
   warning?: boolean;
 }) {
+  const { colors } = useTheme();
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.row, warning ? styles.rowWarning : null]}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          backgroundColor: warning
+            ? colors.dangerMuted
+            : pressed
+              ? colors.surfaceMutedStrong
+              : colors.surfaceMuted,
+          borderColor: warning ? colors.danger : colors.border,
+        },
+      ]}
       testID={testID}
     >
       <Ionicons
         name={warning ? "git-merge" : "arrow-forward"}
         size={18}
-        color={warning ? "#dc2626" : "#22c55e"}
+        color={warning ? colors.danger : colors.primary}
       />
       <View style={{ flex: 1 }}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {sublabel ? <Text style={styles.rowSub}>{sublabel}</Text> : null}
+        <Text style={[textTokens.bodyStrong, { color: colors.text }]}>{label}</Text>
+        {sublabel ? (
+          <Text style={[textTokens.meta, { color: colors.textMuted, marginTop: 2 }]}>
+            {sublabel}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -235,47 +266,29 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
     maxHeight: "85%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    borderWidth: 1,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
-  headerTitle: { fontSize: 16, fontWeight: "700" },
-  body: { padding: 16, gap: 16, paddingBottom: 32 },
-  centered: { alignItems: "center", padding: 24 },
-  section: { gap: 8 },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#666",
-    textTransform: "uppercase",
-  },
+  body: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  centered: { alignItems: "center", padding: spacing.xxl },
+  section: { gap: spacing.sm },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
   },
-  rowWarning: { backgroundColor: "#fef2f2" },
-  rowLabel: { fontSize: 14, fontWeight: "600", color: "#111" },
-  rowSub: { fontSize: 11, color: "#666", marginTop: 2 },
-  error: { color: "#ef4444", fontSize: 12 },
-  hint: { color: "#888", fontSize: 12, fontStyle: "italic" },
 });

@@ -39,6 +39,8 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.fitBounds(${json});`;
     case "refreshTiles":
       return `window.olBridge.refreshTiles(${json});`;
+    case "setHeatmapVisible":
+      return `window.olBridge.setHeatmapVisible(${json});`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -67,6 +69,7 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "setShape",
     "fitBounds",
     "refreshTiles",
+    "setHeatmapVisible",
   ].includes(method);
 }
 

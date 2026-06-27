@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -13,6 +12,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient } from "@magnum/shared";
 import { TraceRow, type TraceRowData } from "./TraceRow";
 import { Button } from "../ui/Button";
+import { useTheme } from "../../providers/ThemeProvider";
+import { spacing, text as textTokens } from "../../theme/tokens";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -32,6 +33,7 @@ export interface TrailTracesTabProps {
  */
 export function TrailTracesTab({ systemId, testID }: TrailTracesTabProps) {
   const router = useRouter();
+  const { colors } = useTheme();
   const [items, setItems] = useState<TraceRowData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,7 +76,18 @@ export function TrailTracesTab({ systemId, testID }: TrailTracesTabProps) {
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.header}>
-        <Text style={styles.heading}>Traces ({items.length})</Text>
+        <View style={styles.headerInfo}>
+          <Text style={[textTokens.h3, { color: colors.textMuted }]}>Traces</Text>
+          <Text
+            style={[
+              textTokens.bodyStrong,
+              { color: colors.text, marginTop: 2 },
+            ]}
+            testID="traces-count"
+          >
+            {items.length}
+          </Text>
+        </View>
         <View style={styles.headerActions}>
           <Button
             variant="ghost"
@@ -82,7 +95,7 @@ export function TrailTracesTab({ systemId, testID }: TrailTracesTabProps) {
             onPress={() => router.push(`/system/${systemId}/organize` as never)}
             testID="traces-organize"
           >
-            <Ionicons name="git-merge" size={14} color="#111" /> Organize
+            <Ionicons name="git-merge" size={14} color={colors.text} /> Organize
           </Button>
           <Button
             variant="primary"
@@ -90,23 +103,28 @@ export function TrailTracesTab({ systemId, testID }: TrailTracesTabProps) {
             onPress={() => router.push(`/system/${systemId}/traces/upload` as never)}
             testID="traces-upload"
           >
-            + Upload Trace
+            <Ionicons name="add" size={14} color={colors.textInverse} /> Upload
           </Button>
         </View>
       </View>
       {loading ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="small" color="#22c55e" />
+          <ActivityIndicator size="small" color={colors.primary} />
         </View>
       ) : error ? (
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[textTokens.meta, { color: colors.danger }]}>{error}</Text>
         </View>
       ) : items.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.hint}>
-            No traces yet. Upload a GPX file or record a hike to get
-            started.
+        <View style={styles.emptyState}>
+          <Ionicons name="navigate-outline" size={32} color={colors.textMuted} />
+          <Text
+            style={[
+              textTokens.body,
+              { color: colors.textMuted, textAlign: "center" },
+            ]}
+          >
+            No traces yet. Upload a GPX file or record a hike to get started.
           </Text>
         </View>
       ) : (
@@ -115,6 +133,7 @@ export function TrailTracesTab({ systemId, testID }: TrailTracesTabProps) {
           keyExtractor={(t) => t.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
+          scrollEnabled={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       )}
@@ -123,16 +142,22 @@ export function TrailTracesTab({ systemId, testID }: TrailTracesTabProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 8 },
+  container: { gap: spacing.md, paddingTop: spacing.sm },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
   },
-  heading: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
-  headerActions: { flexDirection: "row", gap: 6 },
-  list: { gap: 6, paddingBottom: 16 },
-  centered: { alignItems: "center", justifyContent: "center", padding: 16 },
-  errorText: { color: "#ef4444", fontSize: 12 },
-  hint: { color: "#888", fontSize: 12, textAlign: "center" },
+  headerInfo: { flexShrink: 1 },
+  headerActions: { flexDirection: "row", gap: spacing.xs, flexShrink: 0 },
+  list: { gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  centered: { alignItems: "center", justifyContent: "center", padding: spacing.lg },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xxl,
+    gap: spacing.sm,
+  },
 });

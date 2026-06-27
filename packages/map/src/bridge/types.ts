@@ -79,7 +79,8 @@ export type BridgeCommand =
         maxZoom?: number;
       };
     }
-  | { method: "refreshTiles"; args: { version: number } };
+  | { method: "refreshTiles"; args: { version: number } }
+  | { method: "setHeatmapVisible"; args: { visible: boolean } };
 
 export type BridgeEvent =
   | { type: "ready" }

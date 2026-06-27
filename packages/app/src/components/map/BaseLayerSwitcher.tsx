@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useBaseLayerStore } from "../../stores/baseLayerStore";
+import { useTheme } from "../../providers/ThemeProvider";
 import type { BaseLayerDef } from "@magnum/map";
 
 interface BaseLayerSwitcherProps {
@@ -11,7 +12,15 @@ interface BaseLayerSwitcherProps {
 const TRIGGER_HEIGHT = 36;
 const ITEM_HEIGHT = 40;
 
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
+  const { colors } = useTheme();
   const activeId = useBaseLayerStore((s) => s.baseLayerId);
   const setActiveId = useBaseLayerStore((s) => s.setBaseLayerId);
   const hasHydrated = useBaseLayerStore((s) => s.hasHydrated);
@@ -30,16 +39,27 @@ export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
   // label may flash from the default to the user's choice on app launch.
   if (!hasHydrated || !active) return null;
 
+  const shadowRgba08 = hexToRgba(colors.shadow, 0.08);
+  const shadowRgba15 = hexToRgba(colors.shadow, 0.15);
+
   return (
     <View style={styles.root} testID={testID}>
       <Pressable
         onPress={() => setOpen((v) => !v)}
-        style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
+        style={({ pressed }) => [
+          styles.trigger,
+          {
+            backgroundColor: hexToRgba(colors.surface, 0.95),
+            borderColor: shadowRgba08,
+            shadowColor: colors.shadow,
+          },
+          pressed && { backgroundColor: colors.surfaceMuted },
+        ]}
         accessibilityRole="button"
         accessibilityLabel={`Map style: ${active.label}. Tap to change.`}
         testID={testID ? `${testID}-trigger` : undefined}
       >
-        <View style={styles.dot}>
+        <View style={[styles.dot, { backgroundColor: colors.surface, borderColor: shadowRgba15 }]}>
           <View
             style={[
               styles.dotInner,
@@ -47,21 +67,28 @@ export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
             ]}
           />
         </View>
-        <Text style={styles.triggerLabel} numberOfLines={1}>
+        <Text style={[styles.triggerLabel, { color: colors.text }]} numberOfLines={1}>
           {active.label}
         </Text>
-        <Text style={styles.chevron}>▾</Text>
+        <Text style={[styles.chevron, { color: colors.textMuted }]}>▾</Text>
       </Pressable>
 
       {open ? (
         <Modal transparent animationType="fade" onRequestClose={() => setOpen(false)}>
           <Pressable
-            style={styles.backdrop}
+            style={[styles.backdrop, { backgroundColor: hexToRgba(colors.shadow, 0.25) }]}
             onPress={() => setOpen(false)}
             testID={testID ? `${testID}-backdrop` : undefined}
           >
             <Pressable
-              style={styles.menu}
+              style={[
+                styles.menu,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: shadowRgba08,
+                  shadowColor: colors.shadow,
+                },
+              ]}
               onPress={() => {
                 /* swallow so the menu doesn't close when tapping inside */
               }}
@@ -74,8 +101,8 @@ export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
                     onPress={() => onPick(l.id)}
                     style={({ pressed }) => [
                       styles.item,
-                      isActive && styles.itemActive,
-                      pressed && styles.itemPressed,
+                      isActive && { backgroundColor: colors.primaryMuted },
+                      pressed && { backgroundColor: colors.surfaceMutedStrong },
                     ]}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isActive }}
@@ -88,14 +115,21 @@ export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
                       ]}
                     />
                     <View style={styles.itemText}>
-                      <Text style={styles.itemLabel}>{l.label}</Text>
+                      <Text style={[styles.itemLabel, { color: colors.text }]}>
+                        {l.label}
+                      </Text>
                       {l.attribution ? (
-                        <Text style={styles.itemAttribution} numberOfLines={1}>
+                        <Text
+                          style={[styles.itemAttribution, { color: colors.textMuted }]}
+                          numberOfLines={1}
+                        >
                           {l.attribution}
                         </Text>
                       ) : null}
                     </View>
-                    {isActive ? <Text style={styles.check}>✓</Text> : null}
+                    {isActive ? (
+                      <Text style={[styles.check, { color: colors.primary }]}>✓</Text>
+                    ) : null}
                   </Pressable>
                 );
               })}
@@ -121,35 +155,25 @@ const styles = StyleSheet.create({
     height: TRIGGER_HEIGHT,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.95)",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-    shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 3,
   },
-  triggerPressed: {
-    backgroundColor: "rgba(245,245,245,1)",
-  },
   triggerLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#222",
     maxWidth: 110,
   },
   chevron: {
     fontSize: 12,
-    color: "#666",
   },
   dot: {
     width: 14,
     height: 14,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.15)",
-    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -166,7 +190,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.25)",
     justifyContent: "flex-start",
     alignItems: "flex-end",
     paddingTop: 60,
@@ -174,12 +197,9 @@ const styles = StyleSheet.create({
   },
   menu: {
     minWidth: 220,
-    backgroundColor: "#fff",
     borderRadius: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-    shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -192,28 +212,19 @@ const styles = StyleSheet.create({
     height: ITEM_HEIGHT,
     paddingHorizontal: 12,
   },
-  itemActive: {
-    backgroundColor: "rgba(34,197,94,0.08)",
-  },
-  itemPressed: {
-    backgroundColor: "rgba(0,0,0,0.04)",
-  },
   itemText: {
     flex: 1,
   },
   itemLabel: {
     fontSize: 14,
-    color: "#222",
     fontWeight: "500",
   },
   itemAttribution: {
     fontSize: 11,
-    color: "#888",
     marginTop: 1,
   },
   check: {
     fontSize: 14,
-    color: "#22c55e",
     fontWeight: "700",
   },
 });

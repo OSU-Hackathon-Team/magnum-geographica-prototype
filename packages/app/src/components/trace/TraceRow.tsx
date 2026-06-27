@@ -11,6 +11,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient } from "@magnum/shared";
 import { type TrustTier, TIER_COLORS, TIER_LABELS } from "@magnum/shared";
 import { useAuthStore } from "../../stores/authStore";
+import { useTheme } from "../../providers/ThemeProvider";
+import { spacing } from "../../theme/tokens";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -40,6 +42,7 @@ export function TraceRow(props: TraceRowProps) {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const role = user?.role;
+  const { colors } = useTheme();
   const [busy, setBusy] = useState(false);
   const [myVote, setMyVote] = useState<-1 | 0 | 1>(0);
 
@@ -120,21 +123,33 @@ export function TraceRow(props: TraceRowProps) {
   const date = new Date(props.created_at).toLocaleDateString();
 
   return (
-    <View style={[styles.row, props.status === "removed" ? styles.rowRemoved : null]} testID={props.testID}>
+    <View
+      style={[
+        styles.row,
+        props.status === "removed" ? styles.rowRemoved : null,
+        { backgroundColor: colors.surfaceMuted },
+      ]}
+      testID={props.testID}
+    >
       <View style={styles.colMain}>
         <View style={styles.contributorRow}>
           <Ionicons
             name={props.source === "import" ? "document-text-outline" : "navigate-outline"}
             size={14}
-            color="#64748b"
+            color={colors.textMuted}
           />
-          <Text style={styles.contributor}>{props.contributor_name}</Text>
-          <Text style={styles.date}>· {date}</Text>
+          <Text style={[styles.contributor, { color: colors.text }]}>
+            {props.contributor_name}
+          </Text>
+          <Text style={[styles.date, { color: colors.textMuted }]}>· {date}</Text>
           <WeightBadge weight={props.weight} status={props.status} />
         </View>
         <View style={styles.actionsRow}>
           <Pressable
-            style={[styles.voteBtn, myVote === 1 ? styles.upActive : null]}
+            style={[
+              styles.voteBtn,
+              myVote === 1 ? { backgroundColor: colors.successMuted } : null,
+            ]}
             onPress={() => handleVote(1)}
             disabled={busy || props.status === "removed"}
             testID={props.testID ? `${props.testID}-up` : undefined}
@@ -142,17 +157,26 @@ export function TraceRow(props: TraceRowProps) {
             <Ionicons
               name="arrow-up"
               size={14}
-              color={myVote === 1 ? "#22c55e" : "#64748b"}
+              color={myVote === 1 ? colors.primary : colors.textMuted}
             />
           </Pressable>
           <Text
-            style={[styles.score, net < 0 ? styles.scoreNegative : null, net > 0 ? styles.scorePositive : null]}
+            style={[
+              styles.score,
+              {
+                color:
+                  net < 0 ? colors.danger : net > 0 ? colors.success : colors.text,
+              },
+            ]}
             testID={props.testID ? `${props.testID}-score` : undefined}
           >
             {net}
           </Text>
           <Pressable
-            style={[styles.voteBtn, myVote === -1 ? styles.downActive : null]}
+            style={[
+              styles.voteBtn,
+              myVote === -1 ? { backgroundColor: colors.dangerMuted } : null,
+            ]}
             onPress={() => handleVote(-1)}
             disabled={busy || props.status === "removed"}
             testID={props.testID ? `${props.testID}-down` : undefined}
@@ -160,15 +184,19 @@ export function TraceRow(props: TraceRowProps) {
             <Ionicons
               name="arrow-down"
               size={14}
-              color={myVote === -1 ? "#ef4444" : "#64748b"}
+              color={myVote === -1 ? colors.danger : colors.textMuted}
             />
           </Pressable>
           {busy ? <ActivityIndicator size="small" /> : null}
         </View>
       </View>
       {role === "admin" || role === "moderator" ? (
-        <Pressable onPress={handleRemove} style={styles.removeBtn} testID={props.testID ? `${props.testID}-remove` : undefined}>
-          <Ionicons name="trash-outline" size={18} color="#ef4444" />
+        <Pressable
+          onPress={handleRemove}
+          style={styles.removeBtn}
+          testID={props.testID ? `${props.testID}-remove` : undefined}
+        >
+          <Ionicons name="trash-outline" size={18} color={colors.danger} />
         </Pressable>
       ) : null}
     </View>
@@ -182,20 +210,34 @@ function WeightBadge({
   weight: number;
   status: "active" | "ignored" | "removed";
 }) {
+  const { colors } = useTheme();
+
   if (status !== "active") {
     return (
-      <View style={[styles.badge, styles.badgeRemoved]}>
-        <Text style={styles.badgeTextRemoved}>{status}</Text>
+      <View
+        style={[
+          styles.badge,
+          { backgroundColor: colors.dangerMuted, borderColor: colors.danger },
+        ]}
+      >
+        <Text style={[styles.badgeText, { color: colors.danger }]}>
+          {status}
+        </Text>
       </View>
     );
   }
   // 0.0..1.0 → green→amber→red shading. Above the floor (0.3) we
   // mark the trace as a "heavy" contributor.
-  const tier: TrustTier = weight >= 0.7 ? "trusted" : weight >= 0.3 ? "established" : "new";
+  const tier: TrustTier =
+    weight >= 0.7 ? "trusted" : weight >= 0.3 ? "established" : "new";
   const color = TIER_COLORS[tier];
   return (
-    <View style={[styles.badge, { backgroundColor: `${color}22`, borderColor: color }]}>
-      <Text style={[styles.badgeText, { color }]}>{`w${weight.toFixed(2)}`}</Text>
+    <View
+      style={[styles.badge, { backgroundColor: `${color}22`, borderColor: color }]}
+    >
+      <Text style={[styles.badgeText, { color }]}>
+        {`w${weight.toFixed(2)}`}
+      </Text>
     </View>
   );
 }
@@ -204,35 +246,37 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    backgroundColor: "#f9fafb",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
     borderRadius: 6,
   },
   rowRemoved: { opacity: 0.5 },
-  colMain: { flex: 1, gap: 4 },
-  contributorRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  contributor: { fontSize: 13, fontWeight: "600", color: "#0f172a" },
-  date: { fontSize: 11, color: "#94a3b8" },
+  colMain: { flex: 1, gap: spacing.xs },
+  contributorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  contributor: { fontSize: 13, fontWeight: "600" },
+  date: { fontSize: 11 },
   actionsRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   voteBtn: {
-    padding: 4,
+    padding: spacing.xs,
     borderRadius: 4,
   },
-  upActive: { backgroundColor: "#dcfce7" },
-  downActive: { backgroundColor: "#fee2e2" },
-  score: { fontSize: 12, fontWeight: "700", minWidth: 22, textAlign: "center", color: "#0f172a" },
-  scorePositive: { color: "#22c55e" },
-  scoreNegative: { color: "#ef4444" },
+  score: {
+    fontSize: 12,
+    fontWeight: "700",
+    minWidth: 22,
+    textAlign: "center",
+  },
   removeBtn: { padding: 6 },
   badge: {
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: spacing.xxs,
     borderRadius: 4,
     borderWidth: 1,
   },
-  badgeRemoved: { backgroundColor: "#fee2e2", borderColor: "#dc2626" },
   badgeText: { fontSize: 10, fontWeight: "700" },
-  badgeTextRemoved: { fontSize: 10, fontWeight: "700", color: "#dc2626" },
 });

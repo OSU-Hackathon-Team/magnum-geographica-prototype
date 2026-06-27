@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, Link } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../src/stores/authStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
+import { useUiStore, type ThemeMode } from "../../src/stores/uiStore";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
 import { StorageManager } from "../../src/components/offline/StorageManager";
@@ -16,8 +19,15 @@ import {
 import { syncContributions } from "../../src/services/syncService";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 import { type TrustTier } from "@magnum/shared/constants";
+import { radii, spacing, text as textTokens } from "../../src/theme/tokens";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+
+const THEME_OPTIONS: { key: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "system", label: "System", icon: "phone-portrait-outline" },
+  { key: "light", label: "Light", icon: "sunny-outline" },
+  { key: "dark", label: "Dark", icon: "moon-outline" },
+];
 
 interface UserKarma {
   user_id: string;
@@ -32,6 +42,7 @@ interface UserKarma {
 }
 
 export default function ProfileScreen() {
+  const { colors } = useTheme();
   const contributor = useAuthStore((s) => s.contributorName);
   const isIpContributor = useAuthStore((s) => s.isIpContributor);
   const user = useAuthStore((s) => s.user);
@@ -41,6 +52,8 @@ export default function ProfileScreen() {
   const pending = useOfflineStore((s) => s.pendingCount);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const syncState = useOfflineStore((s) => s.syncState);
+  const theme = useUiStore((s) => s.theme);
+  const setTheme = useUiStore((s) => s.setTheme);
 
   const [items, setItems] = useState<PendingItem[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -55,12 +68,6 @@ export default function ProfileScreen() {
     void refreshPending();
   }, [refreshPending, pending]);
 
-  // Validate the cached session against the server. The access token's JWT
-  // is self-contained and remains signature-valid until expiry, so a stale
-  // cache (e.g. after a database reset that deleted the user) is invisible
-  // until we hit an endpoint that checks the DB — `/api/auth/me` is that
-  // endpoint. If the user is gone or the token is no longer accepted,
-  // clear the stored auth and route to the login screen.
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     let cancelled = false;
@@ -79,13 +86,9 @@ export default function ProfileScreen() {
     return () => {
       cancelled = true;
     };
-    // Re-validate only on user-identity or auth-state changes; `logout` is
-    // a stable zustand action and the full `user` object is intentionally
-    // excluded so we don't refetch /me on every field update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isAuthenticated, logout]);
 
-  // Fetch karma + tier for the current user.
   useEffect(() => {
     if (!user?.id) {
       setKarma(null);
@@ -128,18 +131,20 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       contentContainerStyle={styles.content}
       testID="profile-screen"
     >
       <Card>
-        <Text style={styles.label}>Account</Text>
+        <Text style={[textTokens.h3, { color: colors.textMuted }]}>Account</Text>
         {isAuthenticated && user ? (
           <View>
-            <Text style={styles.value} testID="profile-username">
+            <Text style={[textTokens.bodyStrong, { color: colors.text }]} testID="profile-username">
               {user.username}
             </Text>
-            <Text style={styles.sub}>{user.email}</Text>
+            <Text style={[textTokens.meta, { color: colors.textMuted, marginTop: spacing.xxs }]}>
+              {user.email}
+            </Text>
             <View style={styles.buttonRow}>
               <Button
                 onPress={handleLogout}
@@ -160,10 +165,10 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <View>
-            <Text style={styles.value} testID="profile-contributor">
+            <Text style={[textTokens.bodyStrong, { color: colors.text }]} testID="profile-contributor">
               {contributor}
             </Text>
-            <Text style={styles.sub}>
+            <Text style={[textTokens.meta, { color: colors.textMuted, marginTop: spacing.xxs }]}>
               {isIpContributor ? "Editing as your IP address" : "Editing anonymously"}
             </Text>
             <View style={styles.buttonRow}>
@@ -179,7 +184,13 @@ export default function ProfileScreen() {
               </Link>
             </View>
             {isIpContributor ? (
-              <Text style={styles.hint} testID="profile-ip-note">
+              <Text
+                style={[
+                  textTokens.meta,
+                  { color: colors.textSecondary, marginTop: spacing.sm, fontStyle: "italic" },
+                ]}
+                testID="profile-ip-note"
+              >
                 Your edits are publicly attributed to your IP address. Create an account to use a
                 username instead.
               </Text>
@@ -189,45 +200,99 @@ export default function ProfileScreen() {
       </Card>
 
       <Card>
-        <Text style={styles.label}>Status</Text>
-        <Text style={styles.value} testID="profile-status">
+        <Text style={[textTokens.h3, { color: colors.textMuted }]}>Appearance</Text>
+        <View style={styles.themeRow}>
+          {THEME_OPTIONS.map((opt) => {
+            const active = theme === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => setTheme(opt.key)}
+                style={({ pressed }) => [
+                  styles.themeChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surfaceMuted,
+                    borderColor: active ? colors.primary : colors.border,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+                testID={`profile-theme-${opt.key}`}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+              >
+                <Ionicons
+                  name={opt.icon}
+                  size={16}
+                  color={active ? colors.textInverse : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    textTokens.small,
+                    { color: active ? colors.textInverse : colors.textSecondary },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Card>
+
+      <Card>
+        <Text style={[textTokens.h3, { color: colors.textMuted }]}>Status</Text>
+        <Text style={[textTokens.bodyStrong, { color: colors.text }]} testID="profile-status">
           {isOnline ? (syncState === "syncing" ? "Syncing..." : "Online") : "Offline"}
         </Text>
-        <Text style={styles.sub}>{pending} pending change(s)</Text>
+        <Text style={[textTokens.meta, { color: colors.textMuted, marginTop: spacing.xxs }]}>
+          {pending} pending change(s)
+        </Text>
       </Card>
 
       {karma ? (
         <Card testID="profile-karma">
-          <Text style={styles.label}>Karma</Text>
+          <Text style={[textTokens.h3, { color: colors.textMuted }]}>Karma</Text>
           <View style={styles.karmaRow}>
-            <Text style={styles.karmaValue} testID="profile-karma-value">
+            <Text style={[styles.karmaValue, { color: colors.primary }]} testID="profile-karma-value">
               {karma.karma.toFixed(0)}
             </Text>
             <TrustTierBadge tier={karma.tier} size="medium" testID="profile-tier-badge" />
           </View>
           <View style={styles.karmaStats}>
-            <View style={styles.karmaStat}>
-              <Text style={styles.karmaStatValue}>{karma.upvotes_received}</Text>
-              <Text style={styles.karmaStatLabel}>↑ received</Text>
+            <View style={[styles.karmaStat, { backgroundColor: colors.surfaceMuted }]}>
+              <Text style={[styles.karmaStatValue, { color: colors.text }]}>
+                {karma.upvotes_received}
+              </Text>
+              <Text style={[styles.karmaStatLabel, { color: colors.textMuted }]}>
+                {String.fromCharCode(8593)} received
+              </Text>
             </View>
-            <View style={styles.karmaStat}>
-              <Text style={styles.karmaStatValue}>{karma.trace_count}</Text>
-              <Text style={styles.karmaStatLabel}>traces</Text>
+            <View style={[styles.karmaStat, { backgroundColor: colors.surfaceMuted }]}>
+              <Text style={[styles.karmaStatValue, { color: colors.text }]}>
+                {karma.trace_count}
+              </Text>
+              <Text style={[styles.karmaStatLabel, { color: colors.textMuted }]}>traces</Text>
             </View>
-            <View style={styles.karmaStat}>
-              <Text style={styles.karmaStatValue}>{karma.feature_count}</Text>
-              <Text style={styles.karmaStatLabel}>features</Text>
+            <View style={[styles.karmaStat, { backgroundColor: colors.surfaceMuted }]}>
+              <Text style={[styles.karmaStatValue, { color: colors.text }]}>
+                {karma.feature_count}
+              </Text>
+              <Text style={[styles.karmaStatLabel, { color: colors.textMuted }]}>features</Text>
             </View>
-            <View style={styles.karmaStat}>
-              <Text style={styles.karmaStatValue}>{karma.revision_count}</Text>
-              <Text style={styles.karmaStatLabel}>edits</Text>
+            <View style={[styles.karmaStat, { backgroundColor: colors.surfaceMuted }]}>
+              <Text style={[styles.karmaStatValue, { color: colors.text }]}>
+                {karma.revision_count}
+              </Text>
+              <Text style={[styles.karmaStatLabel, { color: colors.textMuted }]}>edits</Text>
             </View>
           </View>
         </Card>
       ) : user ? (
         <Card>
-          <Text style={styles.label}>Karma</Text>
-          <Text style={styles.sub}>Sign in to track your karma and trust tier.</Text>
+          <Text style={[textTokens.h3, { color: colors.textMuted }]}>Karma</Text>
+          <Text style={[textTokens.meta, { color: colors.textMuted }]}>
+            Sign in to track your karma and trust tier.
+          </Text>
         </Card>
       ) : null}
 
@@ -248,33 +313,38 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  content: { padding: 16, gap: 12 },
-  label: { fontSize: 12, color: "#888", marginBottom: 4 },
-  value: { fontSize: 16, fontWeight: "600" },
-  sub: { fontSize: 12, color: "#888", marginTop: 4 },
-  hint: { fontSize: 12, color: "#0a0a0a", marginTop: 8, fontStyle: "italic" },
-  buttonRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  container: { flex: 1 },
+  content: { padding: spacing.lg, gap: spacing.md },
+  buttonRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  themeRow: { flexDirection: "row", gap: spacing.xs, marginTop: spacing.sm },
+  themeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
   karmaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 8,
+    gap: spacing.md,
+    marginBottom: spacing.sm,
   },
-  karmaValue: { fontSize: 32, fontWeight: "700", color: "#22c55e" },
+  karmaValue: { fontSize: 32, fontWeight: "700" },
   karmaStats: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 8,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   karmaStat: {
     flex: 1,
     minWidth: 70,
-    padding: 8,
-    backgroundColor: "#f9fafb",
-    borderRadius: 6,
+    padding: spacing.sm,
+    borderRadius: radii.sm,
   },
   karmaStatValue: { fontSize: 18, fontWeight: "600" },
-  karmaStatLabel: { fontSize: 10, color: "#888" },
+  karmaStatLabel: { fontSize: 10 },
 });

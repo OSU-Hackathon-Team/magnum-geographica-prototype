@@ -36,9 +36,10 @@ async function loginAsAdmin(page: Page) {
   await expect(page).toHaveURL(/\/explore$/);
 }
 
-test.describe("System — Trails & Traces tab (§21.4)", () => {
+test.describe("System — Trails & Traces tab ($21.4)", () => {
   test("system detail renders the Trails & Traces tab", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await page.getByTestId("system-tab-traces").click();
     await expect(page.getByTestId("system-traces-tab-content")).toBeVisible();
     await expect(page.getByTestId("traces-organize")).toBeVisible();
     await expect(page.getByTestId("traces-upload")).toBeVisible();
@@ -46,15 +47,17 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
 
   test("tab heading shows the count of seeded traces", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await page.getByTestId("system-tab-traces").click();
     // The mock seeds 2 traces into FIXTURE_IDS.sys1 (FIXTURE_IDS.trace1, FIXTURE_IDS.trace2).
-    await expect(page.getByTestId("system-traces-tab-content")).toContainText("Traces (2)");
+    await expect(page.getByTestId("traces-count")).toHaveText("2");
   });
 
   test("each seeded trace renders as a row with vote controls", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await page.getByTestId("system-tab-traces").click();
     await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}`)).toBeVisible();
     await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace2}`)).toBeVisible();
-    // Per-row vote controls (§21.7 vote control on trace rows).
+    // Per-row vote controls ($21.7 vote control on trace rows).
     await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-up`)).toBeVisible();
     await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-score`)).toBeVisible();
     await expect(page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-down`)).toBeVisible();
@@ -62,6 +65,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
 
   test("organize button navigates to the organize page", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await page.getByTestId("system-tab-traces").click();
     const button = page.getByTestId("traces-organize");
     await button.scrollIntoViewIfNeeded();
     await button.click();
@@ -71,6 +75,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
 
   test("upload button navigates to the upload sheet", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await page.getByTestId("system-tab-traces").click();
     const button = page.getByTestId("traces-upload");
     await button.scrollIntoViewIfNeeded();
     await button.click();
@@ -81,6 +86,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
   test("upvote increments the trace score", async ({ page }) => {
     await registerAndLogin(page, "tracevoter", "tracevoter@example.com");
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
+    await page.getByTestId("system-tab-traces").click();
     const up = page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-up`);
     const score = page.getByTestId(`traces-row-${FIXTURE_IDS.trace1}-score`);
     // Read the initial numeric portion (text is "3score" or "3votes"
@@ -97,7 +103,8 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
   test("moderator can remove a trace", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    // The remove button is moderator-only (§21.6) and shows on every
+    await page.getByTestId("system-tab-traces").click();
+    // The remove button is moderator-only ($21.6) and shows on every
     // row for users with role=admin. The mock's getAllDownloadedSystems
     // path may not surface it for unauthenticated visitors, so we
     // assert the button renders for admin only.
@@ -146,7 +153,7 @@ test.describe("System — Trails & Traces tab (§21.4)", () => {
     // Build enough downvotes to push weight under 0.3.
     // We use the mock's trust-score-weighted logic: each distinct
     // voter adds a -1. FIXTURE_IDS.trace1 starts with weight 1.0, upvotes=3,
-    // downvotes=0. Adding 4 distinct downvoters: up=3, down=4 →
+    // downvotes=0. Adding 4 distinct downvoters: up=3, down=4 ->
     // w = (3+1-4) / (3+4+2) = 0/9 = 0 (well under 0.3).
     const tokens: string[] = [];
     for (let i = 0; i < 4; i++) {

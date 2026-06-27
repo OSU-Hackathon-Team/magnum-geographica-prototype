@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../providers/ThemeProvider";
+import { elevation, radii, spacing, text as textTokens } from "../../theme/tokens";
 
 /**
  * §21.5 — the bottom bar of the boundary editor. Three slots:
@@ -37,43 +39,81 @@ export function ShapeEditorBar({
   hint,
   testID,
 }: ShapeEditorBarProps) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.container} testID={testID ?? "boundary-bar"}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.surface, borderTopColor: colors.divider },
+        elevation.card,
+      ]}
+      testID={testID ?? "boundary-bar"}
+    >
       <Pressable
         onPress={onBack}
-        style={styles.btn}
+        style={({ pressed }) => [
+          styles.btn,
+          {
+            backgroundColor: pressed ? colors.surfaceMutedStrong : colors.surfaceMuted,
+          },
+        ]}
         testID="boundary-back"
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel="Back"
       >
-        <Ionicons name="arrow-back" size={20} color="#0f172a" />
+        <Ionicons name="arrow-back" size={20} color={colors.text} />
       </Pressable>
       <View style={styles.titleWrap}>
-        <Text style={styles.title} testID="boundary-title" numberOfLines={1}>
+        <Text
+          style={[textTokens.bodyStrong, { color: colors.text }]}
+          testID="boundary-title"
+          numberOfLines={1}
+        >
           {title}
         </Text>
         {hint && !saveError ? (
-          <Text style={styles.hint} testID="boundary-hint" numberOfLines={1}>
+          <Text
+            style={[textTokens.meta, { color: colors.success, marginTop: 2 }]}
+            testID="boundary-hint"
+            numberOfLines={1}
+          >
             {hint}
           </Text>
         ) : null}
         {saveError ? (
-          <Text style={styles.error} testID="boundary-save-error" numberOfLines={2}>
+          <Text
+            style={[textTokens.meta, { color: colors.danger, marginTop: 2 }]}
+            testID="boundary-save-error"
+            numberOfLines={2}
+          >
             {saveError}
           </Text>
         ) : null}
       </View>
       <Pressable
         onPress={onSave}
-        style={[styles.btn, saveDisabled && styles.btnDisabled]}
+        style={({ pressed }) => [
+          styles.btn,
+          {
+            backgroundColor: saveDisabled
+              ? colors.surfaceMuted
+              : pressed
+                ? colors.surfaceMutedStrong
+                : colors.surfaceMuted,
+          },
+        ]}
         testID="boundary-save"
         hitSlop={8}
         disabled={saveDisabled}
         accessibilityRole="button"
         accessibilityLabel="Save boundary"
       >
-        <Ionicons name="checkmark" size={22} color={saveDisabled ? "#cbd5e1" : "#22c55e"} />
+        <Ionicons
+          name="checkmark"
+          size={22}
+          color={saveDisabled ? colors.textMuted : colors.primary}
+        />
       </Pressable>
     </View>
   );
@@ -84,46 +124,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    gap: 12,
+    gap: spacing.md,
   },
   btn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f1f5f9",
+    borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
-  },
-  btnDisabled: {
-    backgroundColor: "#f8fafc",
   },
   titleWrap: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  title: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#0f172a",
-    textAlign: "center",
-  },
-  hint: {
-    fontSize: 11,
-    color: "#16a34a",
-    textAlign: "center",
-    marginTop: 2,
-  },
-  error: {
-    fontSize: 11,
-    color: "#dc2626",
-    textAlign: "center",
-    marginTop: 2,
-  },
 });
-

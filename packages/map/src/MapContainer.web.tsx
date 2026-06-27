@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Map, View } from "ol";
 import type { Layer } from "ol/layer.js";
+import VectorTileLayer from "ol/layer/VectorTile.js";
 import "ol/ol.css";
 import { fromLonLat, toLonLat, transformExtent } from "ol/proj.js";
 import { defaultMapConfig, resolveBaseLayers, resolveDefaultBaseLayerId } from "./shared/config.js";
@@ -9,6 +10,7 @@ import { createTrailsLayer } from "./layers/TrailsLayer.js";
 import { createSystemsLayer } from "./layers/SystemsLayer.js";
 import { createFeaturesLayer } from "./layers/FeaturesLayer.js";
 import { createSuperSystemsLayer } from "./layers/SuperSystemsLayer.js";
+import { createTracesHeatmapLayer } from "./layers/TracesHeatmapLayer.js";
 import { applyBaseLayer } from "./layers/BaseLayer.js";
 import {
   createShapeLayer,
@@ -71,6 +73,7 @@ export default function MapContainer({
   onShapeChange: _onShapeChange,
   fitGeometry,
   tileVersion,
+  showHeatmap,
 }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -119,6 +122,9 @@ export default function MapContainer({
     const featuresLayer = createFeaturesLayer(merged);
     if (featuresLayer) layers.push(featuresLayer);
 
+    const heatmapLayer = createTracesHeatmapLayer(merged);
+    if (heatmapLayer) layers.push(heatmapLayer);
+
     // Shape editor layer — only mounted when the host passes a shape.
     // We always create it (cheaper than recreating on every shape
     // change); the rebuild effect drives the source.
@@ -134,6 +140,7 @@ export default function MapContainer({
     // Stash the shape context for later effects.
     (map as unknown as { __shapeCtx?: typeof shapeCtx; __systemsLayer?: typeof systemsLayer }).__shapeCtx = shapeCtx;
     (map as unknown as { __systemsLayer?: typeof systemsLayer }).__systemsLayer = systemsLayer;
+    (map as unknown as { __heatmapLayer?: typeof heatmapLayer }).__heatmapLayer = heatmapLayer;
 
     applyBaseLayer(map, baseLayerDefs, defaultBaseLayerId);
 
@@ -478,6 +485,15 @@ export default function MapContainer({
       }
     }
   }, [tileVersion]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const heatmapLayer = (map as unknown as { __heatmapLayer?: VectorTileLayer }).__heatmapLayer;
+    if (heatmapLayer) {
+      heatmapLayer.setVisible(!!showHeatmap);
+    }
+  }, [showHeatmap]);
 
   return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
 }

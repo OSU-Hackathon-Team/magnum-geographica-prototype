@@ -27,6 +27,9 @@ postgres:
     features:
       schema: public
       function: features
+    traces_heatmap:
+      schema: public
+      function: traces_heatmap
 
 mbtiles:
   paths: /data

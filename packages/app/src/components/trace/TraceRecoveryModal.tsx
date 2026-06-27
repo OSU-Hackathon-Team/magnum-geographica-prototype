@@ -12,6 +12,8 @@ import {
   recomputeTraceDistance,
   listTracePoints,
 } from "../../services/offlineDataService";
+import { useTheme } from "../../providers/ThemeProvider";
+import { spacing, text as textTokens } from "../../theme/tokens";
 
 /**
  * Shown on app launch whenever the SQLite mirror has a session in
@@ -25,6 +27,7 @@ import {
  * trace store (which is set by the recovery probe on launch).
  */
 export function TraceRecoveryModal() {
+  const { colors } = useTheme();
   const recoveryCandidate = useTraceStore((s) => s.recoveryCandidate);
   const clearRecovery = useTraceStore((s) => s.clearRecovery);
   const beginSession = useTraceStore((s) => s.beginSession);
@@ -136,12 +139,19 @@ export function TraceRecoveryModal() {
       testID="trace-recovery-modal"
     >
       <View style={styles.overlay}>
-        <View style={styles.dialog}>
+        <View
+          style={[
+            styles.dialog,
+            { backgroundColor: colors.surface, shadowColor: colors.shadow },
+          ]}
+        >
           <View style={styles.header}>
-            <Ionicons name="walk-outline" size={28} color="#22c55e" />
-            <Text style={styles.title}>Continue your trace?</Text>
+            <Ionicons name="walk-outline" size={28} color={colors.primary} />
+            <Text style={[styles.title, { color: colors.text }]}>
+              Continue your trace?
+            </Text>
           </View>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             You have an unfinished recording from {dateLabel}.
           </Text>
 
@@ -157,24 +167,30 @@ export function TraceRecoveryModal() {
               disabled={busy}
               style={({ pressed }) => [
                 styles.primaryBtn,
+                { backgroundColor: colors.primary },
                 pressed ? styles.btnPressed : null,
               ]}
               testID="trace-recovery-continue"
             >
-              <Ionicons name="play" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>Continue</Text>
+              <Ionicons name="play" size={18} color={colors.textInverse} />
+              <Text style={[styles.primaryBtnText, { color: colors.textInverse }]}>
+                Continue
+              </Text>
             </Pressable>
             <Pressable
               onPress={handleEndAndSave}
               disabled={busy}
               style={({ pressed }) => [
                 styles.secondaryBtn,
+                { backgroundColor: colors.border },
                 pressed ? styles.btnPressed : null,
               ]}
               testID="trace-recovery-end"
             >
-              <Ionicons name="checkmark" size={18} color="#0f172a" />
-              <Text style={styles.secondaryBtnText}>End &amp; Save</Text>
+              <Ionicons name="checkmark" size={18} color={colors.text} />
+              <Text style={[styles.secondaryBtnText, { color: colors.text }]}>
+                End &amp; Save
+              </Text>
             </Pressable>
             <Pressable
               onPress={handleDiscard}
@@ -185,8 +201,10 @@ export function TraceRecoveryModal() {
               ]}
               testID="trace-recovery-discard"
             >
-              <Ionicons name="trash-outline" size={16} color="#ef4444" />
-              <Text style={styles.discardBtnText}>Discard</Text>
+              <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              <Text style={[styles.discardBtnText, { color: colors.danger }]}>
+                Discard
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -196,10 +214,11 @@ export function TraceRecoveryModal() {
 }
 
 function RecoveryStat({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.statBox}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={[styles.statBox, { backgroundColor: colors.surfaceMuted }]}>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
     </View>
   );
 }
@@ -218,62 +237,57 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: spacing.xl,
   },
   dialog: {
     width: "100%",
     maxWidth: 380,
-    backgroundColor: "#fff",
     borderRadius: 14,
-    padding: 20,
+    padding: spacing.xl,
     gap: 14,
-    shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  title: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
-  subtitle: { fontSize: 13, color: "#475569", lineHeight: 18 },
-  statsRow: { flexDirection: "row", gap: 8 },
+  title: { fontSize: 18, fontWeight: "700" },
+  subtitle: { fontSize: 13, lineHeight: 18 },
+  statsRow: { flexDirection: "row", gap: spacing.sm },
   statBox: {
     flex: 1,
-    backgroundColor: "#f1f5f9",
     padding: 10,
     borderRadius: 8,
     alignItems: "center",
   },
-  statValue: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  statLabel: { fontSize: 11, color: "#64748b", marginTop: 2 },
-  actions: { gap: 8 },
+  statValue: { fontSize: 16, fontWeight: "700" },
+  statLabel: { fontSize: 11, marginTop: 2 },
+  actions: { gap: spacing.sm },
   primaryBtn: {
-    backgroundColor: "#22c55e",
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
-  primaryBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  primaryBtnText: { fontSize: 15, fontWeight: "700" },
   secondaryBtn: {
-    backgroundColor: "#e2e8f0",
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
   },
-  secondaryBtnText: { color: "#0f172a", fontSize: 15, fontWeight: "600" },
+  secondaryBtnText: { fontSize: 15, fontWeight: "600" },
   discardBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
-  discardBtnText: { color: "#ef4444", fontSize: 13, fontWeight: "600" },
+  discardBtnText: { fontSize: 13, fontWeight: "600" },
   btnPressed: { opacity: 0.8 },
 });

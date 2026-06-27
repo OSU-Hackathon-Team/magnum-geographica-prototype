@@ -13,6 +13,7 @@ test("end-to-end: browse a system and follow a trail through to its details", as
   await expect(page).toHaveURL(/\/system\/hocking-hills-state-park$/);
   await expect(page.getByTestId("system-name")).toHaveText("Hocking Hills State Park");
 
+  await page.getByTestId("system-tab-trails").click();
   await page.getByTestId("system-trail-card-buckeye-trail").click();
   await expect(page).toHaveURL(/\/trail\/buckeye-trail$/);
   await expect(page.getByTestId("trail-name")).toHaveText("Buckeye Trail");

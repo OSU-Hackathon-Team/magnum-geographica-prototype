@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,6 +13,9 @@ import { useRouter } from "expo-router";
 import { createMagnumClient } from "@magnum/shared";
 import { Button } from "../ui/Button";
 import { useAuthStore } from "../../stores/authStore";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing, text as textTokens } from "../../theme/tokens";
+import type { ThemeColors } from "../../theme/colors";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -26,6 +29,70 @@ export interface UploadTraceSheetProps {
 type Mode = "menu" | "import" | "manual-paste";
 type ImportFormat = "gpx" | "geojson";
 
+const createStyles = (c: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: c.surface,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      maxHeight: "85%",
+      shadowColor: c.shadow,
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 8,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: c.divider,
+    },
+    headerTitle: { fontSize: 16, fontWeight: "700" },
+    body: { padding: 16, paddingBottom: 32 },
+    card: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 14,
+      backgroundColor: c.surfaceMuted,
+      borderRadius: 8,
+    },
+    cardTitle: { fontSize: 14, fontWeight: "600", color: c.text },
+    cardSub: { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    toggleRow: { flexDirection: "row", gap: 6 },
+    toggleBtn: {
+      flex: 1,
+      paddingVertical: 8,
+      alignItems: "center",
+      backgroundColor: c.surfaceMuted,
+      borderRadius: 6,
+    },
+    toggleBtnActive: { backgroundColor: c.primary },
+    toggleText: { fontSize: 13, fontWeight: "600", color: c.textSecondary },
+    toggleTextActive: { color: c.textInverse },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 6,
+      padding: 10,
+      fontSize: 13,
+      color: c.text,
+      backgroundColor: c.surfaceMuted,
+    },
+    textArea: { minHeight: 100, textAlignVertical: "top", fontFamily: "monospace" },
+    hint: { color: c.textMuted, fontSize: 12 },
+    error: { color: c.danger, fontSize: 12 },
+    footer: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 8 },
+  });
+
 /**
  * §21.3.2 — Upload Trace bottom sheet.
  *
@@ -38,6 +105,9 @@ type ImportFormat = "gpx" | "geojson";
  *      route, mounted separately).
  */
 export function UploadTraceSheet({ visible, onClose, onImported, testID }: UploadTraceSheetProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -140,7 +210,7 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
               : `Import ${importFormat.toUpperCase()}`}
         </Text>
         <Pressable onPress={handleClose} testID="upload-trace-close" hitSlop={12}>
-          <Ionicons name="close" size={24} color="#666" />
+          <Ionicons name="close" size={24} color={colors.textMuted} />
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.body}>
@@ -279,7 +349,7 @@ export function UploadTraceSheet({ visible, onClose, onImported, testID }: Uploa
                 Back
               </Button>
               {submitting ? (
-                <ActivityIndicator size="small" color="#22c55e" />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Button variant="primary" onPress={handleImport} testID="upload-trace-submit">
                   Import Trace
@@ -306,77 +376,17 @@ function ActionCard({
   onPress: () => void;
   testID?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Pressable style={styles.card} onPress={onPress} testID={testID}>
-      <Ionicons name={icon} size={28} color="#22c55e" />
+      <Ionicons name={icon} size={28} color={colors.primary} />
       <View style={{ flex: 1 }}>
         <Text style={styles.cardTitle}>{title}</Text>
         <Text style={styles.cardSub}>{subtitle}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color="#888" />
+      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: "85%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  headerTitle: { fontSize: 16, fontWeight: "700" },
-  body: { padding: 16, paddingBottom: 32 },
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-  },
-  cardTitle: { fontSize: 14, fontWeight: "600", color: "#111" },
-  cardSub: { fontSize: 12, color: "#666", marginTop: 2 },
-  toggleRow: { flexDirection: "row", gap: 6 },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    backgroundColor: "#f1f1f1",
-    borderRadius: 6,
-  },
-  toggleBtnActive: { backgroundColor: "#22c55e" },
-  toggleText: { fontSize: 13, fontWeight: "600", color: "#444" },
-  toggleTextActive: { color: "#fff" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 6,
-    padding: 10,
-    fontSize: 13,
-    color: "#222",
-    backgroundColor: "#fafafa",
-  },
-  textArea: { minHeight: 100, textAlignVertical: "top", fontFamily: "monospace" },
-  hint: { color: "#888", fontSize: 12 },
-  error: { color: "#ef4444", fontSize: 12 },
-  footer: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 8 },
-});

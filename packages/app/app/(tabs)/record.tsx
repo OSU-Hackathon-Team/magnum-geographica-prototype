@@ -28,6 +28,8 @@ import {
   listTracePoints,
   type TraceSession as StoredSession,
 } from "../../src/services/offlineDataService";
+import { useTheme } from "../../src/providers/ThemeProvider";
+import { radii, spacing, text as textTokens } from "../../src/theme/tokens";
 
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
@@ -40,6 +42,7 @@ const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001"
  * state, so the user can review what they've recorded.
  */
 export default function RecordScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
   const status = useTraceStore((s) => s.status);
   const activeSessionId = useTraceStore((s) => s.activeSessionId);
@@ -275,7 +278,7 @@ export default function RecordScreen() {
       : [-82.9988, 39.9612];
 
   return (
-    <View style={styles.container} testID="record-screen">
+    <View style={[styles.container, { backgroundColor: colors.bg }]} testID="record-screen">
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -307,7 +310,7 @@ export default function RecordScreen() {
 
         {recent.length > 0 ? (
           <View style={styles.recentSection} testID="record-recent">
-            <Text style={styles.recentHeading}>Recent</Text>
+            <Text style={[styles.recentHeading, { color: colors.textMuted }]}>Recent</Text>
             {recent.map((s) => (
               <RecentRow
                 key={s.id}
@@ -345,38 +348,44 @@ function IdleView({
   onOpenFileImport: () => void;
   error: string | null;
 }) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.idleContent} testID="record-idle">
       <View style={styles.idleHero}>
-        <View style={styles.idleIcon}>
-          <Ionicons name="radio-button-on" size={56} color="#22c55e" />
+        <View style={[styles.idleIcon, { backgroundColor: colors.successMuted }]}>
+          <Ionicons name="radio-button-on" size={56} color={colors.primary} />
         </View>
-        <Text style={styles.idleTitle}>Record a hike</Text>
-        <Text style={styles.idleSubtitle}>
+        <Text style={[styles.idleTitle, { color: colors.text }]}>Record a hike</Text>
+        <Text style={[styles.idleSubtitle, { color: colors.textSecondary }]}>
           High-accuracy GPS tracking, even with the screen off. Your points save as they happen
           {isWeb ? " (browser fallback on web)" : ""}.
         </Text>
       </View>
 
       {error ? (
-        <View style={styles.errorBanner} testID="record-error">
-          <Ionicons name="alert-circle" size={16} color="#ef4444" />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.errorBanner, { backgroundColor: colors.dangerMuted }]} testID="record-error">
+          <Ionicons name="alert-circle" size={16} color={colors.danger} />
+          <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
         </View>
       ) : null}
 
       <Pressable
         onPress={onStart}
         disabled={busy}
-        style={({ pressed }) => [styles.startButton, pressed ? styles.startButtonPressed : null]}
+        style={({ pressed }) => [
+          styles.startButton,
+          { backgroundColor: colors.primary, shadowColor: colors.primary },
+          pressed ? styles.startButtonPressed : null,
+        ]}
         testID="record-start"
       >
         {busy ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.textInverse} />
         ) : (
           <>
-            <Ionicons name="radio-button-on" size={22} color="#fff" />
-            <Text style={styles.startButtonText}>Start recording</Text>
+            <Ionicons name="radio-button-on" size={22} color={colors.textInverse} />
+            <Text style={[styles.startButtonText, { color: colors.textInverse }]}>Start recording</Text>
           </>
         )}
       </Pressable>
@@ -387,8 +396,8 @@ function IdleView({
           style={styles.secondaryBtn}
           testID="record-import-link"
         >
-          <Ionicons name="document-text-outline" size={18} color="#22c55e" />
-          <Text style={styles.secondaryBtnText}>Import a GPX or GeoJSON file</Text>
+          <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+          <Text style={[styles.secondaryBtnText, { color: colors.primary }]}>Import a GPX or GeoJSON file</Text>
         </Pressable>
       </View>
 
@@ -396,9 +405,9 @@ function IdleView({
         <Ionicons
           name={isOnline ? "cloud-done-outline" : "cloud-offline-outline"}
           size={14}
-          color={isOnline ? "#22c55e" : "#f59e0b"}
+          color={isOnline ? colors.primary : colors.warning}
         />
-        <Text style={styles.statusHintText}>
+        <Text style={[styles.statusHintText, { color: colors.textMuted }]}>
           {isOnline
             ? "Online — submitted traces upload immediately."
             : "Offline — submitted traces queue and sync when you're back online."}
@@ -435,6 +444,7 @@ function ActiveView({
   onSubmit: () => void;
   onDiscard: () => void;
 }) {
+  const { colors } = useTheme();
   const status_ = useTraceStore((s) => s.status);
   const startedAt = useTraceStore((s) => s.startedAt);
   const totalPausedMs = useTraceStore((s) => s.totalPausedMs);
@@ -499,16 +509,16 @@ function ActiveView({
       <View
         style={[
           styles.statusPill,
-          status_ === "paused" ? styles.statusPillPaused : styles.statusPillRecording,
+          { backgroundColor: status_ === "paused" ? colors.warningMuted : colors.dangerMuted },
         ]}
       >
         <View
           style={[
             styles.statusPillDot,
-            { backgroundColor: status_ === "paused" ? "#f59e0b" : "#ef4444" },
+            { backgroundColor: status_ === "paused" ? colors.warning : colors.danger },
           ]}
         />
-        <Text style={styles.statusPillText}>
+        <Text style={[styles.statusPillText, { color: colors.text }]}>
           {isSubmitting
             ? "Submitting…"
             : status_ === "paused"
@@ -517,7 +527,7 @@ function ActiveView({
         </Text>
       </View>
 
-      <View style={styles.mapWrap} testID="record-map">
+      <View style={[styles.mapWrap, { backgroundColor: colors.surfaceMutedStrong }]} testID="record-map">
         {!isWeb ? (
           <MapContainer
             config={{
@@ -537,7 +547,7 @@ function ActiveView({
           />
         ) : (
           <View style={styles.webMapPlaceholder}>
-            <Text style={styles.webMapText}>
+            <Text style={[styles.webMapText, { color: colors.textMuted }]}>
               Map preview unavailable in the browser build. The native app shows the live route
               here.
             </Text>
@@ -559,9 +569,9 @@ function ActiveView({
       </View>
 
       {error ? (
-        <View style={styles.errorBanner} testID="record-error">
-          <Ionicons name="alert-circle" size={16} color="#ef4444" />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.errorBanner, { backgroundColor: colors.dangerMuted }]} testID="record-error">
+          <Ionicons name="alert-circle" size={16} color={colors.danger} />
+          <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
         </View>
       ) : null}
 
@@ -571,7 +581,7 @@ function ActiveView({
           disabled={submitBusy}
           style={({ pressed }) => [
             styles.actionBtn,
-            styles.pauseBtn,
+            { backgroundColor: colors.surfaceMutedStrong },
             pressed ? styles.actionBtnPressed : null,
           ]}
           testID="record-pause-toggle"
@@ -579,26 +589,26 @@ function ActiveView({
           <Ionicons
             name={status_ === "paused" ? "play" : "pause"}
             size={20}
-            color={status_ === "paused" ? "#22c55e" : "#111"}
+            color={status_ === "paused" ? colors.primary : colors.text}
           />
-          <Text style={styles.pauseBtnText}>{status_ === "paused" ? "Resume" : "Pause"}</Text>
+          <Text style={[styles.pauseBtnText, { color: colors.text }]}>{status_ === "paused" ? "Resume" : "Pause"}</Text>
         </Pressable>
         <Pressable
           onPress={onSubmit}
           disabled={submitBusy || liveRouteCoords.length < 2}
           style={({ pressed }) => [
             styles.actionBtn,
-            styles.submitBtn,
+            { backgroundColor: colors.primary },
             pressed ? styles.actionBtnPressed : null,
           ]}
           testID="record-submit"
         >
           {submitBusy ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.textInverse} />
           ) : (
             <>
-              <Ionicons name="checkmark" size={20} color="#fff" />
-              <Text style={styles.submitBtnText}>Submit</Text>
+              <Ionicons name="checkmark" size={20} color={colors.textInverse} />
+              <Text style={[styles.submitBtnText, { color: colors.textInverse }]}>Submit</Text>
             </>
           )}
         </Pressable>
@@ -612,18 +622,20 @@ function ActiveView({
         ]}
         testID="record-discard"
       >
-        <Ionicons name="trash-outline" size={16} color="#ef4444" />
-        <Text style={styles.discardBtnText}>Discard trace</Text>
+        <Ionicons name="trash-outline" size={16} color={colors.danger} />
+        <Text style={[styles.discardBtnText, { color: colors.danger }]}>Discard trace</Text>
       </Pressable>
     </View>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.statBox}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={[styles.statBox, { backgroundColor: colors.surfaceMuted }]}>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
     </View>
   );
 }
@@ -635,6 +647,8 @@ function RecentRow({
   session: StoredSession;
   onPress?: () => void;
 }) {
+  const { colors } = useTheme();
+
   const started = new Date(session.started_at);
   const dateLabel = started.toLocaleDateString();
   const timeLabel = started.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -652,12 +666,16 @@ function RecentRow({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.recentRow, pressed && onPress ? styles.recentRowPressed : null]}
+      style={({ pressed }) => [
+        styles.recentRow,
+        { backgroundColor: colors.surfaceMuted },
+        pressed && onPress ? styles.recentRowPressed : null,
+      ]}
       testID={`record-recent-${session.id}`}
     >
       <View style={styles.recentRowMain}>
-        <Text style={styles.recentRowTime}>{timeLabel}</Text>
-        <Text style={styles.recentRowSub}>{subtitle}</Text>
+        <Text style={[styles.recentRowTime, { color: colors.text }]}>{timeLabel}</Text>
+        <Text style={[styles.recentRowSub, { color: colors.textMuted }]}>{subtitle}</Text>
       </View>
       <Ionicons
         name={
@@ -668,7 +686,7 @@ function RecentRow({
             : "ellipse-outline"
         }
         size={16}
-        color={session.status === "submitted" ? "#22c55e" : "#888"}
+        color={session.status === "submitted" ? colors.primary : colors.textMuted}
       />
     </Pressable>
   );
@@ -730,7 +748,7 @@ async function startWebBrowserRecording(): Promise<TraceSession | null> {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   content: { padding: 16, paddingBottom: 40, gap: 16 },
 
   // ---- Idle ----
@@ -740,34 +758,30 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: "#f0fdf4",
     alignItems: "center",
     justifyContent: "center",
   },
-  idleTitle: { fontSize: 24, fontWeight: "700", color: "#0f172a" },
+  idleTitle: { fontSize: 24, fontWeight: "700" },
   idleSubtitle: {
     fontSize: 13,
-    color: "#475569",
     textAlign: "center",
     paddingHorizontal: 16,
     lineHeight: 18,
   },
   startButton: {
-    backgroundColor: "#22c55e",
     paddingVertical: 18,
     borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: "#22c55e",
     shadowOpacity: 0.25,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
   startButtonPressed: { opacity: 0.85 },
-  startButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
+  startButtonText: { fontSize: 17, fontWeight: "700" },
   secondaryRow: { flexDirection: "row", justifyContent: "center" },
   secondaryBtn: {
     flexDirection: "row",
@@ -777,14 +791,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
   },
-  secondaryBtnText: { color: "#22c55e", fontSize: 13, fontWeight: "600" },
+  secondaryBtnText: { fontSize: 13, fontWeight: "600" },
   statusHint: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 4,
   },
-  statusHintText: { color: "#64748b", fontSize: 12, flex: 1 },
+  statusHintText: { fontSize: 12, flex: 1 },
 
   // ---- Active ----
   activeContent: { gap: 12 },
@@ -797,15 +811,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     gap: 6,
   },
-  statusPillRecording: { backgroundColor: "#fef2f2" },
-  statusPillPaused: { backgroundColor: "#fffbeb" },
   statusPillDot: { width: 8, height: 8, borderRadius: 4 },
-  statusPillText: { fontSize: 12, fontWeight: "700", color: "#0f172a" },
+  statusPillText: { fontSize: 12, fontWeight: "700" },
   mapWrap: {
     height: 280,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: "#e8e8e8",
   },
   webMapPlaceholder: {
     flex: 1,
@@ -813,17 +824,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
   },
-  webMapText: { color: "#64748b", fontSize: 12, textAlign: "center", lineHeight: 18 },
+  webMapText: { fontSize: 12, textAlign: "center", lineHeight: 18 },
   statsRow: { flexDirection: "row", gap: 8 },
   statBox: {
     flex: 1,
-    backgroundColor: "#f9fafb",
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
   },
-  statValue: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
-  statLabel: { fontSize: 11, color: "#64748b", marginTop: 2 },
+  statValue: { fontSize: 18, fontWeight: "700" },
+  statLabel: { fontSize: 11, marginTop: 2 },
 
   actionsRow: { flexDirection: "row", gap: 8 },
   actionBtn: {
@@ -836,10 +846,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionBtnPressed: { opacity: 0.8 },
-  pauseBtn: { backgroundColor: "#f1f5f9" },
-  pauseBtnText: { color: "#0f172a", fontSize: 15, fontWeight: "700" },
-  submitBtn: { backgroundColor: "#22c55e" },
-  submitBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  pauseBtnText: { fontSize: 15, fontWeight: "700" },
+  submitBtnText: { fontSize: 15, fontWeight: "700" },
   discardBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -848,32 +856,30 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   discardBtnPressed: { opacity: 0.7 },
-  discardBtnText: { color: "#ef4444", fontSize: 13, fontWeight: "600" },
+  discardBtnText: { fontSize: 13, fontWeight: "600" },
 
   // ---- Recent ----
   recentSection: { gap: 8 },
-  recentHeading: { fontSize: 12, fontWeight: "700", color: "#64748b", letterSpacing: 0.5 },
+  recentHeading: { fontSize: 12, fontWeight: "700", letterSpacing: 0.5 },
   recentRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: "#f9fafb",
     borderRadius: 8,
     gap: 10,
   },
   recentRowPressed: { opacity: 0.7 },
   recentRowMain: { flex: 1, gap: 2 },
-  recentRowTime: { fontSize: 14, fontWeight: "600", color: "#0f172a" },
-  recentRowSub: { fontSize: 12, color: "#64748b" },
+  recentRowTime: { fontSize: 14, fontWeight: "600" },
+  recentRowSub: { fontSize: 12 },
 
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#fef2f2",
     padding: 10,
     borderRadius: 6,
   },
-  errorText: { color: "#ef4444", fontSize: 12, flex: 1 },
+  errorText: { fontSize: 12, flex: 1 },
 });

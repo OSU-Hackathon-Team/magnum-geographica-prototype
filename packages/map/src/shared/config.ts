@@ -103,3 +103,8 @@ export function superSystemsTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
   return `${cfg.martinTilesUrl}/super_systems/{z}/{x}/{y}`;
 }
+
+export function tracesHeatmapTileUrl(cfg: MapConfig): string | undefined {
+  if (!cfg.martinTilesUrl) return undefined;
+  return `${cfg.martinTilesUrl}/traces_heatmap/{z}/{x}/{y}`;
+}

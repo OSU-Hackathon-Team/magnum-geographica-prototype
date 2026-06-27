@@ -34,6 +34,7 @@ const APP_TABLES = [
   "gps_trace_segments",
   "trace_segment_votes",
   "synthesis_runs",
+  "trace_heatmap",
 ] as const;
 
 const databaseUrl =

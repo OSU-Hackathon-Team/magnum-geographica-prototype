@@ -9,6 +9,8 @@ import {
 } from "@magnum/shared";
 import { Button } from "../ui/Button";
 import { FeatureTypeIcon } from "./FeatureTypeIcon";
+import { useTheme } from "../../providers/ThemeProvider";
+import { radii, spacing } from "../../theme/tokens";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -51,6 +53,7 @@ export function FeatureForm({
   submitLabel = "Save Feature",
   testID,
 }: FeatureFormProps) {
+  const { colors } = useTheme();
   const [name, setName] = useState(initialName);
   // New code path: pick a preset and we'll derive the legacy type_tag
   // from the preset's key for backwards compat. Fall back to FEATURE_TYPES
@@ -120,13 +123,18 @@ export function FeatureForm({
   };
 
   return (
-    <ScrollView style={styles.container} testID={testID}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      testID={testID}
+    >
       <View style={styles.section}>
-        <Text style={styles.label}>Feature Preset</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Feature Preset</Text>
         {loadingPresets ? (
           <ActivityIndicator size="small" />
         ) : presets.length === 0 ? (
-          <Text style={styles.hint}>No presets available — pick a legacy type below.</Text>
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            No presets available — pick a legacy type below.
+          </Text>
         ) : (
           <View style={styles.typeGrid}>
             {presets.slice(0, 12).map((p) => (
@@ -153,7 +161,9 @@ export function FeatureForm({
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Or pick a legacy type</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Or pick a legacy type
+        </Text>
         <View style={styles.typeGrid}>
           {FEATURE_TYPES.map((t) => (
             <Button
@@ -167,7 +177,12 @@ export function FeatureForm({
               testID={`feature-type-${t}`}
             >
               <FeatureTypeIcon type={t} size={12} />
-              <Text style={[styles.typeLabel, typeTag === t && styles.typeLabelActive]}>
+              <Text
+                style={[
+                  styles.typeLabel,
+                  { color: typeTag === t ? colors.textInverse : colors.textMuted },
+                ]}
+              >
                 {t.replace(/_/g, " ")}
               </Text>
             </Button>
@@ -176,9 +191,16 @@ export function FeatureForm({
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Name</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.surfaceMuted,
+            },
+          ]}
           value={name}
           onChangeText={setName}
           placeholder="Feature name"
@@ -187,18 +209,22 @@ export function FeatureForm({
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Coordinates</Text>
-        <Text style={styles.coords}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Coordinates</Text>
+        <Text style={[styles.coords, { color: colors.textMuted }]}>
           {initialLat.toFixed(5)}, {initialLon.toFixed(5)}
         </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>System (required)</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          System (required)
+        </Text>
         {loadingSystems ? (
           <ActivityIndicator size="small" />
         ) : systems.length === 0 ? (
-          <Text style={styles.hint}>No systems available</Text>
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            No systems available
+          </Text>
         ) : (
           <ScrollView
             horizontal
@@ -239,11 +265,15 @@ export function FeatureForm({
 
       {systemId ? (
         <View style={styles.section}>
-          <Text style={styles.label}>Trail (optional)</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Trail (optional)
+          </Text>
           {loadingTrails ? (
             <ActivityIndicator size="small" />
           ) : trails.length === 0 ? (
-            <Text style={styles.hint}>No trails in this system</Text>
+            <Text style={[styles.hint, { color: colors.textMuted }]}>
+              No trails in this system
+            </Text>
           ) : (
             <ScrollView
               horizontal
@@ -278,9 +308,19 @@ export function FeatureForm({
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.label}>Description (optional)</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          Description (optional)
+        </Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[
+            styles.input,
+            styles.textArea,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              backgroundColor: colors.surfaceMuted,
+            },
+          ]}
           value={description}
           onChangeText={setDescription}
           placeholder="Describe this feature..."
@@ -292,7 +332,9 @@ export function FeatureForm({
 
       <View style={styles.section}>
         {!canSave && name.trim().length > 0 && (
-          <Text style={styles.hint}>Assign this feature to a System to save.</Text>
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            Assign this feature to a System to save.
+          </Text>
         )}
         <Button
           variant="primary"
@@ -308,17 +350,14 @@ export function FeatureForm({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  section: { padding: 16, gap: 8 },
-  label: { fontSize: 13, fontWeight: "600", color: "#444" },
+  container: { flex: 1 },
+  section: { padding: spacing.lg, gap: spacing.sm },
+  label: { fontSize: 13, fontWeight: "600" },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 6,
+    borderRadius: radii.sm,
     padding: 10,
     fontSize: 14,
-    color: "#222",
-    backgroundColor: "#fafafa",
   },
   textArea: { minHeight: 100 },
   typeGrid: {
@@ -326,10 +365,9 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 6,
   },
-  typeLabel: { fontSize: 11, color: "#666", textTransform: "capitalize" },
-  typeLabelActive: { color: "#fff" },
-  coords: { fontSize: 13, color: "#666", fontFamily: "monospace" },
-  hint: { fontSize: 12, color: "#888", fontStyle: "italic" },
+  typeLabel: { fontSize: 11, textTransform: "capitalize" },
+  coords: { fontSize: 13, fontFamily: "monospace" },
+  hint: { fontSize: 12, fontStyle: "italic" },
   hierarchyScroll: { maxHeight: 50 },
   hierarchyRow: { flexDirection: "row", gap: 6, alignItems: "center" },
 });
