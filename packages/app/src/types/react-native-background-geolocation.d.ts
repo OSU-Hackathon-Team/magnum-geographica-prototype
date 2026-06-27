@@ -1,4 +1,4 @@
-// Type stubs for react-native-background-geolocation. We only use a
+// Type stubs for react-native-background-geolocation v5. We only use a
 // small slice of the API; the full typings live in the npm package
 // but we don't need them to typecheck (and installing the typings
 // would force a full type-graph rebuild for the native package
@@ -18,7 +18,7 @@ declare module "react-native-background-geolocation" {
     uuid?: string;
   }
 
-  export interface BGGConfig {
+  export interface Config {
     desiredAccuracy?: number;
     distanceFilter?: number;
     stopOnTerminate?: boolean;
@@ -27,6 +27,7 @@ declare module "react-native-background-geolocation" {
     heartbeatInterval?: number;
     locationAuthorizationRequest?: string;
     locationAuthorizationAlert?: {
+      titleWhenOff?: string;
       titleWhenNotEnabled?: string;
       titleWhenDisabled?: string;
       instructions?: string;
@@ -43,8 +44,8 @@ declare module "react-native-background-geolocation" {
     extras?: Record<string, unknown>;
   }
 
-  export interface BGGModule {
-    ready: (config: BGGConfig) => Promise<void>;
+  interface BGGModule {
+    ready: (config: Config) => Promise<void>;
     start: () => Promise<void>;
     stop: () => Promise<void>;
     changePace: (moving: boolean) => Promise<void>;
@@ -54,8 +55,13 @@ declare module "react-native-background-geolocation" {
     getCurrentPosition: () => Promise<BGGLocation>;
     destroyLocations: () => Promise<void>;
     logger: { enable: () => void };
+    DESIRED_ACCURACY_HIGH: number;
+    DESIRED_ACCURACY_MEDIUM: number;
+    DESIRED_ACCURACY_LOW: number;
+    DESIRED_ACCURACY_VERY_LOW: number;
+    DESIRED_ACCURACY_LOWEST: number;
   }
 
-  const bgg: BGGModule;
-  export default bgg;
+  const BackgroundGeolocation: BGGModule;
+  export default BackgroundGeolocation;
 }

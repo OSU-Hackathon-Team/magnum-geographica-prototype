@@ -52,5 +52,8 @@
   "type": "module",
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "@transistorsoft/background-geolocation-types": "5.2.0"
+  }
 }

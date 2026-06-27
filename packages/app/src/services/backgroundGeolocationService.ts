@@ -78,7 +78,7 @@ const SESSION_LIVE_KEY = "magnum.activeTraceSession";
 function bggConfig(sessionId: string): Config {
   return {
     desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
-    distanceFilter: 5, // meters
+    distanceFilter: 2, // meters
     stopOnTerminate: false,
     startOnBoot: true,
     preventSuspend: true,

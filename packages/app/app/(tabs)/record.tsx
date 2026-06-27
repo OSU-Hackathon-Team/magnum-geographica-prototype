@@ -454,6 +454,14 @@ function ActiveView({
   const isSubmitting = useTraceStore((s) => s.status === "submitting");
   const submitBusy = useTraceStore((s) => s.status === "submitting");
 
+  const [flyTo, setFlyTo] = useState<{ lon: number; lat: number; zoom: number } | null>(null);
+
+  const handleRecenter = useCallback(() => {
+    if (followTarget) {
+      setFlyTo({ lon: followTarget.lon, lat: followTarget.lat, zoom: 17 });
+    }
+  }, [followTarget]);
+
   // 1Hz elapsed ticker. Single timer; the displayed duration is
   // derived from sessionElapsedMs so a paused session freezes the
   // clock cleanly.
@@ -543,7 +551,21 @@ function ActiveView({
                 }
               : null
           }
+          flyTo={flyTo}
         />
+        {followTarget ? (
+          <Pressable
+            onPress={handleRecenter}
+            style={({ pressed }) => [
+              styles.recenterBtn,
+              { backgroundColor: colors.bg },
+              pressed && styles.recenterBtnPressed,
+            ]}
+            testID="record-recenter"
+          >
+            <Ionicons name="locate" size={20} color={colors.text} />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.statsRow}>
@@ -809,6 +831,22 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
   },
+  recenterBtn: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  recenterBtnPressed: { opacity: 0.75 },
   statsRow: { flexDirection: "row", gap: 8 },
   statBox: {
     flex: 1,
