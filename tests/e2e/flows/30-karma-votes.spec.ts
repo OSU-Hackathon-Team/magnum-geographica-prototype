@@ -36,7 +36,6 @@ test.describe("Vote control — feature page (§21.7)", () => {
     await page.goto(`${BASE}/feature/${FIXTURE_IDS.f1}`);
 
     const up = page.getByTestId("feature-vote-up");
-    const down = page.getByTestId("feature-vote-down");
     const score = page.getByTestId("feature-vote-score");
 
     await expect(score).toHaveText("0");
@@ -61,31 +60,29 @@ test.describe("Vote control — feature page (§21.7)", () => {
     const token = await page.evaluate(() =>
       (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, ""),
     );
-    // First vote: +1. The mock returns net=1, my_vote=1.
-    const up = await page.evaluate(async (t) => {
+    const f4Id = FIXTURE_IDS.f4;
+    // First vote: +1.
+    const up = await page.evaluate(async ({ t, targetId }) => {
       const r = await fetch("/api/votes", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${t}` },
-        body: JSON.stringify({ target_type: "feature", target_id: `${FIXTURE_IDS.f4}`, value: 1 }),
+        body: JSON.stringify({ target_type: "feature", target_id: targetId, value: 1 }),
       });
       return r.json();
-    }, token);
+    }, { t: token, targetId: f4Id });
     const upBody = up as { net: number; my_vote: number; upvotes: number; downvotes: number };
     expect(upBody.my_vote).toBe(1);
     expect(upBody.net).toBe(1);
-    // Switch to -1. The mock's previous.value=1, so upvotes goes 1→0
-    // and downvotes goes 0→1, net = -1.
-    const down = await page.evaluate(async (t) => {
+    // Switch to -1.
+    const down = await page.evaluate(async ({ t, targetId }) => {
       const r = await fetch("/api/votes", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${t}` },
-        body: JSON.stringify({ target_type: "feature", target_id: `${FIXTURE_IDS.f4}`, value: -1 }),
+        body: JSON.stringify({ target_type: "feature", target_id: targetId, value: -1 }),
       });
       return r.json();
-    }, token);
+    }, { t: token, targetId: f4Id });
     const downBody = down as { net: number; my_vote: number; upvotes: number; downvotes: number };
-    // eslint-disable-next-line no-console
-    console.log("down body:", JSON.stringify(downBody));
     expect(downBody.my_vote).toBe(-1);
     expect(downBody.net).toBe(-1);
     expect(downBody.upvotes).toBe(0);
