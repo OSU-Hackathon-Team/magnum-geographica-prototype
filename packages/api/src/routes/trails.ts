@@ -3,8 +3,13 @@ import { eq, and, ilike, sql, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { trails, trailSystems, trailSegments, features } from "../db/schema.js";
 import { createTrailInputSchema } from "@magnum/shared";
+import { optionalAuth, actorRequired, type AuthUser } from "../middleware/auth.js";
+import { resolveActor } from "../services/identity.js";
+import { recordRevision } from "../services/revisions.js";
 
 export const trailsRoute = new Hono();
+
+type Variables = { user?: AuthUser };
 
 const baseTrailSelect = {
   id: trails.id,
@@ -170,7 +175,7 @@ trailsRoute.get("/:id/features", async (c) => {
   return c.json({ items, total: items.length });
 });
 
-trailsRoute.post("/", async (c) => {
+trailsRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createTrailInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -179,6 +184,8 @@ trailsRoute.post("/", async (c) => {
       400,
     );
   }
+
+  const actor = resolveActor(c);
 
   const rows = await db
     .insert(trails)
@@ -192,5 +199,20 @@ trailsRoute.post("/", async (c) => {
     })
     .returning();
 
-  return c.json(rows[0], 201);
+  const created = rows[0];
+  if (!created) {
+    return c.json({ error: "internal", message: "failed to create trail" }, 500);
+  }
+
+  await recordRevision({
+    targetType: "trail",
+    targetId: created.id,
+    action: "create",
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: `Created trail ${created.name}`,
+    payloadAfter: { name: created.name, slug: created.slug },
+  });
+
+  return c.json(created, 201);
 });

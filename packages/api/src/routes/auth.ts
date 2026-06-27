@@ -12,8 +12,8 @@ import {
   signRefreshToken,
   authRequired,
   type AuthUser,
-  type TrustTier,
 } from "../middleware/auth.js";
+import type { TrustTier } from "@magnum/shared/constants";
 import { readClientIp } from "../services/identity.js";
 import { tierFromKarma } from "../services/karma.js";
 
@@ -166,7 +166,7 @@ authRoute.post("/refresh", async (c) => {
       j.jwtVerify(
         body.refresh_token,
         new TextEncoder().encode(
-          process.env.JWT_SECRET ?? process.env.ADMIN_SECRET ?? "dev-secret-change-me",
+          process.env.JWT_SECRET ?? "dev-secret-change-me",
         ),
       ),
     );

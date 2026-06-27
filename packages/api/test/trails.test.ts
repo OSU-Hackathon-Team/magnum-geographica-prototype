@@ -37,7 +37,7 @@ describe("POST /api/trails", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         name: "X",
         slug: "x",
@@ -52,7 +52,7 @@ describe("POST /api/trails", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         name: "Buckeye",
         slug: "buckeye",
@@ -61,8 +61,10 @@ describe("POST /api/trails", () => {
       }),
     });
     expect(res.status).toBe(201);
-    expect(state.insertCalls.length).toBe(1);
-    const values = state.insertCalls[0]?.values as { name: string; difficulty: string };
+    expect(state.insertCalls.length).toBeGreaterThanOrEqual(1);
+    const trailInsert = state.insertCalls.find((c) => c.table === "trails");
+    expect(trailInsert).toBeDefined();
+    const values = trailInsert!.values as { name: string; difficulty: string };
     expect(values.name).toBe("Buckeye");
     expect(values.difficulty).toBe("moderate");
   });

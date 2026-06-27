@@ -3,10 +3,11 @@ import { eq, desc, sql, gt, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { wikiPages, revisions, features, trailSegments, media } from "../db/schema.js";
 import { resolveContributorName } from "../services/identity.js";
+import { optionalAuth, actorRequired } from "../middleware/auth.js";
 
 export const syncRoute = new Hono();
 
-syncRoute.post("/contributions", async (c) => {
+syncRoute.post("/contributions", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => ({ contributions: [] }));
   const contributions = (body as { contributions?: unknown[] }).contributions ?? [];
 

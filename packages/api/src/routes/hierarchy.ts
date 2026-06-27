@@ -1,5 +1,11 @@
 import { Hono } from "hono";
-import { authRequired, type AuthUser } from "../middleware/auth.js";
+import {
+  authRequired,
+  optionalAuth,
+  actorRequired,
+  type AuthUser,
+} from "../middleware/auth.js";
+import { resolveActor } from "../services/identity.js";
 import {
   assignTrailsInputSchema,
   createSubSystemInputSchema,
@@ -11,7 +17,7 @@ import {
   updateSuperSystemInputSchema,
   updateSystemInputSchema,
 } from "@magnum/shared";
-import { refreshProtection, canWrite, canDelete } from "../services/protection.js";
+import { refreshProtection, canWrite, canDelete, getProtection } from "../services/protection.js";
 import { evaluateAction } from "../services/patrol.js";
 import { recordRevision } from "../services/revisions.js";
 import { db } from "../db/index.js";
@@ -58,9 +64,7 @@ superSystemsRoute.get("/:id", async (c) => {
   return c.json(sup);
 });
 
-superSystemsRoute.post("/", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+superSystemsRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createSuperSystemInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -69,25 +73,23 @@ superSystemsRoute.post("/", authRequired(), async (c) => {
       400,
     );
   }
-  // Per outline.md, super-systems are "Unofficial" if self-organized.
-  // Mods+ are treated as official.
-  const official = authUser.role === "admin" || authUser.role === "moderator" || parsed.data.official;
+  const authUser = c.get("user");
+  const official = authUser?.role === "admin" || authUser?.role === "moderator" || parsed.data.official;
   const created = await createSuperSystem({ ...parsed.data, official });
+  const actor = resolveActor(c);
   await recordRevision({
     targetType: "super_system",
     targetId: created.id,
     action: "create",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: `Created super-system ${created.name}`,
     payloadAfter: { name: created.name, official: created.official },
   });
   return c.json(created, 201);
 });
 
-superSystemsRoute.put("/:id", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+superSystemsRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = updateSuperSystemInputSchema.safeParse(body);
@@ -97,14 +99,41 @@ superSystemsRoute.put("/:id", authRequired(), async (c) => {
       400,
     );
   }
+  // Protection gate.
+  await refreshProtection("super_system", id);
+  const prot = await getProtection("super_system", id);
+  const actor = resolveActor(c);
+  let role: string | undefined;
+  let karma = 0;
+  if (actor.kind === "user" && actor.userId) {
+    const actorRow = await db
+      .select({ karma: users.trustScore, role: users.role })
+      .from(users)
+      .where(eq(users.id, actor.userId))
+      .limit(1);
+    role = actorRow[0]?.role ?? undefined;
+    karma = Number(actorRow[0]?.karma ?? 0);
+  }
+  const allowed = canWrite(prot.level, {
+    role: role ?? null,
+    karma,
+    loggedIn: actor.kind === "user",
+    kind: actor.kind,
+  });
+  if (!allowed) {
+    return c.json(
+      { error: "forbidden", message: `protection level requires higher trust tier`, protection: prot.level },
+      403,
+    );
+  }
   const updated = await updateSuperSystem(id, parsed.data);
   if (!updated) return c.json({ error: "not_found" }, 404);
   await recordRevision({
     targetType: "super_system",
     targetId: id,
     action: "update",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: "Updated super-system",
   });
   return c.json(updated);
@@ -114,14 +143,33 @@ superSystemsRoute.delete("/:id", authRequired(), async (c) => {
   const authUser = c.get("user");
   if (!authUser) return c.json({ error: "unauthorized" }, 401);
   const id = c.req.param("id");
+  await refreshProtection("super_system", id);
+  const prot = await getProtection("super_system", id);
+  const actorRow = await db
+    .select({ karma: users.trustScore, role: users.role })
+    .from(users)
+    .where(eq(users.id, authUser.id))
+    .limit(1);
+  const allowed = canWrite(prot.level, {
+    role: actorRow[0]?.role ?? null,
+    karma: Number(actorRow[0]?.karma ?? 0),
+    loggedIn: true,
+  });
+  if (!allowed) {
+    return c.json(
+      { error: "forbidden", message: `protection level requires higher trust tier`, protection: prot.level },
+      403,
+    );
+  }
   const ok = await deleteSuperSystem(id);
   if (!ok) return c.json({ error: "not_found" }, 404);
+  const actor = resolveActor(c);
   await recordRevision({
     targetType: "super_system",
     targetId: id,
     action: "delete",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: "Deleted super-system",
   });
   return c.json({ ok: true });
@@ -146,9 +194,7 @@ subSystemsRoute.get("/:id", async (c) => {
   return c.json(sub);
 });
 
-subSystemsRoute.post("/", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+subSystemsRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createSubSystemInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -164,20 +210,19 @@ subSystemsRoute.post("/", authRequired(), async (c) => {
     geometry: parsed.data.geometry,
     description: parsed.data.description,
   });
+  const actor = resolveActor(c);
   await recordRevision({
     targetType: "sub_system",
     targetId: created.id,
     action: "create",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: `Created sub-system ${created.name}`,
   });
   return c.json(created, 201);
 });
 
-subSystemsRoute.put("/:id", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+subSystemsRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = updateSubSystemInputSchema.safeParse(body);
@@ -186,14 +231,41 @@ subSystemsRoute.put("/:id", authRequired(), async (c) => {
       400,
     );
   }
+  // Protection gate.
+  await refreshProtection("sub_system", id);
+  const prot = await getProtection("sub_system", id);
+  const actor = resolveActor(c);
+  let role: string | undefined;
+  let karma = 0;
+  if (actor.kind === "user" && actor.userId) {
+    const actorRow = await db
+      .select({ karma: users.trustScore, role: users.role })
+      .from(users)
+      .where(eq(users.id, actor.userId))
+      .limit(1);
+    role = actorRow[0]?.role ?? undefined;
+    karma = Number(actorRow[0]?.karma ?? 0);
+  }
+  const allowed = canWrite(prot.level, {
+    role: role ?? null,
+    karma,
+    loggedIn: actor.kind === "user",
+    kind: actor.kind,
+  });
+  if (!allowed) {
+    return c.json(
+      { error: "forbidden", message: `protection level requires higher trust tier`, protection: prot.level },
+      403,
+    );
+  }
   const updated = await updateSubSystem(id, parsed.data);
   if (!updated) return c.json({ error: "not_found" }, 404);
   await recordRevision({
     targetType: "sub_system",
     targetId: id,
     action: "update",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: "Updated sub-system",
   });
   return c.json(updated);
@@ -203,14 +275,33 @@ subSystemsRoute.delete("/:id", authRequired(), async (c) => {
   const authUser = c.get("user");
   if (!authUser) return c.json({ error: "unauthorized" }, 401);
   const id = c.req.param("id");
+  await refreshProtection("sub_system", id);
+  const prot = await getProtection("sub_system", id);
+  const actorRow = await db
+    .select({ karma: users.trustScore, role: users.role })
+    .from(users)
+    .where(eq(users.id, authUser.id))
+    .limit(1);
+  const allowed = canWrite(prot.level, {
+    role: actorRow[0]?.role ?? null,
+    karma: Number(actorRow[0]?.karma ?? 0),
+    loggedIn: true,
+  });
+  if (!allowed) {
+    return c.json(
+      { error: "forbidden", message: `protection level requires higher trust tier`, protection: prot.level },
+      403,
+    );
+  }
   const ok = await deleteSubSystem(id);
   if (!ok) return c.json({ error: "not_found" }, 404);
+  const actor = resolveActor(c);
   await recordRevision({
     targetType: "sub_system",
     targetId: id,
     action: "delete",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: "Deleted sub-system",
   });
   return c.json({ ok: true });
@@ -222,9 +313,8 @@ subSystemsRoute.delete("/:id", authRequired(), async (c) => {
 
 export const systemMoveRoute = new Hono<{ Variables: Variables }>();
 
-systemMoveRoute.post("/:id/move", authRequired(), async (c) => {
+systemMoveRoute.post("/:id/move", optionalAuth(), actorRequired(), async (c) => {
   const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
   const sourceSystemId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = moveSystemInputSchema.safeParse(body);
@@ -240,17 +330,24 @@ systemMoveRoute.post("/:id/move", authRequired(), async (c) => {
   if (action !== "assign_trail" && action !== "unassign_trail" && action !== "merge_into") {
     if (sourceSystemId) {
       await refreshProtection("system", sourceSystemId);
-      const { getProtection } = await import("../services/protection.js");
       const prot = await getProtection("system", sourceSystemId);
-      const actorRow = await db
-        .select({ karma: users.trustScore, role: users.role })
-        .from(users)
-        .where(eq(users.id, authUser.id))
-        .limit(1);
+      const actor = resolveActor(c);
+      let role: string | undefined;
+      let karma = 0;
+      if (actor.kind === "user" && actor.userId) {
+        const actorRow = await db
+          .select({ karma: users.trustScore, role: users.role })
+          .from(users)
+          .where(eq(users.id, actor.userId))
+          .limit(1);
+        role = actorRow[0]?.role ?? undefined;
+        karma = Number(actorRow[0]?.karma ?? 0);
+      }
       const allowed = canWrite(prot.level, {
-        role: actorRow[0]?.role ?? null,
-        karma: Number(actorRow[0]?.karma ?? 0),
-        loggedIn: true,
+        role: role ?? null,
+        karma,
+        loggedIn: actor.kind === "user",
+        kind: actor.kind,
       });
       if (!allowed) {
         return c.json(
@@ -275,9 +372,11 @@ systemMoveRoute.post("/:id/move", authRequired(), async (c) => {
   }
 
   // For merge_into we also check the delete gate (the source system is
-  // being absorbed — outline.md's "multiple trails you did not create"
-  // rule still applies).
+  // being absorbed).
   if (action === "merge_into" && sourceSystemId) {
+    if (!authUser) {
+      return c.json({ error: "forbidden", message: "merge_into requires authentication" }, 403);
+    }
     const actorRow = await db
       .select({ karma: users.trustScore, role: users.role })
       .from(users)
@@ -303,9 +402,10 @@ systemMoveRoute.post("/:id/move", authRequired(), async (c) => {
     }
   }
 
+  const actor = authUser ?? resolveActor(c);
   const result = await moveSystem(action, {
-    actorId: authUser.id,
-    actorRole: authUser.role,
+    actorId: authUser?.id ?? "",
+    actorRole: authUser?.role ?? undefined,
     sourceSystemId,
     sourceSubSystemId: sub_system_id,
     targetSuperId: target_super_id,
@@ -314,13 +414,12 @@ systemMoveRoute.post("/:id/move", authRequired(), async (c) => {
   if (!result.ok) {
     return c.json({ error: "invalid_input", message: result.reason ?? "move failed" }, 400);
   }
-  // Patrol: log the action. Trust tier is checked on the next mutation;
-  // for now we just record.
+  // Patrol: log the action.
   await evaluateAction({
-    revisionId: "00000000-0000-0000-0000-000000000000", // synthetic; patrol uses this for grouping
-    actorId: authUser.id,
+    revisionId: "00000000-0000-0000-0000-000000000000",
+    actorId: authUser?.id ?? "",
     actorKarma: 0,
-    actorRole: authUser.role,
+    actorRole: authUser?.role ?? null,
     targetType: "system",
     targetId: sourceSystemId,
     action: "reassign",

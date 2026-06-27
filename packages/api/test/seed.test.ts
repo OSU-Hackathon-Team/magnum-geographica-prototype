@@ -16,15 +16,12 @@ const { seedRoute } = await import("../src/routes/seed.js");
 const buildApp = () => new Hono().route("/api/seed", seedRoute);
 
 describe("POST /api/seed", () => {
-  test("runs without auth in dev (NODE_ENV != production)", async () => {
-    const prevEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "development";
-    try {
-      const res = await buildApp().request("/api/seed", { method: "POST" });
-      expect([200, 500]).toContain(res.status);
-    } finally {
-      process.env.NODE_ENV = prevEnv;
-    }
+  test("runs with admin secret in any environment", async () => {
+    const res = await buildApp().request("/api/seed", {
+      method: "POST",
+      headers: { "x-admin-secret": "dev-secret-change-me" },
+    });
+    expect([200, 500]).toContain(res.status);
   });
 
   test("returns 401 in production without admin secret", async () => {

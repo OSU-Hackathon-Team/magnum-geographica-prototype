@@ -2,6 +2,14 @@ import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 import type { User } from "@magnum/shared/types";
+import type { TrustTier } from "@magnum/shared/constants";
+import { TRUST_TIER_THRESHOLDS } from "@magnum/shared/constants";
+
+function tierFromKarma(karma: number): TrustTier {
+  if (karma >= TRUST_TIER_THRESHOLDS.trusted) return "trusted";
+  if (karma >= TRUST_TIER_THRESHOLDS.established) return "established";
+  return "new";
+}
 
 const TOKEN_KEY = "magnum_auth_token";
 const REFRESH_KEY = "magnum_refresh_token";
@@ -13,6 +21,8 @@ export interface AuthState {
   token: string | null;
   refreshToken: string | null;
   user: User | null;
+  karma: number;
+  tier: TrustTier;
   contributorName: string;
   isIpContributor: boolean;
   isAuthenticated: boolean;
@@ -31,6 +41,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   refreshToken: null,
   user: null,
+  karma: 0,
+  tier: "new",
   contributorName: "anonymous",
   isIpContributor: false,
   isAuthenticated: false,
@@ -43,6 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setAuth: async (token: string, refreshToken: string, user: User) => {
+    const karma = user.trust_score ?? 0;
     await AsyncStorage.multiSet([
       [TOKEN_KEY, token],
       [REFRESH_KEY, refreshToken],
@@ -54,6 +67,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user,
       isAuthenticated: true,
       isAdmin: user.role === "admin" || user.role === "moderator",
+      karma,
+      tier: tierFromKarma(karma),
       contributorName: user.username,
       isIpContributor: false,
       isLoading: false,
@@ -73,6 +88,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       isAuthenticated: false,
       isAdmin: false,
+      karma: 0,
+      tier: "new",
       contributorName: "anonymous",
       isIpContributor: false,
       isLoading: false,
@@ -88,12 +105,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userJson = entries[2]?.[1] ?? null;
       if (token && refreshToken && userJson) {
         const user = JSON.parse(userJson) as User;
+        const karma = user.trust_score ?? 0;
         set({
           token,
           refreshToken,
           user,
           isAuthenticated: true,
           isAdmin: user.role === "admin" || user.role === "moderator",
+          karma,
+          tier: tierFromKarma(karma),
           contributorName: user.username,
           isIpContributor: false,
           isLoading: false,

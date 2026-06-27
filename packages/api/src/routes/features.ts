@@ -8,7 +8,9 @@ import {
   validateAnswers,
 } from "@magnum/shared";
 import { getPresetById } from "../services/presets.js";
-import { authRequired, type AuthUser } from "../middleware/auth.js";
+import { authRequired, optionalAuth, actorRequired, type AuthUser } from "../middleware/auth.js";
+import { resolveContributorName, resolveActor } from "../services/identity.js";
+import { canWrite, getProtection, refreshProtection } from "../services/protection.js";
 
 type Variables = { user?: AuthUser };
 
@@ -78,7 +80,7 @@ featuresRoute.get("/:id", async (c) => {
   return c.json({ ...rest, center });
 });
 
-featuresRoute.post("/", authRequired(), async (c) => {
+featuresRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const authUser = c.get("user");
   const body = await c.req.json().catch(() => null);
   const parsed = createFeatureInputSchema.safeParse(body);
@@ -124,15 +126,14 @@ featuresRoute.post("/", authRequired(), async (c) => {
       );
     }
     resolvedPresetId = preset.id;
-    // Keep type_tag in sync so legacy clients still get a usable label.
     resolvedTypeTag = preset.key;
   }
 
-  // Look up the author for karma attribution.
-  const authorRows = authUser
-    ? await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, authUser.id)).limit(1)
-    : [];
-  const author = authorRows[0];
+  // Attribution via resolveActor — IP users get "IP:<addr>", auth users get their username.
+  const actor = resolveActor(c);
+  const authorId = authUser
+    ? (await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, authUser.id)).limit(1))[0]?.id ?? null
+    : null;
 
   const rows = await db
     .insert(features)
@@ -145,8 +146,8 @@ featuresRoute.post("/", authRequired(), async (c) => {
       trailId: trail_id ?? null,
       systemId: system_id ?? null,
       description: description ?? null,
-      createdByUserId: author?.id ?? null,
-      contributorName: author?.username ?? "anonymous",
+      createdByUserId: authorId ?? null,
+      contributorName: actor.contributorName,
     })
     .returning();
 
@@ -173,7 +174,7 @@ featuresRoute.post("/", authRequired(), async (c) => {
   );
 });
 
-featuresRoute.put("/:id", async (c) => {
+featuresRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = updateFeatureInputSchema.safeParse(body);
@@ -184,6 +185,34 @@ featuresRoute.put("/:id", async (c) => {
     );
   }
   const { name, preset_id, type_tag, description, trail_id, system_id, answers } = parsed.data;
+
+  // Protection gate.
+  await refreshProtection("feature", id);
+  const prot = await getProtection("feature", id);
+  const actor = resolveActor(c);
+  let role: string | undefined;
+  let karma = 0;
+  if (actor.kind === "user" && actor.userId) {
+    const actorRow = await db
+      .select({ karma: users.trustScore, role: users.role })
+      .from(users)
+      .where(eq(users.id, actor.userId))
+      .limit(1);
+    role = actorRow[0]?.role ?? undefined;
+    karma = Number(actorRow[0]?.karma ?? 0);
+  }
+  const allowed = canWrite(prot.level, {
+    role: role ?? null,
+    karma,
+    loggedIn: actor.kind === "user",
+    kind: actor.kind,
+  });
+  if (!allowed) {
+    return c.json(
+      { error: "forbidden", message: `protection level requires higher trust tier`, protection: prot.level },
+      403,
+    );
+  }
 
   // Validate answers against the resolved preset (incoming or existing).
   if (answers !== undefined) {
@@ -259,8 +288,29 @@ featuresRoute.put("/:id", async (c) => {
   });
 });
 
-featuresRoute.delete("/:id", async (c) => {
+featuresRoute.delete("/:id", authRequired(), async (c) => {
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
   const id = c.req.param("id");
-  const result = await db.delete(features).where(eq(features.id, id));
+  // Protection gate.
+  await refreshProtection("feature", id);
+  const prot = await getProtection("feature", id);
+  const actorRow = await db
+    .select({ karma: users.trustScore, role: users.role })
+    .from(users)
+    .where(eq(users.id, authUser.id))
+    .limit(1);
+  const allowed = canWrite(prot.level, {
+    role: actorRow[0]?.role ?? null,
+    karma: Number(actorRow[0]?.karma ?? 0),
+    loggedIn: true,
+  });
+  if (!allowed) {
+    return c.json(
+      { error: "forbidden", message: `protection level requires higher trust tier`, protection: prot.level },
+      403,
+    );
+  }
+  await db.delete(features).where(eq(features.id, id));
   return c.json({ ok: true });
 });

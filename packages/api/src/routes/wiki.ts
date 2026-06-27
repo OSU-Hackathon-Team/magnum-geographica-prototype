@@ -8,7 +8,7 @@ import {
   revertWikiPageInputSchema,
   wikiPageQuerySchema,
 } from "@magnum/shared";
-import { adminOnly, type AuthUser } from "../middleware/auth.js";
+import { optionalAuth, actorRequired, type AuthUser } from "../middleware/auth.js";
 import { resolveContributorName } from "../services/identity.js";
 
 type Variables = { user?: AuthUser };
@@ -79,7 +79,7 @@ wikiRoute.get("/", async (c) => {
   return c.json(page);
 });
 
-wikiRoute.post("/", async (c) => {
+wikiRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createWikiPageInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -136,7 +136,7 @@ wikiRoute.post("/", async (c) => {
   return c.json(wikiPage, 201);
 });
 
-wikiRoute.put("/:id", async (c) => {
+wikiRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
   const wikiPageId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = updateWikiPageInputSchema.safeParse(body);
@@ -246,7 +246,7 @@ wikiRoute.get("/:id/revisions/:revId", async (c) => {
   return c.json(rev);
 });
 
-wikiRoute.post("/:id/revert", async (c) => {
+wikiRoute.post("/:id/revert", optionalAuth(), actorRequired(), async (c) => {
   const wikiPageId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = revertWikiPageInputSchema.safeParse(body);

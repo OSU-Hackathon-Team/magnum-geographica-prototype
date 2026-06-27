@@ -8,9 +8,8 @@
  *   3. Increment the target author's `users.trust_score` by `karmaDelta`.
  *   4. Recompute protection level for the target.
  *
- * Anonymous votes (no user_id) tally and trigger hide-check but award no
- * karma — that mirrors the §21.7 rule that upvote *value* is weighted by
- * the voter's tier, and a New-tier vote still has weight 1.
+ * Only authenticated users may vote; IP users are rejected at the route
+ * layer. Every vote has a real user_id.
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -34,7 +33,7 @@ export interface CastVoteInput {
   targetType: VoteTargetType;
   targetId: string;
   value: 1 | -1;
-  userId: string | null;
+  userId: string;
   voterKarma: number;
   voterTier: TrustTier;
   contributorName: string;
@@ -52,19 +51,17 @@ export interface CastVoteResult {
 export async function castVote(input: CastVoteInput): Promise<CastVoteResult> {
   return db.transaction(async (tx) => {
     // 1. Upsert vote row. If a row exists, the user is changing their vote.
-    const existing = input.userId
-      ? await tx
-          .select()
-          .from(votes)
-          .where(
-            and(
-              eq(votes.targetType, input.targetType),
-              eq(votes.targetId, input.targetId),
-              eq(votes.userId, input.userId),
-            ),
-          )
-          .limit(1)
-      : [];
+    const existing = await tx
+      .select()
+      .from(votes)
+      .where(
+        and(
+          eq(votes.targetType, input.targetType),
+          eq(votes.targetId, input.targetId),
+          eq(votes.userId, input.userId),
+        ),
+      )
+      .limit(1);
 
     let previousValue: -1 | 1 | null = null;
     if (existing[0]) {
@@ -148,37 +145,32 @@ export async function castVote(input: CastVoteInput): Promise<CastVoteResult> {
       });
     }
 
-    // 3. Karma: find the target author and adjust their trust_score. Skip
-    //    entirely for anonymous votes — there's no attribution target.
+    // 3. Karma: find the target author and adjust their trust_score.
     let karmaAwarded = 0;
-    if (input.userId) {
-      const table = targetTable(input.targetType);
-      const authorCol = authorColumn(input.targetType);
-      if (authorCol) {
-        const authorRows = await tx.execute<{ author_id: string | null }>(
-          sql`SELECT ${sql.raw(authorCol)} AS author_id FROM ${sql.raw(table)} WHERE id = ${input.targetId} LIMIT 1`,
-        );
-        const authorId = (authorRows.rows[0] as { author_id?: string | null } | undefined)
-          ?.author_id;
-        if (authorId) {
-          // Reverse prior karma if the user changed their vote.
-          let totalDelta = 0;
-          if (previousValue !== null) {
-            totalDelta -= karmaDelta(previousValue, input.voterTier);
-          }
-          totalDelta += karmaDelta(input.value, input.voterTier);
-          if (totalDelta !== 0) {
-            await tx
-              .update(users)
-              .set({ trustScore: sql`GREATEST(0, ${users.trustScore} + ${totalDelta})` })
-              .where(eq(users.id, authorId));
-            karmaAwarded = totalDelta;
-          }
+    const table = targetTable(input.targetType);
+    const authorCol = authorColumn(input.targetType);
+    if (authorCol) {
+      const authorRows = await tx.execute<{ author_id: string | null }>(
+        sql`SELECT ${sql.raw(authorCol)} AS author_id FROM ${sql.raw(table)} WHERE id = ${input.targetId} LIMIT 1`,
+      );
+      const authorId = (authorRows.rows[0] as { author_id?: string | null } | undefined)
+        ?.author_id;
+      if (authorId) {
+        // Reverse prior karma if the user changed their vote.
+        let totalDelta = 0;
+        if (previousValue !== null) {
+          totalDelta -= karmaDelta(previousValue, input.voterTier);
+        }
+        totalDelta += karmaDelta(input.value, input.voterTier);
+        if (totalDelta !== 0) {
+          await tx
+            .update(users)
+            .set({ trustScore: sql`GREATEST(0, ${users.trustScore} + ${totalDelta})` })
+            .where(eq(users.id, authorId));
+          karmaAwarded = totalDelta;
         }
       }
     }
-    // Anonymous votes: tally only.
-    void contributorNameColumn;
 
     return {
       upvotes: newUp,

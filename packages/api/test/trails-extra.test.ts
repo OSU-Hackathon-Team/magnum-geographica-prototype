@@ -173,7 +173,7 @@ describe("POST /api/trails", () => {
   test("rejects an invalid difficulty with 400 and does not insert", async () => {
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         name: "X",
         slug: "x",
@@ -188,7 +188,7 @@ describe("POST /api/trails", () => {
   test("accepts a valid trail and inserts it with all fields", async () => {
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         name: "Buckeye",
         slug: "buckeye",
@@ -211,7 +211,7 @@ describe("POST /api/trails", () => {
     await seedTrail();
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ name: "Other", slug: "buckeye" }),
     });
     // The route does not catch the unique-constraint violation, so
@@ -231,7 +231,7 @@ describe("POST /api/trails", () => {
     const sys = await seedSystem();
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         name: "Buckeye",
         slug: "buckeye",

@@ -282,7 +282,7 @@ export async function voteOnTrace(
   traceId: string,
   value: 1 | -1,
   actor: {
-    userId: string | null;
+    userId: string;
     voterKarma: number;
     voterTier: "new" | "established" | "trusted" | "moderator";
     contributorName: string;
