@@ -34,7 +34,7 @@ services:
         condition: service_healthy
     ports:
       - "${MARTIN_HOST_PORT:-3001}:3000"
-    command: ["--config", "/etc/martin.yaml", "--cache-size-mb", "${MARTIN_CACHE_MB:-0}"]
+    command: ["--config", "/etc/martin.yaml", "--cache-size", "${MARTIN_CACHE_MB:-0}"]
 
   api:
     build:
