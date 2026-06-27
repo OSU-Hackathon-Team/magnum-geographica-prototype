@@ -19,6 +19,7 @@ import {
   type Shape,
 } from "@magnum/shared";
 import { Button } from "../../src/components/ui/Button";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuthStore } from "../../src/stores/authStore";
 import { useMapStore } from "../../src/stores/mapStore";
 
@@ -41,6 +42,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
  */
 export default function NewSystemScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const params = useLocalSearchParams<{
@@ -151,14 +153,14 @@ export default function NewSystemScreen() {
     <>
       <Stack.Screen options={{ title: "New System" }} />
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.bg }]}
         contentContainerStyle={styles.content}
         testID="new-system-screen"
       >
         <View style={styles.section}>
-          <Text style={styles.label}>Name</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted }]}
             value={name}
             onChangeText={(v) => {
               setName(v);
@@ -177,9 +179,9 @@ export default function NewSystemScreen() {
           />
         </View>
         <View style={styles.section}>
-          <Text style={styles.label}>Slug</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Slug</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted }]}
             value={slug}
             onChangeText={(v) => {
               setSlug(v);
@@ -191,9 +193,9 @@ export default function NewSystemScreen() {
           />
         </View>
         <View style={styles.section}>
-          <Text style={styles.label}>Description</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Description</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
+            style={[styles.input, styles.textArea, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted }]}
             value={description}
             onChangeText={(v) => {
               setDescription(v);
@@ -205,9 +207,9 @@ export default function NewSystemScreen() {
           />
         </View>
         <View style={styles.section}>
-          <Text style={styles.label}>External URL</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>External URL</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted }]}
             value={externalUrl}
             onChangeText={(v) => {
               setExternalUrl(v);
@@ -219,7 +221,7 @@ export default function NewSystemScreen() {
           />
         </View>
         <View style={styles.section}>
-          <Text style={styles.label}>Provenance</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Provenance</Text>
           <View style={styles.chipsRow}>
             {PROVENANCE_SOURCES.map((s) => (
               <Pressable
@@ -228,13 +230,18 @@ export default function NewSystemScreen() {
                   setSource(s);
                   markDirty();
                 }}
-                style={[styles.chip, source === s ? styles.chipActive : null]}
+                style={[
+                  styles.chip,
+                  { backgroundColor: colors.surfaceMutedStrong },
+                  source === s && { backgroundColor: colors.primary },
+                ]}
                 testID={`new-system-source-${s}`}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    source === s ? styles.chipTextActive : null,
+                    { color: colors.textSecondary },
+                    source === s && { color: colors.textInverse, fontWeight: "600" },
                   ]}
                 >
                   {s}
@@ -243,7 +250,7 @@ export default function NewSystemScreen() {
             ))}
           </View>
           <TextInput
-            style={[styles.input, { marginTop: 8 }]}
+            style={[styles.input, { marginTop: 8, borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceMuted }]}
             value={sourceDate}
             onChangeText={(v) => {
               setSourceDate(v);
@@ -254,14 +261,14 @@ export default function NewSystemScreen() {
           />
         </View>
         <View style={styles.section}>
-          <Text style={styles.label}>Boundary</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Boundary</Text>
           {fromBoundary ? (
             <View
-              style={styles.boundaryIndicator}
+              style={[styles.boundaryIndicator, { borderColor: colors.successMuted, backgroundColor: colors.surfaceTint }]}
               testID="new-system-boundary-indicator"
             >
-              <Ionicons name="map" size={18} color="#22c55e" />
-              <Text style={styles.boundaryIndicatorText}>
+              <Ionicons name="map" size={18} color={colors.primary} />
+              <Text style={[styles.boundaryIndicatorText, { color: colors.textOnTint }]}>
                 {closedRingCount === 1
                   ? `1 region · ${boundaryVertexCount} vertices`
                   : `${closedRingCount} regions · ${boundaryVertexCount} vertices total`}
@@ -276,24 +283,24 @@ export default function NewSystemScreen() {
                 style={styles.boundaryEditLink}
                 hitSlop={8}
               >
-                <Text style={styles.boundaryEditLinkText}>Edit</Text>
+                <Text style={[styles.boundaryEditLinkText, { color: colors.primaryStrong }]}>Edit</Text>
               </Pressable>
             </View>
           ) : (
             <Pressable
-              style={styles.boundaryPicker}
+              style={[styles.boundaryPicker, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}
               onPress={() => router.replace("/system/boundary?mode=create" as never)}
               testID="new-system-boundary-pick"
             >
-              <Ionicons name="map-outline" size={18} color="#64748b" />
-              <Text style={styles.boundaryPickerText}>Draw on map</Text>
+              <Ionicons name="map-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.boundaryPickerText, { color: colors.text }]}>Draw on map</Text>
             </Pressable>
           )}
         </View>
         {error ? (
-          <View style={styles.errorBanner} testID="new-system-error">
-            <Ionicons name="alert-circle" size={16} color="#ef4444" />
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorBanner, { backgroundColor: colors.dangerMuted }]} testID="new-system-error">
+            <Ionicons name="alert-circle" size={16} color={colors.danger} />
+            <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
           </View>
         ) : null}
         <View style={styles.footer}>
@@ -352,18 +359,15 @@ function decodeShapeParam(raw: string | string[] | undefined): Shape | null {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   content: { padding: 16, gap: 16, paddingBottom: 32 },
   section: { gap: 6 },
-  label: { fontSize: 12, fontWeight: "700", color: "#444" },
+  label: { fontSize: 12, fontWeight: "700" },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 6,
     padding: 10,
     fontSize: 14,
-    color: "#222",
-    backgroundColor: "#fafafa",
   },
   textArea: { minHeight: 80, textAlignVertical: "top" },
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
@@ -371,11 +375,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
-    backgroundColor: "#f1f1f1",
   },
-  chipActive: { backgroundColor: "#22c55e" },
-  chipText: { fontSize: 12, color: "#444" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
+  chipText: { fontSize: 12 },
   boundaryPicker: {
     flexDirection: "row",
     alignItems: "center",
@@ -384,11 +385,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderStyle: "dashed",
-    backgroundColor: "#fafafa",
   },
-  boundaryPickerText: { fontSize: 14, color: "#0f172a" },
+  boundaryPickerText: { fontSize: 14 },
   boundaryIndicator: {
     flexDirection: "row",
     alignItems: "center",
@@ -397,21 +396,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#bbf7d0",
-    backgroundColor: "#f0fdf4",
   },
-  boundaryIndicatorText: { fontSize: 14, color: "#14532d", flex: 1 },
+  boundaryIndicatorText: { fontSize: 14, flex: 1 },
   boundaryEditLink: { paddingHorizontal: 4, paddingVertical: 2 },
-  boundaryEditLinkText: { fontSize: 12, color: "#16a34a", fontWeight: "600" },
+  boundaryEditLinkText: { fontSize: 12, fontWeight: "600" },
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#fef2f2",
     padding: 10,
     borderRadius: 6,
   },
-  errorText: { color: "#ef4444", fontSize: 12, flex: 1 },
+  errorText: { fontSize: 12, flex: 1 },
   footer: {
     flexDirection: "row",
     justifyContent: "space-between",

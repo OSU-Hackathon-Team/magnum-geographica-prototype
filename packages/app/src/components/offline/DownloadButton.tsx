@@ -2,6 +2,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "../ui/Button";
+import { useTheme } from "../../providers/ThemeProvider";
 
 export interface DownloadButtonProps {
   systemId: string;
@@ -25,6 +26,7 @@ export function DownloadButton({
   onDownload,
   disabled,
 }: DownloadButtonProps) {
+  const { colors } = useTheme();
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,8 +45,8 @@ export function DownloadButton({
   if (isDownloaded) {
     return (
       <View style={styles.downloaded} testID={`download-done-${systemId}`}>
-        <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-        <Text style={styles.downloadedText}>Downloaded for offline use</Text>
+        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+        <Text style={[styles.downloadedText, { color: colors.primary }]}>Downloaded for offline use</Text>
       </View>
     );
   }
@@ -58,16 +60,16 @@ export function DownloadButton({
         disabled={disabled || downloading}
         testID={`download-button-${systemId}`}
       >
-        <Ionicons name="download-outline" size={14} color="#fff" />
-        <Text style={styles.btnText}>
+        <Ionicons name="download-outline" size={14} color={colors.textInverse} />
+        <Text style={[styles.btnText, { color: colors.textInverse }]}>
           {downloading ? "Downloading..." : "Download for Offline"}
         </Text>
       </Button>
       {downloadSizeBytes !== undefined ? (
-        <Text style={styles.size}>~{formatSize(downloadSizeBytes)}</Text>
+        <Text style={[styles.size, { color: colors.textMuted }]}>~{formatSize(downloadSizeBytes)}</Text>
       ) : null}
       {error ? (
-        <Text style={styles.error} testID={`download-error-${systemId}`}>
+        <Text style={[styles.error, { color: colors.danger }]} testID={`download-error-${systemId}`}>
           {error}
         </Text>
       ) : null}
@@ -78,8 +80,8 @@ export function DownloadButton({
 const styles = StyleSheet.create({
   container: { gap: 6 },
   downloaded: { flexDirection: "row", alignItems: "center", gap: 6 },
-  downloadedText: { fontSize: 12, color: "#22c55e" },
-  size: { fontSize: 11, color: "#999" },
-  error: { color: "#ef4444", fontSize: 12 },
-  btnText: { fontSize: 12, fontWeight: "600", color: "#fff" },
+  downloadedText: { fontSize: 12 },
+  size: { fontSize: 11 },
+  error: { fontSize: 12 },
+  btnText: { fontSize: 12, fontWeight: "600" },
 });

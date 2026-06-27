@@ -193,6 +193,7 @@ function buildMapHtml(
       function buildMap(){
         var allLayers=[];
         var martinUrl=${safeMartin};
+        var apiUrl=${safeApiUrl};
         var baseLayerDefs=${safeBaseLayers};
         var initialBaseId=${safeBaseLayerId};
         var initCenter=${safeCenter};
@@ -432,11 +433,10 @@ function buildMapHtml(
             if(!features)return;
             for(var fi=0;fi<features.length;fi++){
               if(features[fi].get('shapeKind')==='vertex'){
-           dragFired=false,
-           heatmapLayer=null,
-           heatmapSource=null,
-           heatmapVisible=false,
-           apiUrl=${safeApiUrl};
+            dragFired=false,
+            heatmapLayer=null,
+            heatmapSource=null,
+            heatmapVisible=false;
                 var ringIdx=features[fi].get('ringIndex')||0;
                 var vertIdx=features[fi].get('vertexIndex')||0;
                 ev.preventDefault();

@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "scheme": "magnum",
     "userInterfaceStyle": "automatic",
+    "main": "./index.js",
     "newArchEnabled": false,
     "platforms": ["ios", "android", "web"],
         "jsEngine": "hermes",

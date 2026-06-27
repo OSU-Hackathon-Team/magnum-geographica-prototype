@@ -63,7 +63,7 @@ export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
           <View
             style={[
               styles.dotInner,
-              active.kind === "raster" ? styles.dotInnerRaster : styles.dotInnerMvt,
+              { backgroundColor: active.kind === "raster" ? colors.primaryStrong : colors.primary },
             ]}
           />
         </View>
@@ -111,7 +111,7 @@ export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
                     <View
                       style={[
                         styles.dot,
-                        l.kind === "raster" ? styles.dotInnerRaster : styles.dotInnerMvt,
+                        { backgroundColor: l.kind === "raster" ? colors.primaryStrong : colors.primary },
                       ]}
                     />
                     <View style={styles.itemText}>
@@ -181,12 +181,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-  },
-  dotInnerMvt: {
-    backgroundColor: "#a4c47a",
-  },
-  dotInnerRaster: {
-    backgroundColor: "#3a6f8a",
   },
   backdrop: {
     flex: 1,

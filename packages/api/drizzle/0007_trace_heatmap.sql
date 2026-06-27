@@ -10,3 +10,45 @@ CREATE TABLE "trace_heatmap" (
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "trace_heatmap_zoom_tile_x_tile_y_pk" PRIMARY KEY("zoom","tile_x","tile_y")
 );
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION traces_heatmap(
+  z integer, x integer, y integer
+)
+RETURNS bytea
+AS $$
+  WITH bounds AS (
+    SELECT ST_TileEnvelope(z, x, y) AS geom
+  ),
+  grid AS (
+    SELECT
+      gx, gy,
+      (x * 8 + gx)::integer AS cell_x,
+      (y * 8 + gy)::integer AS cell_y,
+      ST_MakeEnvelope(
+        ST_XMin(bounds.geom) + gx * (ST_XMax(bounds.geom) - ST_XMin(bounds.geom)) / 8.0,
+        ST_YMin(bounds.geom) + gy * (ST_YMax(bounds.geom) - ST_YMin(bounds.geom)) / 8.0,
+        ST_XMin(bounds.geom) + (gx + 1) * (ST_XMax(bounds.geom) - ST_XMin(bounds.geom)) / 8.0,
+        ST_YMin(bounds.geom) + (gy + 1) * (ST_YMax(bounds.geom) - ST_YMin(bounds.geom)) / 8.0,
+        3857
+      ) AS cell_geom
+    FROM bounds,
+      generate_series(0, 7) AS gx,
+      generate_series(0, 7) AS gy
+  ),
+  tile AS (
+    SELECT
+      g.cell_geom,
+      COALESCE(SUM(h.trace_count), 0)::integer AS density
+    FROM grid g
+    LEFT JOIN trace_heatmap h ON
+      h.zoom = 14
+      AND h.tile_x BETWEEN (x * 8 + g.gx) * POWER(2, 14 - z - 3)::integer
+                       AND (x * 8 + g.gx + 1) * POWER(2, 14 - z - 3)::integer - 1
+      AND h.tile_y BETWEEN (y * 8 + g.gy) * POWER(2, 14 - z - 3)::integer
+                       AND (y * 8 + g.gy + 1) * POWER(2, 14 - z - 3)::integer - 1
+    GROUP BY g.cell_x, g.cell_y, g.cell_geom
+    HAVING COALESCE(SUM(h.trace_count), 0) > 0
+  )
+  SELECT ST_AsMVT(tile, 'traces_heatmap', 4096, 'cell_geom', 'density')
+  FROM tile;
+$$ LANGUAGE sql STABLE PARALLEL SAFE;

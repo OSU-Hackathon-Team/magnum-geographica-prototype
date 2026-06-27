@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { router, Link } from "expo-router";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../src/stores/authStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
@@ -188,11 +188,14 @@ export default function ProfileScreen() {
                 Log Out
               </Button>
               {isAdmin && (
-                <Link href="/admin/dashboard" asChild>
-                  <Button variant="primary" size="small" testID="profile-admin">
-                    Admin Panel
-                  </Button>
-                </Link>
+                <Button
+                  variant="primary"
+                  size="small"
+                  testID="profile-admin"
+                  onPress={() => router.push("/admin/dashboard")}
+                >
+                  Admin Panel
+                </Button>
               )}
             </View>
           </View>
@@ -205,16 +208,22 @@ export default function ProfileScreen() {
               {isIpContributor ? "Editing as your IP address" : "Editing anonymously"}
             </Text>
             <View style={styles.buttonRow}>
-              <Link href="/auth/login" asChild>
-                <Button variant="primary" size="small" testID="profile-login">
-                  Log In
-                </Button>
-              </Link>
-              <Link href="/auth/register" asChild>
-                <Button variant="secondary" size="small" testID="profile-register">
-                  Register
-                </Button>
-              </Link>
+              <Button
+                variant="primary"
+                size="small"
+                testID="profile-login"
+                onPress={() => router.push("/auth/login")}
+              >
+                Log In
+              </Button>
+              <Button
+                variant="secondary"
+                size="small"
+                testID="profile-register"
+                onPress={() => router.push("/auth/register")}
+              >
+                Register
+              </Button>
             </View>
             {isIpContributor ? (
               <Text

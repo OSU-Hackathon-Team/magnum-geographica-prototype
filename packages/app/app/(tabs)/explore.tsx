@@ -493,7 +493,7 @@ export default function ExploreScreen() {
         />
         <BaseLayerSwitcher layers={baseLayerDefs} testID="explore-base-layer-switcher" />
         <Pressable
-          style={[styles.heatmapToggle, showHeatmap && styles.heatmapToggleActive]}
+          style={[styles.heatmapToggle, showHeatmap && styles.heatmapToggleActive, { shadowColor: colors.shadow }]}
           onPress={toggleHeatmap}
           testID="explore-heatmap-toggle"
           accessibilityLabel="Toggle trace heatmap"
@@ -501,14 +501,14 @@ export default function ExploreScreen() {
           <Ionicons
             name={showHeatmap ? "flame" : "flame-outline"}
             size={18}
-            color={showHeatmap ? "#f97316" : "#6b7280"}
+            color={showHeatmap ? colors.warning : colors.textMuted}
           />
         </Pressable>
       </View>
 
       {deepLink ? (
         <View style={styles.coordsBadge} testID="explore-coords">
-          <Text style={styles.coordsText}>
+          <Text style={[styles.coordsText, { color: colors.textInverse }]}>
             {deepLink.lat.toFixed(4)}, {deepLink.lon.toFixed(4)} · z{deepLink.zoom}
           </Text>
         </View>
@@ -563,51 +563,51 @@ export default function ExploreScreen() {
       ) : null}
 
       {isPlacing ? (
-        <View style={styles.placingBanner} testID="explore-placing-banner">
-          <Text style={styles.placingText}>Tap on the map to place your feature</Text>
+        <View style={[styles.placingBanner, { backgroundColor: colors.primary, shadowColor: colors.shadow }]} testID="explore-placing-banner">
+          <Text style={[styles.placingText, { color: colors.textInverse }]}>Tap on the map to place your feature</Text>
           <Pressable
             onPress={handleCancelPlacing}
             style={styles.placingCancel}
             testID="explore-placing-cancel"
           >
-            <Text style={styles.placingCancelText}>Cancel</Text>
+            <Text style={[styles.placingCancelText, { color: colors.textInverse }]}>Cancel</Text>
           </Pressable>
         </View>
       ) : isDrawing ? (
-        <View style={styles.placingBanner} testID="explore-draw-banner">
-          <Text style={styles.placingText}>Drag to select download area</Text>
+        <View style={[styles.placingBanner, { backgroundColor: colors.primary, shadowColor: colors.shadow }]} testID="explore-draw-banner">
+          <Text style={[styles.placingText, { color: colors.textInverse }]}>Drag to select download area</Text>
           <Pressable
             onPress={handleCancelDraw}
             style={styles.placingCancel}
             testID="explore-draw-cancel"
           >
-            <Text style={styles.placingCancelText}>Cancel</Text>
+            <Text style={[styles.placingCancelText, { color: colors.textInverse }]}>Cancel</Text>
           </Pressable>
         </View>
       ) : (
         <View style={[styles.fabColumn, !showDownloadFab && styles.fabColumnAlone]}>
           {showDownloadFab ? (
             <Pressable
-              style={styles.downloadAreaFab}
+              style={[styles.downloadAreaFab, { backgroundColor: colors.primary, shadowColor: colors.shadow }]}
               onPress={handleStartDraw}
               testID="explore-download-area"
             >
-              <Text style={styles.downloadAreaFabText}>⬇</Text>
+              <Text style={[styles.downloadAreaFabText, { color: colors.textInverse }]}>⬇</Text>
             </Pressable>
           ) : null}
           <Pressable
-            style={styles.uploadTraceFab}
+            style={[styles.uploadTraceFab, { backgroundColor: colors.primary, shadowColor: colors.shadow }]}
             onPress={() => setShowUploadTrace(true)}
             testID="explore-upload-trace"
           >
-            <Ionicons name="navigate-outline" size={20} color="#fff" />
+            <Ionicons name="navigate-outline" size={20} color={colors.textInverse} />
           </Pressable>
           <Pressable
-            style={styles.addFeatureFab}
+            style={[styles.addFeatureFab, { backgroundColor: colors.primary, shadowColor: colors.shadow }]}
             onPress={handleStartPlacing}
             testID="explore-add-feature"
           >
-            <Text style={styles.addFeatureFabText}>+</Text>
+            <Text style={[styles.addFeatureFabText, { color: colors.textInverse }]}>+</Text>
           </Pressable>
         </View>
       )}
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  coordsText: { color: "#fff", fontSize: 12 },
+  coordsText: { fontSize: 12 },
   systemPopupOverlay: {
     position: "absolute",
     bottom: 24,
@@ -748,20 +748,17 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#22c55e",
     paddingHorizontal: 16,
     paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
   placingText: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "600",
   },
@@ -772,7 +769,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   placingCancelText: {
-    color: "#fff",
     fontSize: 13,
     fontWeight: "600",
   },
@@ -780,10 +776,8 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#22c55e",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -793,16 +787,14 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#3b82f6",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
-  addFeatureFabText: { fontSize: 24, color: "#fff", lineHeight: 28 },
+  addFeatureFabText: { fontSize: 24, lineHeight: 28 },
   fabColumn: {
     position: "absolute",
     bottom: 80,
@@ -817,16 +809,14 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#3b82f6",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
-  downloadAreaFabText: { fontSize: 20, color: "#fff", lineHeight: 24 },
+  downloadAreaFabText: { fontSize: 20, lineHeight: 24 },
   heatmapToggle: {
     position: "absolute",
     top: 56,
@@ -840,7 +830,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.08)",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },

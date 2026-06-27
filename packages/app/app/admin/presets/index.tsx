@@ -9,16 +9,19 @@ import {
   Text,
   View,
 } from "react-native";
-import { Link, Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient, PRESET_CATEGORY_LABELS, type Preset, type PresetCategory } from "@magnum/shared";
 import { useAuthStore } from "../../../src/stores/authStore";
+import { useTheme } from "../../../src/providers/ThemeProvider";
 import { Card } from "../../../src/components/ui/Card";
 import { Button } from "../../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export default function AdminPresetsScreen() {
+  const { colors } = useTheme();
+  const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,44 +94,50 @@ export default function AdminPresetsScreen() {
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>{item.label}</Text>
-            <Text style={styles.meta}>
+            <Text style={[styles.meta, { color: colors.textMuted }]}>
               {PRESET_CATEGORY_LABELS[item.category as PresetCategory] ?? item.category} ·{" "}
               {item.questions.length} question{item.questions.length === 1 ? "" : "s"}
               {item.upstreamable ? " · upstreamable" : ""}
             </Text>
           </View>
-          <Link href={{ pathname: "/admin/presets/[id]", params: { id: item.id } } as never} asChild>
-            <Button size="small" variant="secondary" testID={`admin-preset-edit-${item.key}`}>
-              Edit
-            </Button>
-          </Link>
+          <Button
+            size="small"
+            variant="secondary"
+            testID={`admin-preset-edit-${item.key}`}
+            onPress={() => router.push(`/admin/presets/${item.id}`)}
+          >
+            Edit
+          </Button>
           <Pressable onPress={() => handleDelete(item)} style={styles.deleteBtn} testID={`admin-preset-delete-${item.key}`}>
-            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            <Ionicons name="trash-outline" size={18} color={colors.danger} />
           </Pressable>
         </View>
       </Card>
     ),
-    [handleDelete],
+    [handleDelete, router],
   );
 
   return (
-    <View style={styles.container} testID="admin-presets">
+    <View style={[styles.container, { backgroundColor: colors.bg }]} testID="admin-presets">
       <Stack.Screen options={{ title: "Presets" }} />
       <View style={styles.header}>
         <Text style={styles.heading}>Presets ({presets.length})</Text>
-        <Link href="/admin/presets/new" asChild>
-          <Button size="small" variant="primary" testID="admin-preset-new">
-            New
-          </Button>
-        </Link>
+        <Button
+          size="small"
+          variant="primary"
+          testID="admin-preset-new"
+          onPress={() => router.push("/admin/presets/new")}
+        >
+          New
+        </Button>
       </View>
       {loading && presets.length === 0 ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+        <View style={[styles.centered, { backgroundColor: colors.bg }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : error && presets.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
         </View>
       ) : (
         <FlatList
@@ -139,7 +148,7 @@ export default function AdminPresetsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={styles.hint}>No presets yet.</Text>
+              <Text style={[styles.hint, { color: colors.textMuted }]}>No presets yet.</Text>
             </View>
           }
         />
@@ -149,7 +158,7 @@ export default function AdminPresetsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   header: {
     flexDirection: "row",
@@ -162,8 +171,8 @@ const styles = StyleSheet.create({
   list: { padding: 16, gap: 8, paddingBottom: 32 },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
   label: { fontSize: 15, fontWeight: "600" },
-  meta: { fontSize: 11, color: "#888", marginTop: 2 },
+  meta: { fontSize: 11, marginTop: 2 },
   deleteBtn: { padding: 6 },
-  errorText: { color: "#ef4444", fontSize: 12 },
-  hint: { color: "#888", fontSize: 13 },
+  errorText: { fontSize: 12 },
+  hint: { fontSize: 13 },
 });

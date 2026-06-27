@@ -22,6 +22,7 @@ import { FeatureTypeIcon } from "../../src/components/feature/FeatureTypeIcon";
 import { SegmentEditList } from "../../src/components/trail/SegmentEditor";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useAuthStore } from "../../src/stores/authStore";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import {
   addPendingContribution,
   getTrailBySlug,
@@ -37,9 +38,9 @@ import {
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
-function TrailMapPreview({ center, geometry }: { center?: { lon: number; lat: number } | null; geometry?: unknown }) {
+function TrailMapPreview({ center, geometry, backgroundColor }: { center?: { lon: number; lat: number } | null; geometry?: unknown; backgroundColor?: string }) {
   return (
-    <View style={styles.mapPreview}>
+    <View style={[styles.mapPreview, backgroundColor ? { backgroundColor } : undefined]}>
       <MapContainer
         config={{
           martinTilesUrl: MARTIN_URL,
@@ -55,6 +56,7 @@ function TrailMapPreview({ center, geometry }: { center?: { lon: number; lat: nu
 export default function TrailDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const { colors } = useTheme();
   const [trail, setTrail] = useState<Trail | null>(null);
   const [segments, setSegments] = useState<TrailSegment[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
@@ -455,7 +457,7 @@ export default function TrailDetail() {
   if (error) {
     return (
       <View style={styles.centered} testID="trail-detail-error">
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
       </View>
     );
   }
@@ -494,12 +496,12 @@ export default function TrailDetail() {
   return (
     <>
       <Stack.Screen options={{ title: trail.name, headerShown: true }} />
-      <ScrollView style={styles.container} testID="trail-detail-screen">
-        <TrailMapPreview center={trail.center} geometry={trail.geometry} />
+      <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} testID="trail-detail-screen">
+        <TrailMapPreview center={trail.center} geometry={trail.geometry} backgroundColor={colors.border} />
 
         <View style={styles.section} testID="trail-meta">
           <View style={styles.row}>
-            <Text style={styles.title} testID="trail-name">
+            <Text style={[styles.title, { color: colors.text }]} testID="trail-name">
               {trail.name}
             </Text>
             {trail.difficulty ? <DifficultyBadge difficulty={trail.difficulty} /> : null}
@@ -507,23 +509,23 @@ export default function TrailDetail() {
           </View>
           <View style={styles.statsRow} testID="trail-stats">
             {trail.length_meters ? (
-              <Text style={styles.stat} testID="trail-length">
-                <IoniconsLabel name="resize" /> {(trail.length_meters / 1000).toFixed(1)} km
+              <Text style={[styles.stat, { color: colors.textMuted }]} testID="trail-length">
+                <IoniconsLabel name="resize" color={colors.textMuted} /> {(trail.length_meters / 1000).toFixed(1)} km
               </Text>
             ) : null}
             {trail.elevation_gain_meters ? (
-              <Text style={styles.stat} testID="trail-elevation">
-                <IoniconsLabel name="trending-up" /> {trail.elevation_gain_meters.toFixed(0)} m
+              <Text style={[styles.stat, { color: colors.textMuted }]} testID="trail-elevation">
+                <IoniconsLabel name="trending-up" color={colors.textMuted} /> {trail.elevation_gain_meters.toFixed(0)} m
               </Text>
             ) : null}
             {trail.verified ? (
-              <Text style={[styles.stat, styles.verified]} testID="trail-verified">
-                <IoniconsLabel name="checkmark-circle" /> Verified
+              <Text style={[styles.stat, { color: colors.primary }]} testID="trail-verified">
+                <IoniconsLabel name="checkmark-circle" color={colors.primary} /> Verified
               </Text>
             ) : null}
           </View>
           {trail.tier === "synthesized" && trail.derived_from_segments != null ? (
-            <Text style={styles.body} testID="trail-derived-from">
+            <Text style={[styles.body, { color: colors.textSecondary }]} testID="trail-derived-from">
               Derived from {trail.derived_from_segments} segment
               {trail.derived_from_segments === 1 ? "" : "s"}
               {trail.derived_from_traces != null
@@ -534,13 +536,13 @@ export default function TrailDetail() {
                 : ""}
             </Text>
           ) : null}
-          {trail.description ? <Text style={styles.body}>{trail.description}</Text> : null}
+          {trail.description ? <Text style={[styles.body, { color: colors.textSecondary }]}>{trail.description}</Text> : null}
           <ViewOnMapButton center={trail.center ?? null} zoom={11} testID="trail-view-on-map" />
         </View>
 
         <View style={styles.section} testID="trail-segments">
           <View style={styles.row}>
-            <Text style={styles.h2}>Segments ({segments.length})</Text>
+            <Text style={[styles.h2, { color: colors.text }]}>Segments ({segments.length})</Text>
             <Button
               variant="ghost"
               size="small"
@@ -551,27 +553,27 @@ export default function TrailDetail() {
             </Button>
           </View>
           {segments.length === 0 ? (
-            <Text style={styles.body} testID="trail-segments-empty">
+            <Text style={[styles.body, { color: colors.textSecondary }]} testID="trail-segments-empty">
               No segments yet.
             </Text>
           ) : (
             segments.map((s) => (
               <Card key={s.id} testID={`trail-segment-${s.id}`}>
                 <View style={styles.row}>
-                  <Text style={styles.cardTitle}>{s.name ?? `Segment ${s.sort_order + 1}`}</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{s.name ?? `Segment ${s.sort_order + 1}`}</Text>
                   {s.surface_type ? <SegmentTypeBadge surface={s.surface_type} /> : null}
                 </View>
                 {s.hazards.length > 0 ? (
-                  <Text style={styles.meta} testID={`trail-segment-hazards-${s.id}`}>
+                  <Text style={[styles.meta, { color: colors.textMuted }]} testID={`trail-segment-hazards-${s.id}`}>
                     Hazards: {s.hazards.join(", ")}
                   </Text>
                 ) : null}
                 <View style={styles.flagsRow}>
-                  {s.steep_grade ? <Text style={styles.flag}>Steep</Text> : null}
-                  {s.is_road_connector ? <Text style={styles.flag}>Road connector</Text> : null}
-                  {s.one_way ? <Text style={styles.flag}>One-way</Text> : null}
+                  {s.steep_grade ? <Text style={[styles.flag, { color: colors.textMuted, backgroundColor: colors.surfaceMutedStrong }]}>Steep</Text> : null}
+                  {s.is_road_connector ? <Text style={[styles.flag, { color: colors.textMuted, backgroundColor: colors.surfaceMutedStrong }]}>Road connector</Text> : null}
+                  {s.one_way ? <Text style={[styles.flag, { color: colors.textMuted, backgroundColor: colors.surfaceMutedStrong }]}>One-way</Text> : null}
                   {s.length_meters ? (
-                    <Text style={styles.flag} testID={`trail-segment-length-${s.id}`}>
+                    <Text style={[styles.flag, { color: colors.textMuted, backgroundColor: colors.surfaceMutedStrong }]} testID={`trail-segment-length-${s.id}`}>
                       {(s.length_meters / 1000).toFixed(2)} km
                     </Text>
                   ) : null}
@@ -582,9 +584,9 @@ export default function TrailDetail() {
         </View>
 
         <View style={styles.section} testID="trail-features">
-          <Text style={styles.h2}>Features ({features.length})</Text>
+          <Text style={[styles.h2, { color: colors.text }]}>Features ({features.length})</Text>
           {features.length === 0 ? (
-            <Text style={styles.body} testID="trail-features-empty">
+            <Text style={[styles.body, { color: colors.textSecondary }]} testID="trail-features-empty">
               No features yet.
             </Text>
           ) : (
@@ -599,9 +601,9 @@ export default function TrailDetail() {
                     <View testID={`trail-feature-type-${f.id}`}>
                       <FeatureTypeIcon type={f.type_tag ?? undefined} size={14} />
                     </View>
-                    <Text style={styles.cardTitle}>{f.name}</Text>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>{f.name}</Text>
                   </View>
-                  {f.description ? <Text style={styles.body}>{f.description}</Text> : null}
+                  {f.description ? <Text style={[styles.body, { color: colors.textSecondary }]}>{f.description}</Text> : null}
                 </Card>
               </Pressable>
             ))
@@ -610,7 +612,7 @@ export default function TrailDetail() {
 
         <View style={styles.section} testID="trail-wiki">
           <View style={styles.row}>
-            <Text style={styles.h2}>Wiki</Text>
+            <Text style={[styles.h2, { color: colors.text }]}>Wiki</Text>
             <Button
               variant={wikiPage ? "ghost" : "primary"}
               size="small"
@@ -630,12 +632,12 @@ export default function TrailDetail() {
               onPress={() => router.push(`/wiki/trail/${trail.id}` as never)}
               testID="trail-wiki-view"
             >
-              <View style={styles.wikiPreviewBox}>
+              <View style={[styles.wikiPreviewBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
                 <WikiPageView wikiPage={wikiPage} compact />
               </View>
             </Pressable>
           ) : (
-            <Text style={styles.body}>No wiki page yet for this trail.</Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>No wiki page yet for this trail.</Text>
           )}
         </View>
       </ScrollView>
@@ -643,39 +645,34 @@ export default function TrailDetail() {
   );
 }
 
-function IoniconsLabel({ name }: { name: "resize" | "trending-up" | "checkmark-circle" }) {
-  return <Ionicons name={name} size={12} color="#666" />;
+function IoniconsLabel({ name, color }: { name: "resize" | "trending-up" | "checkmark-circle"; color: string }) {
+  return <Ionicons name={name} size={12} color={color} />;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorText: { color: "#ef4444", padding: 16 },
-  mapPreview: { height: 240, backgroundColor: "#e8e8e8" },
+  errorText: { padding: 16 },
+  mapPreview: { height: 240 },
   section: { padding: 16, gap: 8 },
   title: { fontSize: 22, fontWeight: "700", flexShrink: 1 },
   h2: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
-  body: { fontSize: 14, color: "#444", lineHeight: 20 },
-  meta: { fontSize: 12, color: "#888" },
+  body: { fontSize: 14, lineHeight: 20 },
+  meta: { fontSize: 12 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   statsRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 4 },
-  stat: { fontSize: 12, color: "#666" },
-  verified: { color: "#22c55e" },
+  stat: { fontSize: 12 },
   cardTitle: { fontSize: 15, fontWeight: "600" },
   flagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
   flag: {
     fontSize: 10,
-    color: "#666",
-    backgroundColor: "#f1f1f1",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 3,
   },
   wikiPreviewBox: {
-    backgroundColor: "#f9fafb",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#e8e8e8",
     padding: 4,
   },
 });

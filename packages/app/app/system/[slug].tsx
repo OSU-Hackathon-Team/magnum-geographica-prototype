@@ -16,6 +16,7 @@ import { Card } from "../../src/components/ui/Card";
 import { DifficultyBadge } from "../../src/components/ui/DifficultyBadge";
 import { ViewOnMapButton } from "../../src/components/ui/ViewOnMapButton";
 import { Button } from "../../src/components/ui/Button";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { WikiPageView } from "../../src/components/wiki/WikiPageView";
 import { MoveToSheet } from "../../src/components/hierarchy/MoveToSheet";
 import { TrailTracesTab } from "../../src/components/trace/TrailTracesTab";
@@ -26,9 +27,9 @@ import { useMapStore } from "../../src/stores/mapStore";
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
-function SystemMapPreview({ center, boundary, systemTileVersion }: { center?: { lon: number; lat: number } | null; boundary?: unknown; systemTileVersion?: number }) {
+function SystemMapPreview({ center, boundary, systemTileVersion, backgroundColor }: { center?: { lon: number; lat: number } | null; boundary?: unknown; systemTileVersion?: number; backgroundColor?: string }) {
   return (
-    <View style={styles.mapPreview}>
+    <View style={[styles.mapPreview, backgroundColor ? { backgroundColor } : undefined]}>
       <MapContainer
         config={{
           martinTilesUrl: MARTIN_URL,
@@ -45,6 +46,7 @@ function SystemMapPreview({ center, boundary, systemTileVersion }: { center?: { 
 export default function SystemDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const { colors } = useTheme();
   const [system, setSystem] = useState<System | null>(null);
   const [trails, setTrails] = useState<Trail[]>([]);
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
@@ -128,7 +130,7 @@ export default function SystemDetail() {
   if (error) {
     return (
       <View style={styles.centered} testID="system-detail-error">
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
       </View>
     );
   }
@@ -143,16 +145,16 @@ export default function SystemDetail() {
   return (
     <>
       <Stack.Screen options={{ title: system.name, headerShown: true }} />
-      <ScrollView style={styles.container} testID="system-detail-screen">
-        <SystemMapPreview center={system.center} boundary={system.boundary} systemTileVersion={systemTileVersion} />
+      <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} testID="system-detail-screen">
+        <SystemMapPreview center={system.center} boundary={system.boundary} systemTileVersion={systemTileVersion} backgroundColor={colors.border} />
 
         <View style={styles.section} testID="system-meta">
-          <Text style={styles.title} testID="system-name">
+          <Text style={[styles.title, { color: colors.text }]} testID="system-name">
             {system.name}
           </Text>
-          {system.description ? <Text style={styles.body}>{system.description}</Text> : null}
+          {system.description ? <Text style={[styles.body, { color: colors.textSecondary }]}>{system.description}</Text> : null}
           {system.ownership_source ? (
-            <Text style={styles.meta}>Owner: {system.ownership_source}</Text>
+            <Text style={[styles.meta, { color: colors.textMuted }]}>Owner: {system.ownership_source}</Text>
           ) : null}
           {system.external_url ? (
             <Pressable
@@ -160,8 +162,8 @@ export default function SystemDetail() {
               style={styles.link}
               testID="system-external-link"
             >
-              <Ionicons name="open-outline" size={14} color="#22c55e" />
-              <Text style={styles.linkText}>Official page</Text>
+              <Ionicons name="open-outline" size={14} color={colors.primary} />
+              <Text style={[styles.linkText, { color: colors.primary }]}>Official page</Text>
             </Pressable>
           ) : null}
           <ViewOnMapButton center={system.center ?? null} zoom={10} testID="system-view-on-map" />
@@ -192,16 +194,16 @@ export default function SystemDetail() {
             Organize traces
           </Button>
           {isOfflineAvailable ? (
-            <Text style={styles.meta} testID="system-offline-ready">
+            <Text style={[styles.meta, { color: colors.textMuted }]} testID="system-offline-ready">
               Available offline
             </Text>
           ) : null}
         </View>
 
         <View style={styles.section} testID="system-trails">
-          <Text style={styles.h2}>Trails ({trails.length})</Text>
+          <Text style={[styles.h2, { color: colors.text }]}>Trails ({trails.length})</Text>
           {trails.length === 0 ? (
-            <Text style={styles.body} testID="system-trails-empty">
+            <Text style={[styles.body, { color: colors.textSecondary }]} testID="system-trails-empty">
               No trails yet for this system.
             </Text>
           ) : (
@@ -213,11 +215,11 @@ export default function SystemDetail() {
               >
                 <Card>
                   <View style={styles.row}>
-                    <Text style={styles.cardTitle}>{t.name}</Text>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>{t.name}</Text>
                     {t.difficulty ? <DifficultyBadge difficulty={t.difficulty} /> : null}
                   </View>
                   {t.length_meters ? (
-                    <Text style={styles.meta}>
+                    <Text style={[styles.meta, { color: colors.textMuted }]}>
                       {(t.length_meters / 1000).toFixed(1)} km
                       {t.elevation_gain_meters
                         ? ` · ${t.elevation_gain_meters.toFixed(0)} m gain`
@@ -238,7 +240,7 @@ export default function SystemDetail() {
 
         <View style={styles.section} testID="system-wiki">
           <View style={styles.row}>
-            <Text style={styles.h2}>Wiki</Text>
+            <Text style={[styles.h2, { color: colors.text }]}>Wiki</Text>
             <Button
               variant={wikiPage ? "ghost" : "primary"}
               size="small"
@@ -258,12 +260,12 @@ export default function SystemDetail() {
               onPress={() => router.push(`/wiki/system/${system.id}` as never)}
               testID="system-wiki-view"
             >
-              <View style={styles.wikiPreviewBox}>
+              <View style={[styles.wikiPreviewBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
                 <WikiPageView wikiPage={wikiPage} compact />
               </View>
             </Pressable>
           ) : (
-            <Text style={styles.body}>No wiki page yet for this system.</Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>No wiki page yet for this system.</Text>
           )}
         </View>
       </ScrollView>
@@ -280,24 +282,22 @@ export default function SystemDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorText: { color: "#ef4444", padding: 16 },
-  mapPreview: { height: 240, backgroundColor: "#e8e8e8" },
+  errorText: { padding: 16 },
+  mapPreview: { height: 240 },
   section: { padding: 16, gap: 8 },
   title: { fontSize: 22, fontWeight: "700" },
   h2: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
-  body: { fontSize: 14, color: "#444", lineHeight: 20 },
-  meta: { fontSize: 12, color: "#888" },
+  body: { fontSize: 14, lineHeight: 20 },
+  meta: { fontSize: 12 },
   link: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  linkText: { fontSize: 13, color: "#22c55e" },
+  linkText: { fontSize: 13 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { fontSize: 15, fontWeight: "600" },
   wikiPreviewBox: {
-    backgroundColor: "#f9fafb",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#e8e8e8",
     padding: 4,
   },
 });

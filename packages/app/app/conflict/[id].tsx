@@ -10,12 +10,14 @@ import {
   type PendingContributionRow,
 } from "../../src/services/offlineDataService";
 import { useOfflineStore } from "../../src/stores/offlineStore";
+import { useTheme } from "../../src/providers/ThemeProvider";
 
 export default function ConflictScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [item, setItem] = useState<PendingContributionRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const { colors } = useTheme();
 
   useEffect(() => {
     if (!id) return;
@@ -48,7 +50,7 @@ export default function ConflictScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered} testID="conflict-loading">
+      <View style={[styles.centered, { backgroundColor: colors.bg }]} testID="conflict-loading">
         <ActivityIndicator />
       </View>
     );
@@ -56,8 +58,8 @@ export default function ConflictScreen() {
 
   if (!item) {
     return (
-      <View style={styles.centered} testID="conflict-not-found">
-        <Text style={styles.errorText}>Conflict not found</Text>
+      <View style={[styles.centered, { backgroundColor: colors.bg }]} testID="conflict-not-found">
+        <Text style={[styles.errorText, { color: colors.danger }]}>Conflict not found</Text>
         <Button variant="ghost" size="small" onPress={() => router.back()}>
           Go Back
         </Button>
@@ -74,33 +76,36 @@ export default function ConflictScreen() {
     <>
       <Stack.Screen options={{ title: "Resolve Conflict" }} />
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.bg }]}
         contentContainerStyle={styles.content}
         testID="conflict-screen"
       >
         <Card>
           <Text style={styles.heading}>Edit Conflict</Text>
-          <Text style={styles.description}>
+          <Text style={[styles.description, { color: colors.textMuted }]}>
             Your offline edit conflicts with a newer version on the server. Choose how to resolve
             it.
           </Text>
         </Card>
 
         <Card>
-          <Text style={styles.label}>Entity Type</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>Entity Type</Text>
           <Text style={styles.value}>{item.entity_type}</Text>
         </Card>
 
         <Card>
-          <Text style={styles.label}>Action</Text>
+          <Text style={[styles.label, { color: colors.textMuted }]}>Action</Text>
           <View
             style={[
               styles.actionBadge,
-              item.action === "create"
-                ? styles.createBadge
-                : item.action === "update"
-                  ? styles.updateBadge
-                  : styles.deleteBadge,
+              {
+                backgroundColor:
+                  item.action === "create"
+                    ? colors.successMuted
+                    : item.action === "update"
+                      ? colors.primaryMuted
+                      : colors.dangerMuted,
+              },
             ]}
           >
             <Text style={styles.actionText}>{item.action}</Text>
@@ -109,14 +114,14 @@ export default function ConflictScreen() {
 
         {payload ? (
           <Card>
-            <Text style={styles.label}>Your Changes</Text>
-            {payload.title ? <Text style={styles.fieldLabel}>Title</Text> : null}
+            <Text style={[styles.label, { color: colors.textMuted }]}>Your Changes</Text>
+            {payload.title ? <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Title</Text> : null}
             {payload.title ? (
-              <Text style={styles.fieldValue}>{String(payload.title).slice(0, 200)}</Text>
+              <Text style={[styles.fieldValue, { color: colors.text, backgroundColor: colors.surfaceMutedStrong }]}>{String(payload.title).slice(0, 200)}</Text>
             ) : null}
-            {payload.content_md ? <Text style={styles.fieldLabel}>Content</Text> : null}
+            {payload.content_md ? <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Content</Text> : null}
             {payload.content_md ? (
-              <Text style={styles.fieldValue}>{String(payload.content_md).slice(0, 500)}</Text>
+              <Text style={[styles.fieldValue, { color: colors.text, backgroundColor: colors.surfaceMutedStrong }]}>{String(payload.content_md).slice(0, 500)}</Text>
             ) : null}
           </Card>
         ) : null}
@@ -135,7 +140,7 @@ export default function ConflictScreen() {
           </Button>
         </View>
 
-        <Text style={styles.hint}>
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
           &ldquo;Keep My Version&rdquo; overwrites the server version with yours.
           {"\n"}
           &ldquo;Discard My Changes&rdquo; removes your local edit.
@@ -146,19 +151,18 @@ export default function ConflictScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   content: { padding: 16, gap: 12 },
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
     gap: 12,
   },
-  errorText: { color: "#ef4444", fontSize: 14 },
+  errorText: { fontSize: 14 },
   heading: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
-  description: { fontSize: 13, color: "#666", lineHeight: 18 },
-  label: { fontSize: 11, color: "#888", marginBottom: 4 },
+  description: { fontSize: 13, lineHeight: 18 },
+  label: { fontSize: 11, marginBottom: 4 },
   value: { fontSize: 14, fontWeight: "500" },
   actionBadge: {
     alignSelf: "flex-start",
@@ -166,24 +170,18 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 4,
   },
-  createBadge: { backgroundColor: "#dcfce7" },
-  updateBadge: { backgroundColor: "#dbeafe" },
-  deleteBadge: { backgroundColor: "#fee2e2" },
   actionText: { fontSize: 11, fontWeight: "600", textTransform: "uppercase" },
   fieldLabel: {
     fontSize: 11,
-    color: "#888",
     marginTop: 8,
     marginBottom: 2,
   },
   fieldValue: {
     fontSize: 13,
-    color: "#333",
-    backgroundColor: "#f5f5f5",
     padding: 8,
     borderRadius: 4,
     fontFamily: "monospace",
   },
   actions: { gap: 8 },
-  hint: { fontSize: 11, color: "#aaa", textAlign: "center", lineHeight: 16 },
+  hint: { fontSize: 11, textAlign: "center", lineHeight: 16 },
 });

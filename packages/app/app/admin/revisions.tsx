@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
 import { useAuthStore } from "../../src/stores/authStore";
@@ -22,6 +23,7 @@ interface RevisionWithTarget extends Revision {
 }
 
 export default function AdminRevisions() {
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const [items, setItems] = useState<RevisionWithTarget[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,11 +74,11 @@ export default function AdminRevisions() {
 
   const renderItem = ({ item }: { item: RevisionWithTarget }) => (
     <Card testID={`admin-revision-${item.id.slice(0, 8)}`}>
-      <Text style={styles.revMeta}>
+      <Text style={[styles.revMeta, { color: colors.textMuted }]}>
         {item.contributor_name} on {new Date(item.created_at).toLocaleDateString()}
       </Text>
-      {item.edit_summary && <Text style={styles.revSummary}>{item.edit_summary}</Text>}
-      <Text style={styles.revContent} numberOfLines={3}>
+      {item.edit_summary && <Text style={[styles.revSummary, { color: colors.textSecondary }]}>{item.edit_summary}</Text>}
+      <Text style={[styles.revContent, { color: colors.textSecondary }]} numberOfLines={3}>
         {item.content_md.slice(0, 200)}
       </Text>
       <View style={styles.revActions}>
@@ -88,13 +90,13 @@ export default function AdminRevisions() {
   );
 
   return (
-    <View style={styles.container} testID="admin-revisions">
+    <View style={[styles.container, { backgroundColor: colors.bg }]} testID="admin-revisions">
       <Text style={styles.heading}>
         Recent Revisions ({total})
       </Text>
       {loading && items.length === 0 ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+        <View style={[styles.centered, { backgroundColor: colors.bg }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -113,12 +115,12 @@ export default function AdminRevisions() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   heading: { fontSize: 18, fontWeight: "700", padding: 16, paddingBottom: 8 },
   list: { paddingHorizontal: 16, gap: 8, paddingBottom: 32 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  revMeta: { fontSize: 12, color: "#888", marginBottom: 2 },
-  revSummary: { fontSize: 13, fontStyle: "italic", color: "#555", marginBottom: 4 },
-  revContent: { fontSize: 13, color: "#333", marginBottom: 4 },
+  revMeta: { fontSize: 12, marginBottom: 2 },
+  revSummary: { fontSize: 13, fontStyle: "italic", marginBottom: 4 },
+  revContent: { fontSize: 13, marginBottom: 4 },
   revActions: { flexDirection: "row", justifyContent: "flex-end" },
 });

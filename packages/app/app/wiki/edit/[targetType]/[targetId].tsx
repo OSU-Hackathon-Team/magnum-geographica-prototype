@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { createMagnumClient, type WikiPage, type Revision, type Citation } from "@magnum/shared";
+import { useTheme } from "../../../../src/providers/ThemeProvider";
 import { WikiPageEditor } from "../../../../src/components/wiki/WikiPageEditor";
 import { useOfflineStore } from "../../../../src/stores/offlineStore";
 import { useAuthStore } from "../../../../src/stores/authStore";
@@ -20,6 +21,7 @@ export default function WikiEditScreen() {
     targetId: string;
     defaultTitle?: string;
   }>();
+  const { colors } = useTheme();
   const router = useRouter();
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [revisions, setRevisions] = useState<Revision[]>([]);
@@ -254,13 +256,13 @@ export default function WikiEditScreen() {
     <>
       <Stack.Screen options={{ title: wikiPage ? "Edit Wiki" : "Create Wiki" }} />
       {error ? (
-        <View style={styles.errorBanner} testID="wiki-edit-error">
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.errorBanner, { backgroundColor: colors.dangerMuted }]} testID="wiki-edit-error">
+          <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
         </View>
       ) : null}
       {!isOnline ? (
-        <View style={styles.offlineBanner} testID="wiki-edit-offline-banner">
-          <Text style={styles.offlineText}>
+        <View style={[styles.offlineBanner, { backgroundColor: colors.warningMuted }]} testID="wiki-edit-offline-banner">
+          <Text style={[styles.offlineText, { color: colors.warning }]}>
             Offline — your changes will be saved locally and synced when you&apos;re back online.
           </Text>
         </View>
@@ -283,8 +285,8 @@ export default function WikiEditScreen() {
 
 const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorBanner: { backgroundColor: "#fef2f2", padding: 10 },
-  errorText: { color: "#ef4444", fontSize: 13 },
-  offlineBanner: { backgroundColor: "#fef9c3", padding: 10 },
-  offlineText: { color: "#854d0e", fontSize: 12 },
+  errorBanner: { padding: 10 },
+  errorText: { fontSize: 13 },
+  offlineBanner: { padding: 10 },
+  offlineText: { fontSize: 12 },
 });

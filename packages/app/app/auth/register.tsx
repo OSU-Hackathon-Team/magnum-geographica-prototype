@@ -13,10 +13,12 @@ import { Card } from "../../src/components/ui/Card";
 import { Form } from "../../src/components/ui/Form";
 import { useAuthStore } from "../../src/stores/authStore";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
+import { useTheme } from "../../src/providers/ThemeProvider";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,7 +57,7 @@ export default function RegisterScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       contentContainerStyle={styles.content}
       testID="register-screen"
       keyboardShouldPersistTaps="handled"
@@ -64,13 +66,13 @@ export default function RegisterScreen() {
         <Form onSubmit={handleRegister}>
         <Text style={styles.heading}>Create Account</Text>
         {error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorBox, { backgroundColor: colors.dangerMuted }]}>
+            <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
           </View>
         )}
         <Text style={styles.label}>Username</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
           value={username}
           onChangeText={setUsername}
           placeholder="trailhiker42"
@@ -85,7 +87,7 @@ export default function RegisterScreen() {
         />
         <Text style={styles.label}>Email</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
           value={email}
           onChangeText={setEmail}
           placeholder="you@example.com"
@@ -101,7 +103,7 @@ export default function RegisterScreen() {
         />
         <Text style={styles.label}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
           value={password}
           onChangeText={setPassword}
           placeholder="At least 8 characters"
@@ -117,7 +119,7 @@ export default function RegisterScreen() {
         />
         <Text style={styles.label}>Confirm Password</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           placeholder="Type it again"
@@ -138,11 +140,11 @@ export default function RegisterScreen() {
             testID="register-submit"
             style={{ flex: 1 }}
           >
-            {loading ? <ActivityIndicator color="#fff" size="small" /> : "Create Account"}
+            {loading ? <ActivityIndicator color={colors.textInverse} size="small" /> : "Create Account"}
           </Button>
         </View>
         </Form>
-        <Link href="/auth/login" style={styles.link} testID="register-to-login">
+        <Link href="/auth/login" style={[styles.link, { color: colors.primary }]} testID="register-to-login">
           Already have an account? Log in
         </Link>
       </Card>
@@ -151,25 +153,22 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   content: { padding: 16, gap: 12 },
   heading: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
   label: { fontSize: 14, fontWeight: "600", marginBottom: 4, marginTop: 8 },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 8,
     padding: 10,
     fontSize: 15,
-    backgroundColor: "#fafafa",
   },
   buttonRow: { marginTop: 16, flexDirection: "row", gap: 8 },
-  link: { color: "#22c55e", fontSize: 14, textAlign: "center", marginTop: 12 },
+  link: { fontSize: 14, textAlign: "center", marginTop: 12 },
   errorBox: {
-    backgroundColor: "#fee2e2",
     padding: 10,
     borderRadius: 8,
     marginBottom: 8,
   },
-  errorText: { color: "#dc2626", fontSize: 13 },
+  errorText: { fontSize: 13 },
 });

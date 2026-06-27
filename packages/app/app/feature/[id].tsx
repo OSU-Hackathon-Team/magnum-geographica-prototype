@@ -10,6 +10,7 @@ import { MediaGallery, type MediaItem } from "../../src/components/media/MediaGa
 import { MediaUploader } from "../../src/components/media/MediaUploader";
 import { ImageViewer } from "../../src/components/media/ImageViewer";
 import { VoteControl } from "../../src/components/vote/VoteControl";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useAuthStore } from "../../src/stores/authStore";
 import { usePresetStore } from "../../src/stores/presetStore";
@@ -46,6 +47,7 @@ export default function FeatureDetail() {
   const isOnline = useOfflineStore((s) => s.isOnline);
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
+  const { colors } = useTheme();
   const fetchPresets = usePresetStore((s) => s.fetchPresets);
   const loadPresetsFromCache = usePresetStore((s) => s.loadFromCache);
 
@@ -204,7 +206,7 @@ export default function FeatureDetail() {
   if (error) {
     return (
       <View style={styles.centered} testID="feature-detail-error">
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
       </View>
     );
   }
@@ -247,12 +249,12 @@ export default function FeatureDetail() {
               testID="feature-detail-close"
               accessibilityLabel="Close"
             >
-              <Text style={styles.closeBtnText}>×</Text>
+              <Text style={[styles.closeBtnText, { color: colors.textMuted }]}>×</Text>
             </Pressable>
           ),
         }}
       />
-      <ScrollView style={styles.container} testID="feature-detail-screen">
+      <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} testID="feature-detail-screen">
         <View style={styles.section} testID="feature-meta">
           <View style={styles.nameRow}>
             <FeatureTypeIcon
@@ -270,21 +272,21 @@ export default function FeatureDetail() {
             </Text>
           </View>
           {feature.preset_label ? (
-            <Text style={styles.presetLabel} testID="feature-preset-label">
+            <Text style={[styles.presetLabel, { color: colors.textSecondary, backgroundColor: colors.surfaceTint }]} testID="feature-preset-label">
               {feature.preset_label}
             </Text>
           ) : null}
           {answersList.length > 0 ? (
             <View style={styles.answersRow} testID="feature-answers">
               {answersList.map((a) => (
-                <View key={a.key} style={styles.answerBadge}>
-                  <Text style={styles.answerLabel}>{a.label}:</Text>
-                  <Text style={styles.answerValue}>{a.value}</Text>
+                <View key={a.key} style={[styles.answerBadge, { backgroundColor: colors.surfaceMutedStrong }]}>
+                  <Text style={[styles.answerLabel, { color: colors.textMuted }]}>{a.label}:</Text>
+                  <Text style={[styles.answerValue, { color: colors.text }]}>{a.value}</Text>
                 </View>
               ))}
             </View>
           ) : null}
-          {feature.description ? <Text style={styles.body}>{feature.description}</Text> : null}
+          {feature.description ? <Text style={[styles.body, { color: colors.textSecondary }]}>{feature.description}</Text> : null}
           <View style={styles.actionsRow}>
             <VoteControl
               targetType="feature"
@@ -312,7 +314,7 @@ export default function FeatureDetail() {
           {showUploader ? (
             <View testID="feature-media-uploader">
               {!isOnline ? (
-                <Text style={styles.offlineHint}>
+                <Text style={[styles.offlineHint, { color: colors.warning, backgroundColor: colors.warningMuted }]}>
                   Offline — photo will be saved locally and synced when back online.
                 </Text>
               ) : null}
@@ -322,7 +324,7 @@ export default function FeatureDetail() {
                 testID="feature-media-uploader-component"
               />
               {uploadError ? (
-                <Text style={styles.errorText} testID="feature-media-upload-error">
+                <Text style={[styles.errorText, { color: colors.danger }]} testID="feature-media-upload-error">
                   {uploadError}
                 </Text>
               ) : null}
@@ -358,12 +360,12 @@ export default function FeatureDetail() {
               onPress={() => router.push(`/wiki/feature/${feature.id}` as never)}
               testID="feature-wiki-view"
             >
-              <View style={styles.wikiPreviewBox}>
+              <View style={[styles.wikiPreviewBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
                 <WikiPageView wikiPage={wikiPage} compact />
               </View>
             </Pressable>
           ) : (
-            <Text style={styles.body}>No wiki page yet for this feature.</Text>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>No wiki page yet for this feature.</Text>
           )}
         </View>
       </ScrollView>
@@ -378,16 +380,14 @@ export default function FeatureDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorText: { color: "#ef4444", padding: 16 },
+  errorText: { padding: 16 },
   section: { padding: 16, gap: 8 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { fontSize: 22, fontWeight: "700", flexShrink: 1 },
   presetLabel: {
     fontSize: 13,
-    color: "#444",
-    backgroundColor: "#f0fdf4",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
@@ -404,26 +404,21 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: "#f1f5f9",
     borderRadius: 6,
   },
-  answerLabel: { fontSize: 12, color: "#64748b" },
-  answerValue: { fontSize: 12, fontWeight: "600", color: "#0f172a" },
+  answerLabel: { fontSize: 12 },
+  answerValue: { fontSize: 12, fontWeight: "600" },
   actionsRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 4 },
   h2: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
-  body: { fontSize: 14, color: "#444", lineHeight: 20 },
+  body: { fontSize: 14, lineHeight: 20 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   wikiPreviewBox: {
-    backgroundColor: "#f9fafb",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "#e8e8e8",
     padding: 4,
   },
   offlineHint: {
     fontSize: 12,
-    color: "#854d0e",
-    backgroundColor: "#fef9c3",
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 4,
@@ -436,7 +431,6 @@ const styles = StyleSheet.create({
   },
   closeBtnText: {
     fontSize: 24,
-    color: "#666",
     lineHeight: 28,
   },
 });

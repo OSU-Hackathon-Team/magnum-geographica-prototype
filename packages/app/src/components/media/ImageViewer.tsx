@@ -1,5 +1,6 @@
 import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../../providers/ThemeProvider";
 
 export interface ImageViewerProps {
   visible: boolean;
@@ -9,11 +10,12 @@ export interface ImageViewerProps {
 }
 
 export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps) {
+  const { colors } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" testID="image-viewer-modal">
       <View style={styles.overlay} testID="image-viewer-overlay">
         <Pressable style={styles.closeBtn} onPress={onClose} testID="image-viewer-close">
-          <Ionicons name="close" size={24} color="#fff" />
+          <Ionicons name="close" size={24} color={colors.textInverse} />
         </Pressable>
 
         {uri ? (
@@ -24,14 +26,14 @@ export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps
             testID="image-viewer-image"
           />
         ) : (
-          <Text style={styles.noImage} testID="image-viewer-no-image">
+          <Text style={[styles.noImage, { color: colors.textInverse }]} testID="image-viewer-no-image">
             No image
           </Text>
         )}
 
         {caption ? (
           <View style={styles.captionBar} testID="image-viewer-caption-bar">
-            <Text style={styles.caption} testID="image-viewer-caption">
+            <Text style={[styles.caption, { color: colors.textInverse }]} testID="image-viewer-caption">
               {caption}
             </Text>
           </View>
@@ -56,7 +58,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   image: { width: "100%", height: "80%" },
-  noImage: { color: "#fff", fontSize: 16 },
+  noImage: { fontSize: 16 },
   captionBar: {
     position: "absolute",
     bottom: 48,
@@ -66,5 +68,5 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
   },
-  caption: { color: "#fff", fontSize: 14, textAlign: "center" },
+  caption: { fontSize: 14, textAlign: "center" },
 });

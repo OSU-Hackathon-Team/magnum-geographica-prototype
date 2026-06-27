@@ -1,15 +1,17 @@
 import { Redirect, Stack } from "expo-router";
 import { useAuthStore } from "../../src/stores/authStore";
 import { ActivityIndicator, View } from "react-native";
+import { useTheme } from "../../src/providers/ThemeProvider";
 
 export default function AdminLayout() {
+  const { colors } = useTheme();
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const isLoading = useAuthStore((s) => s.isLoading);
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color="#22c55e" />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -21,8 +23,8 @@ export default function AdminLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: "#fff" },
-        headerTintColor: "#22c55e",
+        headerStyle: { backgroundColor: colors.bg },
+        headerTintColor: colors.primary,
       }}
     >
       <Stack.Screen name="dashboard" options={{ title: "Admin" }} />

@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
 import { createMagnumClient, type Trail, type System } from "@magnum/shared";
 import { useAuthStore } from "../../../src/stores/authStore";
+import { useTheme } from "../../../src/providers/ThemeProvider";
 import { Button } from "../../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -33,6 +34,7 @@ const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001"
 export default function SystemOrganize() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const contributorName = useAuthStore((s) => s.contributorName);
   const isAdmin = useAuthStore((s) => s.isAdmin);
@@ -145,7 +147,7 @@ export default function SystemOrganize() {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <Stack.Screen
         options={{
           title: system?.name ? `Organize · ${system.name}` : "Organize",
@@ -161,8 +163,8 @@ export default function SystemOrganize() {
                   pressed && { opacity: 0.6 },
                 ]}
               >
-                <Ionicons name="refresh" size={18} color="#0a84ff" />
-                <Text style={styles.headerBtnText}>
+                <Ionicons name="refresh" size={18} color={colors.primary} />
+                <Text style={[styles.headerBtnText, { color: colors.primary }]}>
                   {synthLoading ? "Running…" : "Run synthesis"}
                 </Text>
               </Pressable>
@@ -170,7 +172,7 @@ export default function SystemOrganize() {
         }}
       />
 
-      <View style={styles.map} testID="organize-map">
+      <View style={[styles.map, { backgroundColor: colors.border }]} testID="organize-map">
         <MapContainer
           config={{
             martinTilesUrl: MARTIN_URL,
@@ -182,18 +184,18 @@ export default function SystemOrganize() {
 
       <View style={styles.summary} testID="organize-summary">
         {synthResult ? (
-          <Text style={styles.summaryText}>
+          <Text style={[styles.summaryText, { color: colors.textOnTint }]}>
             ✓ Assigned {synthResult.assigned} · Proposed {synthResult.proposed} · Updated{" "}
             {synthResult.trails_updated}
           </Text>
         ) : null}
-        {synthError ? <Text style={styles.errorText}>{synthError}</Text> : null}
+        {synthError ? <Text style={[styles.errorText, { color: colors.danger }]}>{synthError}</Text> : null}
       </View>
 
       <ScrollView style={styles.list} testID="organize-proposals">
-        <Text style={styles.h2}>Proposals ({proposals.length})</Text>
+        <Text style={[styles.h2, { color: colors.text }]}>Proposals ({proposals.length})</Text>
         {proposals.length === 0 ? (
-          <Text style={styles.muted}>
+          <Text style={[styles.muted, { color: colors.textMuted }]}>
             No outstanding segments. Tap “Run synthesis” to cut the latest traces and queue
             proposals.
           </Text>
@@ -202,14 +204,14 @@ export default function SystemOrganize() {
           <Pressable
             key={p.id}
             onPress={() => setSelectedSegment(p)}
-            style={({ pressed }) => [styles.row, pressed && { backgroundColor: "#f3f4f6" }]}
+            style={({ pressed }) => [styles.row, { borderBottomColor: colors.divider }, pressed && { backgroundColor: colors.surfaceMutedStrong }]}
             testID={`proposal-${p.id}`}
           >
             <View style={styles.rowMain}>
-              <Text style={styles.rowTitle}>Cluster #{p.cluster_id ?? "?"}</Text>
-              <Text style={styles.rowSub}>Trace {p.trace_id.slice(0, 8)}…</Text>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Cluster #{p.cluster_id ?? "?"}</Text>
+              <Text style={[styles.rowSub, { color: colors.textMuted }]}>Trace {p.trace_id.slice(0, 8)}…</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#6b7280" />
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
         ))}
       </ScrollView>
@@ -220,41 +222,41 @@ export default function SystemOrganize() {
         transparent
         onRequestClose={() => setSelectedSegment(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard} testID="proposal-sheet">
+          <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]} testID="proposal-sheet">
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
                 Segment {selectedSegment?.segment_id.slice(0, 8)}…
               </Text>
               <Pressable onPress={() => setSelectedSegment(null)} testID="proposal-sheet-close">
-                <Ionicons name="close" size={22} color="#111" />
+                <Ionicons name="close" size={22} color={colors.text} />
               </Pressable>
             </View>
-            <Text style={styles.muted}>
+            <Text style={[styles.muted, { color: colors.textMuted }]}>
               Cluster #{selectedSegment?.cluster_id ?? "?"} · no nearby trail
             </Text>
 
-            <Text style={styles.label}>Or assign to existing trail</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Or assign to existing trail</Text>
             <ScrollView style={styles.trailsList} testID="proposal-sheet-trails">
               {trails.length === 0 ? (
-                <Text style={styles.muted}>No synthesized trails in this system yet.</Text>
+                <Text style={[styles.muted, { color: colors.textMuted }]}>No synthesized trails in this system yet.</Text>
               ) : null}
               {trails.map((t) => (
                 <Pressable
                   key={t.id}
                   onPress={() => selectedSegment && approveProposal(selectedSegment.segment_id, t.name)}
-                  style={styles.trailRow}
+                  style={[styles.trailRow, { borderBottomColor: colors.divider }]}
                   testID={`proposal-sheet-trail-${t.id}`}
                 >
-                  <Ionicons name="trail-sign" size={16} color="#0a84ff" />
-                  <Text style={styles.trailName}>{t.name}</Text>
+                  <Ionicons name="trail-sign" size={16} color={colors.primary} />
+                  <Text style={[styles.trailName, { color: colors.text }]}>{t.name}</Text>
                 </Pressable>
               ))}
             </ScrollView>
 
-            <Text style={styles.label}>Or propose a new trail</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Or propose a new trail</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.borderStrong, color: colors.text, backgroundColor: colors.surfaceMuted }]}
               placeholder="Trail name (e.g. Sycamore Ridge)"
               value={newTrailName}
               onChangeText={setNewTrailName}
@@ -288,12 +290,12 @@ export default function SystemOrganize() {
       </Modal>
 
       {synthLoading ? (
-        <View style={styles.overlay} testID="organize-loading">
-          <ActivityIndicator size="large" color="#0a84ff" />
+        <View style={[styles.overlay, { backgroundColor: "rgba(0,0,0,0.5)" }]} testID="organize-loading">
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : null}
 
-      <Text style={styles.foot} testID="organize-foot">
+      <Text style={[styles.foot, { color: colors.textMuted }]} testID="organize-foot">
         contributor: {contributorName} · {isModerator ? "moderator" : "viewer"}
       </Text>
     </View>
@@ -301,30 +303,28 @@ export default function SystemOrganize() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#fff" },
+  root: { flex: 1 },
   headerBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8 },
-  headerBtnText: { color: "#0a84ff", fontWeight: "600" },
-  map: { height: 220, backgroundColor: "#e5e7eb" },
+  headerBtnText: { fontWeight: "600" },
+  map: { height: 220 },
   summary: { paddingHorizontal: 16, paddingVertical: 8 },
-  summaryText: { color: "#065f46", fontWeight: "600" },
-  errorText: { color: "#b91c1c" },
+  summaryText: { fontWeight: "600" },
+  errorText: {},
   list: { flex: 1, paddingHorizontal: 16, paddingBottom: 16 },
-  h2: { fontSize: 16, fontWeight: "700", marginVertical: 8, color: "#111" },
-  muted: { color: "#6b7280" },
+  h2: { fontSize: 16, fontWeight: "700", marginVertical: 8 },
+  muted: {},
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
   },
   rowMain: { flex: 1 },
-  rowTitle: { fontWeight: "600", color: "#111" },
-  rowSub: { color: "#6b7280", fontSize: 12 },
+  rowTitle: { fontWeight: "600" },
+  rowSub: { fontSize: 12 },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
   modalCard: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
@@ -336,8 +336,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: "#111" },
-  label: { marginTop: 16, marginBottom: 6, fontWeight: "600", color: "#374151" },
+  modalTitle: { fontSize: 18, fontWeight: "700" },
+  label: { marginTop: 16, marginBottom: 6, fontWeight: "600" },
   trailsList: { maxHeight: 160 },
   trailRow: {
     flexDirection: "row",
@@ -345,12 +345,10 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
   },
-  trailName: { color: "#111" },
+  trailName: {},
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 10,
     fontSize: 15,
@@ -366,7 +364,6 @@ const styles = StyleSheet.create({
     inset: 0,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.5)",
   },
-  foot: { fontSize: 10, color: "#9ca3af", paddingHorizontal: 16, paddingBottom: 12 },
+  foot: { fontSize: 10, paddingHorizontal: 16, paddingBottom: 12 },
 });

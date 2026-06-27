@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuthStore } from "../../src/stores/authStore";
 import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
@@ -15,6 +16,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
  * geometry is stored verbatim.
  */
 export default function AdminImportScreen() {
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -72,26 +74,26 @@ export default function AdminImportScreen() {
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <ScrollView style={[styles.root, { backgroundColor: colors.bg }]} contentContainerStyle={styles.content}>
       <Card>
-        <Text style={styles.h1}>Premium trail import</Text>
-        <Text style={styles.muted}>
+        <Text style={[styles.h1, { color: colors.text }]}>Premium trail import</Text>
+        <Text style={[styles.muted, { color: colors.textMuted }]}>
           Upload a GeoJSON LineString or MultiLineString. The trail will be marked
           `tier=premium` and skipped by the synthesis loop.
         </Text>
 
-        <Text style={styles.label}>Name</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: colors.borderStrong, color: colors.text, backgroundColor: colors.surfaceMuted }]}
           value={name}
           onChangeText={setName}
           placeholder="Bear Creek"
           testID="import-name"
         />
 
-        <Text style={styles.label}>Slug</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Slug</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: colors.borderStrong, color: colors.text, backgroundColor: colors.surfaceMuted }]}
           value={slug}
           onChangeText={setSlug}
           placeholder="bear-creek"
@@ -99,9 +101,9 @@ export default function AdminImportScreen() {
           testID="import-slug"
         />
 
-        <Text style={styles.label}>System id</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>System id</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: colors.borderStrong, color: colors.text, backgroundColor: colors.surfaceMuted }]}
           value={systemId}
           onChangeText={setSystemId}
           placeholder="00000000-…"
@@ -109,7 +111,7 @@ export default function AdminImportScreen() {
           testID="import-system"
         />
 
-        <Text style={styles.label}>Difficulty</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Difficulty</Text>
         <View style={styles.row}>
           {(["easy", "moderate", "hard", "expert"] as const).map((d) => (
             <Button
@@ -124,9 +126,9 @@ export default function AdminImportScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>External URL (optional)</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>External URL (optional)</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: colors.borderStrong, color: colors.text, backgroundColor: colors.surfaceMuted }]}
           value={externalUrl}
           onChangeText={setExternalUrl}
           placeholder="https://example.com/trail"
@@ -134,9 +136,9 @@ export default function AdminImportScreen() {
           testID="import-url"
         />
 
-        <Text style={styles.label}>Geometry (GeoJSON)</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Geometry (GeoJSON)</Text>
         <TextInput
-          style={[styles.input, styles.geojson]}
+          style={[styles.input, styles.geojson, { borderColor: colors.borderStrong, color: colors.text, backgroundColor: colors.surfaceMuted }]}
           value={geojson}
           onChangeText={setGeojson}
           placeholder='{"type":"LineString","coordinates":[[-120,50],…]}'
@@ -151,11 +153,11 @@ export default function AdminImportScreen() {
         </View>
 
         {result ? (
-          <View style={styles.success} testID="import-success">
-            <Text style={styles.successText}>
+          <View style={[styles.success, { backgroundColor: colors.successMuted }]} testID="import-success">
+            <Text style={[styles.successText, { color: colors.textOnTint }]}>
               ✓ Created "{result.name}" ({result.tier}, {result.slug})
             </Text>
-            <Text style={styles.muted}>id: {result.id}</Text>
+            <Text style={[styles.muted, { color: colors.textMuted }]}>id: {result.id}</Text>
           </View>
         ) : null}
       </Card>
@@ -164,14 +166,13 @@ export default function AdminImportScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#fff" },
+  root: { flex: 1 },
   content: { padding: 16 },
   h1: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
-  muted: { color: "#6b7280", marginBottom: 12 },
-  label: { fontWeight: "600", color: "#374151", marginTop: 12, marginBottom: 4 },
+  muted: { marginBottom: 12 },
+  label: { fontWeight: "600", marginTop: 12, marginBottom: 4 },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 10,
     fontSize: 15,
@@ -179,6 +180,6 @@ const styles = StyleSheet.create({
   geojson: { minHeight: 140, textAlignVertical: "top", fontFamily: "monospace" },
   row: { flexDirection: "row", gap: 8 },
   actions: { marginTop: 16, alignItems: "flex-end" },
-  success: { marginTop: 16, padding: 12, backgroundColor: "#d1fae5", borderRadius: 8 },
-  successText: { color: "#065f46", fontWeight: "600" },
+  success: { marginTop: 16, padding: 12, borderRadius: 8 },
+  successText: { fontWeight: "600" },
 });

@@ -10,6 +10,7 @@ import {
 } from "../../src/components/polygon/ShapeEditor";
 import { ShapeEditorBar } from "../../src/components/polygon/ShapeEditorBar";
 import { ShapeEditorModeToggle } from "../../src/components/polygon/ShapeEditorModeToggle";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { useAuthStore } from "../../src/stores/authStore";
 import { useMapStore } from "../../src/stores/mapStore";
 
@@ -35,6 +36,7 @@ const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001"
  */
 export default function BoundaryScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const params = useLocalSearchParams<{
     mode?: string;
@@ -168,17 +170,17 @@ export default function BoundaryScreen() {
 
   if (loading) {
     return (
-      <View style={styles.fill} testID="boundary-screen">
+      <View style={[styles.fill, { backgroundColor: colors.bg }]} testID="boundary-screen">
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.centered}>
-          <Text style={styles.loading}>Loading…</Text>
+          <Text style={[styles.loading, { color: colors.textMuted }]}>Loading…</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.fill} testID="boundary-screen">
+    <View style={[styles.fill, { backgroundColor: colors.bg }]} testID="boundary-screen">
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.mapWrap}>
         <ShapeEditor
@@ -280,12 +282,12 @@ function encodeShape(shape: Shape): string {
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1, backgroundColor: "#fff" },
+  fill: { flex: 1 },
   mapWrap: { flex: 1, position: "relative" },
   centered: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  loading: { fontSize: 14, color: "#64748b" },
+  loading: { fontSize: 14 },
 });

@@ -120,7 +120,7 @@ export function SegmentEditor({
                 style={[
                   styles.surfaceOption,
                   surfaceType === s
-                    ? { backgroundColor: "#fff7ed", borderColor: "#ea580c" }
+                    ? { backgroundColor: colors.warningMuted, borderColor: colors.warning }
                     : { backgroundColor: colors.divider, borderColor: "transparent" },
                 ]}
                 testID={`segment-editor-surface-${s}-${segment.id}`}
@@ -130,7 +130,7 @@ export function SegmentEditor({
                   style={[
                     styles.surfaceOptionText,
                     { color: colors.textSecondary },
-                    surfaceType === s && { color: "#9a3412", fontWeight: "600" },
+                    surfaceType === s && { color: colors.warning, fontWeight: "600" },
                   ]}
                 >
                   {s.replace("_", " ")}
@@ -264,7 +264,7 @@ export function SegmentEditor({
                   style={[
                     styles.splitPreset,
                     splitAt === v
-                      ? { backgroundColor: "#1d4ed8" }
+                      ? { backgroundColor: colors.primary }
                       : { backgroundColor: colors.divider },
                   ]}
                   testID={`segment-editor-split-preset-${v}-${segment.id}`}
@@ -439,7 +439,7 @@ export function SegmentEditList({
               style={[
                 styles.mergeToggle,
                 selectedForMerge.has(s.id)
-                  ? { backgroundColor: "#1d4ed8" }
+                  ? { backgroundColor: colors.primary }
                   : { backgroundColor: colors.divider },
               ]}
               testID={`segment-merge-toggle-${s.id}`}

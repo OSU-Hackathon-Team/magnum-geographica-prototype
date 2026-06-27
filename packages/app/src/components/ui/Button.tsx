@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from "react-native";
-import type { ReactNode } from "react";
+import { forwardRef, type ReactNode } from "react";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "../../providers/ThemeProvider";
 import { radii, spacing, text as textTokens } from "../../theme/tokens";
 
@@ -25,16 +25,10 @@ function nodeIsString(node: ReactNode): node is string {
  * - ghost    : transparent; tertiary actions (Edit, Move to, etc.)
  * - danger   : red; destructive actions (Delete, Remove)
  */
-export function Button({
-  title,
-  onPress,
-  variant = "primary",
-  size = "medium",
-  disabled,
-  style,
-  testID,
-  children,
-}: ButtonProps) {
+export const Button = forwardRef<View, ButtonProps>(function Button(
+  { title, onPress, variant = "primary", size = "medium", disabled, style, testID, children },
+  ref,
+) {
   const { colors } = useTheme();
   const isDisabled = disabled || !onPress;
   const textStyle = [
@@ -70,6 +64,7 @@ export function Button({
 
   return (
     <Pressable
+      ref={ref}
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
@@ -88,7 +83,7 @@ export function Button({
       {content}
     </Pressable>
   );
-}
+});
 
 function textColor(
   variant: NonNullable<ButtonProps["variant"]>,

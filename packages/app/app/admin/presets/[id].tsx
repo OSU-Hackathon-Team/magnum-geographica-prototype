@@ -22,6 +22,7 @@ import {
   type PresetCategory,
 } from "@magnum/shared";
 import { useAuthStore } from "../../../src/stores/authStore";
+import { useTheme } from "../../../src/providers/ThemeProvider";
 import { Button } from "../../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -66,6 +67,7 @@ const COLORS = [
 ];
 
 export default function AdminPresetEditorScreen() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
@@ -77,7 +79,7 @@ export default function AdminPresetEditorScreen() {
   const [key, setKey] = useState("");
   const [label, setLabel] = useState("");
   const [iconName, setIconName] = useState("ellipse");
-  const [iconColor, setIconColor] = useState("#22c55e");
+  const [iconColor, setIconColor] = useState(colors.primary);
   const [category, setCategory] = useState<PresetCategory>("landmarks");
   const [upstreamable, setUpstreamable] = useState(false);
   const [sortOrder, setSortOrder] = useState(100);
@@ -217,8 +219,8 @@ export default function AdminPresetEditorScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#22c55e" />
+      <View style={[styles.centered, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -226,11 +228,11 @@ export default function AdminPresetEditorScreen() {
   return (
     <>
       <Stack.Screen options={{ title: isNew ? "New Preset" : `Edit ${label}` }} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} testID="admin-preset-editor">
+      <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={styles.content} testID="admin-preset-editor">
         <Section title="Identity">
           <Field label="Key (snake_case)">
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, color: colors.text }]}
               value={key}
               onChangeText={setKey}
               editable={isNew}
@@ -241,7 +243,7 @@ export default function AdminPresetEditorScreen() {
           </Field>
           <Field label="Label">
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, color: colors.text }]}
               value={label}
               onChangeText={setLabel}
               placeholder="Bench"
@@ -250,7 +252,7 @@ export default function AdminPresetEditorScreen() {
           </Field>
           <Field label="Sort order">
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, color: colors.text }]}
               value={String(sortOrder)}
               onChangeText={(v) => setSortOrder(Number(v) || 0)}
               keyboardType="numeric"
@@ -268,10 +270,10 @@ export default function AdminPresetEditorScreen() {
               <Pressable
                 key={c}
                 onPress={() => setCategory(c)}
-                style={[styles.chip, category === c ? styles.chipActive : null]}
+                style={[styles.chip, category === c ? [styles.chipActive, { backgroundColor: colors.primary }] : { backgroundColor: colors.surfaceMutedStrong }]}
                 testID={`preset-category-${c}`}
               >
-                <Text style={[styles.chipText, category === c ? styles.chipTextActive : null]}>
+                <Text style={[styles.chipText, category === c ? [styles.chipTextActive, { color: colors.textInverse }] : { color: colors.text }]}>
                   {PRESET_CATEGORY_LABELS[c]}
                 </Text>
               </Pressable>
@@ -285,10 +287,10 @@ export default function AdminPresetEditorScreen() {
               <Pressable
                 key={g}
                 onPress={() => setIconName(g)}
-                style={[styles.iconBtn, iconName === g ? styles.iconBtnActive : null]}
+                style={[styles.iconBtn, iconName === g ? [styles.iconBtnActive, { borderColor: colors.primary, backgroundColor: colors.successMuted }] : null]}
                 testID={`preset-icon-${g}`}
               >
-                <Ionicons name={g as never} size={20} color={iconName === g ? iconColor : "#666"} />
+                <Ionicons name={g as never} size={20} color={iconName === g ? iconColor : colors.textMuted} />
               </Pressable>
             ))}
           </View>
@@ -300,7 +302,7 @@ export default function AdminPresetEditorScreen() {
                 style={[
                   styles.colorDot,
                   { backgroundColor: c },
-                  iconColor === c ? styles.colorDotActive : null,
+                  iconColor === c ? [styles.colorDotActive, { borderColor: colors.text }] : null,
                 ]}
                 testID={`preset-color-${c}`}
               />
@@ -321,25 +323,25 @@ export default function AdminPresetEditorScreen() {
           }
         >
           {questions.length === 0 ? (
-            <Text style={styles.hint}>No questions — feature will save with just a name.</Text>
+            <Text style={[styles.hint, { color: colors.textMuted }]}>No questions — feature will save with just a name.</Text>
           ) : (
             questions.map((q, qi) => (
-              <View key={qi} style={styles.questionCard}>
+              <View key={qi} style={[styles.questionCard, { backgroundColor: colors.surfaceMuted }]}>
                 <View style={styles.row}>
                   <TextInput
-                    style={[styles.input, styles.flex1]}
+                    style={[styles.input, styles.flex1, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, color: colors.text }]}
                     value={q.label}
                     onChangeText={(v) => updateQuestion(qi, { label: v })}
                     placeholder="Question label"
                     testID={`preset-q-${qi}-label`}
                   />
                   <Pressable onPress={() => removeQuestion(qi)} style={styles.removeBtn} testID={`preset-q-${qi}-remove`}>
-                    <Ionicons name="close" size={18} color="#ef4444" />
+                    <Ionicons name="close" size={18} color={colors.danger} />
                   </Pressable>
                 </View>
                 <View style={styles.row}>
                   <TextInput
-                    style={[styles.input, styles.flex1]}
+                    style={[styles.input, styles.flex1, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, color: colors.text }]}
                     value={q.key}
                     onChangeText={(v) => updateQuestion(qi, { key: v })}
                     placeholder="question_key"
@@ -348,18 +350,18 @@ export default function AdminPresetEditorScreen() {
                   />
                   <Pressable
                     onPress={() => updateQuestion(qi, { type: q.type === "boolean" ? "select" : "boolean" })}
-                    style={styles.typeBtn}
+                    style={[styles.typeBtn, { backgroundColor: colors.primaryMuted }]}
                     testID={`preset-q-${qi}-type`}
                   >
-                    <Text style={styles.typeBtnText}>{q.type}</Text>
+                    <Text style={[styles.typeBtnText, { color: colors.text }]}>{q.type}</Text>
                   </Pressable>
                 </View>
                 {q.type === "select" ? (
-                  <View style={styles.optionsBlock}>
+                  <View style={[styles.optionsBlock, { borderLeftColor: colors.primaryMuted }]}>
                     {q.options.map((o, oi) => (
                       <View key={oi} style={styles.row}>
                         <TextInput
-                          style={[styles.input, styles.flex2]}
+                          style={[styles.input, styles.flex2, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, color: colors.text }]}
                           value={o.value}
                           onChangeText={(v) => updateOption(qi, oi, { value: v })}
                           placeholder="value"
@@ -367,7 +369,7 @@ export default function AdminPresetEditorScreen() {
                           testID={`preset-q-${qi}-opt-${oi}-value`}
                         />
                         <TextInput
-                          style={[styles.input, styles.flex3]}
+                          style={[styles.input, styles.flex3, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, color: colors.text }]}
                           value={o.label}
                           onChangeText={(v) => updateOption(qi, oi, { label: v })}
                           placeholder="Label"
@@ -378,7 +380,7 @@ export default function AdminPresetEditorScreen() {
                           style={styles.removeBtn}
                           testID={`preset-q-${qi}-opt-${oi}-remove`}
                         >
-                          <Ionicons name="close" size={18} color="#ef4444" />
+                          <Ionicons name="close" size={18} color={colors.danger} />
                         </Pressable>
                       </View>
                     ))}
@@ -403,55 +405,52 @@ export default function AdminPresetEditorScreen() {
       </ScrollView>
     </>
   );
-}
 
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {action}
+  function Section({
+    title,
+    action,
+    children,
+  }: {
+    title: string;
+    action?: React.ReactNode;
+    children: React.ReactNode;
+  }) {
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{title}</Text>
+          {action}
+        </View>
+        <View style={{ gap: 8 }}>{children}</View>
       </View>
-      <View style={{ gap: 8 }}>{children}</View>
-    </View>
-  );
-}
+    );
+  }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      {children}
-    </View>
-  );
+  function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+      <View style={styles.field}>
+        <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>
+        {children}
+      </View>
+    );
+  }
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { padding: 16, gap: 16, paddingBottom: 32 },
   section: { gap: 8 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  sectionTitle: { fontSize: 14, fontWeight: "700", color: "#444" },
+  sectionTitle: { fontSize: 14, fontWeight: "700" },
   field: { gap: 4 },
-  label: { fontSize: 12, fontWeight: "600", color: "#666" },
+  label: { fontSize: 12, fontWeight: "600" },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 14,
-    color: "#222",
-    backgroundColor: "#fafafa",
   },
   flex1: { flex: 1 },
   flex2: { flex: 2 },
@@ -462,23 +461,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 6,
-    backgroundColor: "#e0e7ff",
   },
-  typeBtnText: { fontSize: 12, color: "#4338ca", fontWeight: "700", textTransform: "uppercase" },
-  optionsBlock: { gap: 6, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: "#e0e7ff" },
-  questionCard: { gap: 8, padding: 12, backgroundColor: "#f9fafb", borderRadius: 8 },
+  typeBtnText: { fontSize: 12, fontWeight: "700", textTransform: "uppercase" },
+  optionsBlock: { gap: 6, paddingLeft: 12, borderLeftWidth: 2 },
+  questionCard: { gap: 8, padding: 12, borderRadius: 8 },
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: "#f1f1f1" },
-  chipActive: { backgroundColor: "#22c55e" },
-  chipText: { fontSize: 12, color: "#444" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
+  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14 },
+  chipActive: {},
+  chipText: { fontSize: 12 },
+  chipTextActive: { fontWeight: "600" },
   iconRow: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   iconBtn: { padding: 6, borderRadius: 6, borderWidth: 1, borderColor: "transparent" },
-  iconBtnActive: { borderColor: "#22c55e", backgroundColor: "#dcfce7" },
+  iconBtnActive: {},
   colorDot: { width: 22, height: 22, borderRadius: 11 },
-  colorDotActive: { borderWidth: 2, borderColor: "#000" },
+  colorDotActive: { borderWidth: 2 },
   previewRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8 },
   previewLabel: { fontSize: 14, fontWeight: "600" },
-  hint: { color: "#888", fontSize: 12, fontStyle: "italic" },
+  hint: { fontSize: 12, fontStyle: "italic" },
   footer: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginTop: 8 },
 });

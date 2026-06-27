@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 import { useAuthStore } from "../../src/stores/authStore";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
 
@@ -27,6 +28,7 @@ interface Proposal {
 }
 
 export default function AdminSynthesisScreen() {
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const [systemId, setSystemId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -101,7 +103,7 @@ export default function AdminSynthesisScreen() {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <Card style={styles.headerCard}>
         <Text style={styles.h1}>Synthesis proposals</Text>
         <Text style={styles.muted}>
@@ -110,7 +112,7 @@ export default function AdminSynthesisScreen() {
         </Text>
         <View style={styles.systemRow}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: colors.borderStrong }]}
             placeholder="System id (uuid)"
             value={systemInput}
             onChangeText={setSystemInput}
@@ -128,11 +130,11 @@ export default function AdminSynthesisScreen() {
       </Card>
 
       {systemId == null ? (
-        <Text style={styles.mutedCenter} testID="synthesis-empty">
+        <Text style={[styles.mutedCenter, { color: colors.textMuted }]} testID="synthesis-empty">
           Enter a system id to load its proposal queue.
         </Text>
       ) : loading ? (
-        <ActivityIndicator size="large" color="#0a84ff" />
+        <ActivityIndicator size="large" color={colors.primary} />
       ) : (
         <FlatList
           data={proposals}
@@ -141,20 +143,24 @@ export default function AdminSynthesisScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => setSelected(item)}
-              style={({ pressed }) => [styles.row, pressed && { backgroundColor: "#f3f4f6" }]}
+              style={({ pressed }) => [
+                styles.row,
+                { borderBottomColor: colors.divider },
+                pressed && { backgroundColor: colors.surfaceMutedStrong },
+              ]}
               testID={`synthesis-row-${item.id}`}
             >
               <View style={styles.rowMain}>
-                <Text style={styles.rowTitle}>Cluster #{item.cluster_id ?? "?"}</Text>
-                <Text style={styles.rowSub}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Cluster #{item.cluster_id ?? "?"}</Text>
+                <Text style={[styles.rowSub, { color: colors.textMuted }]}>
                   Segment {item.segment_id.slice(0, 8)}… · Trace {item.trace_id.slice(0, 8)}…
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#6b7280" />
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
           )}
           ListEmptyComponent={
-            <Text style={styles.mutedCenter} testID="synthesis-no-proposals">
+            <Text style={[styles.mutedCenter, { color: colors.textMuted }]} testID="synthesis-no-proposals">
               No pending proposals.
             </Text>
           }
@@ -168,19 +174,19 @@ export default function AdminSynthesisScreen() {
         onRequestClose={() => setSelected(null)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Approve as new trail</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Approve as new trail</Text>
               <Pressable onPress={() => setSelected(null)} testID="synthesis-modal-close">
-                <Ionicons name="close" size={22} color="#111" />
+                <Ionicons name="close" size={22} color={colors.text} />
               </Pressable>
             </View>
-            <Text style={styles.muted}>
+            <Text style={[styles.muted, { color: colors.textMuted }]}>
               Segment {selected?.segment_id.slice(0, 8)}… · cluster{" "}
               {selected?.cluster_id ?? "?"}
             </Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.borderStrong }]}
               placeholder="Trail name (e.g. Sycamore Ridge)"
               value={name}
               onChangeText={setName}
@@ -214,16 +220,15 @@ export default function AdminSynthesisScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 16, backgroundColor: "#fff" },
+  root: { flex: 1, padding: 16 },
   headerCard: { marginBottom: 12 },
   h1: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
-  muted: { color: "#6b7280" },
-  mutedCenter: { color: "#6b7280", textAlign: "center", marginTop: 24 },
+  muted: {},
+  mutedCenter: { textAlign: "center", marginTop: 24 },
   systemRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#d1d5db",
     borderRadius: 8,
     padding: 10,
     fontSize: 15,
@@ -235,14 +240,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
   },
   rowMain: { flex: 1 },
-  rowTitle: { fontWeight: "600", color: "#111" },
-  rowSub: { color: "#6b7280", fontSize: 12 },
+  rowTitle: { fontWeight: "600" },
+  rowSub: { fontSize: 12 },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
   modalCard: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
@@ -254,7 +257,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: "#111" },
+  modalTitle: { fontSize: 18, fontWeight: "700" },
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 import { useAuthStore } from "../../stores/authStore";
+import { useTheme } from "../../providers/ThemeProvider";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -37,6 +38,7 @@ export function VoteControl({
 }: VoteControlProps) {
   const token = useAuthStore((s) => s.token);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { colors } = useTheme();
   const [upvotes, setUpvotes] = useState(initialUpvotes);
   const [downvotes, setDownvotes] = useState(initialDownvotes);
   const [myVote, setMyVote] = useState<-1 | 0 | 1>(initialMyVote);
@@ -120,22 +122,21 @@ export function VoteControl({
       <Pressable
         onPress={() => submit(myVote === 1 ? 0 : 1)}
         disabled={loading || !isAuthenticated}
-        style={[styles.button, myVote === 1 ? styles.upActive : null]}
+        style={[styles.button, myVote === 1 && { backgroundColor: colors.successMuted }]}
         testID={testID ? `${testID}-up` : undefined}
         accessibilityRole="button"
         accessibilityLabel="Upvote"
       >
-        <Text style={[styles.arrow, arrowDim, myVote === 1 ? styles.upActiveText : null]}>▲</Text>
+        <Text style={[styles.arrow, arrowDim, myVote === 1 && styles.upActiveText, { color: myVote === 1 ? colors.primary : colors.textMuted }]}>▲</Text>
       </Pressable>
       {loading ? (
-        <ActivityIndicator size="small" color="#22c55e" style={styles.scoreLoader} />
+        <ActivityIndicator size="small" color={colors.primary} style={styles.scoreLoader} />
       ) : (
         <Text
           style={[
             styles.score,
             size === "small" ? styles.scoreSmall : null,
-            net < 0 ? styles.scoreNegative : null,
-            net > 0 ? styles.scorePositive : null,
+            { color: net < 0 ? colors.danger : net > 0 ? colors.primary : colors.text },
           ]}
           testID={testID ? `${testID}-score` : undefined}
         >
@@ -145,12 +146,12 @@ export function VoteControl({
       <Pressable
         onPress={() => submit(myVote === -1 ? 0 : -1)}
         disabled={loading || !isAuthenticated}
-        style={[styles.button, myVote === -1 ? styles.downActive : null]}
+        style={[styles.button, myVote === -1 && { backgroundColor: colors.dangerMuted }]}
         testID={testID ? `${testID}-down` : undefined}
         accessibilityRole="button"
         accessibilityLabel="Downvote"
       >
-        <Text style={[styles.arrow, arrowDim, myVote === -1 ? styles.downActiveText : null]}>▼</Text>
+        <Text style={[styles.arrow, arrowDim, myVote === -1 && styles.downActiveText, { color: myVote === -1 ? colors.danger : colors.textMuted }]}>▼</Text>
       </Pressable>
     </View>
   );
@@ -169,21 +170,16 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  upActive: { backgroundColor: "#dcfce7" },
-  downActive: { backgroundColor: "#fee2e2" },
-  arrow: { fontSize: 14, color: "#888" },
-  arrowSmall: { fontSize: 11, color: "#888" },
-  upActiveText: { color: "#22c55e", fontWeight: "700" },
-  downActiveText: { color: "#ef4444", fontWeight: "700" },
+  arrow: { fontSize: 14 },
+  arrowSmall: { fontSize: 11 },
+  upActiveText: { fontWeight: "700" },
+  downActiveText: { fontWeight: "700" },
   score: {
     minWidth: 28,
     textAlign: "center",
     fontSize: 13,
     fontWeight: "600",
-    color: "#111",
   },
   scoreSmall: { fontSize: 11, minWidth: 22 },
-  scorePositive: { color: "#22c55e" },
-  scoreNegative: { color: "#ef4444" },
   scoreLoader: { minWidth: 28, height: 14 },
 });

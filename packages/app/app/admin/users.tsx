@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
 } from "react-native";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
 import { useAuthStore } from "../../src/stores/authStore";
@@ -18,6 +19,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const PAGE_SIZE = 20;
 
 export default function AdminUsers() {
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const [items, setItems] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,12 +86,17 @@ export default function AdminUsers() {
       <View style={styles.userRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.userName}>{item.username}</Text>
-          <Text style={styles.userEmail}>{item.email}</Text>
+          <Text style={[styles.userEmail, { color: colors.textMuted }]}>{item.email}</Text>
           <View style={styles.badges}>
-            <Text style={[styles.badge, item.role === "banned" ? styles.badgeBanned : styles.badgeRole]}>
+            <Text style={[
+              styles.badge,
+              item.role === "banned"
+                ? [styles.badgeBanned, { backgroundColor: colors.dangerMuted, color: colors.danger }]
+                : [styles.badgeRole, { backgroundColor: colors.surfaceMutedStrong, color: colors.textSecondary }],
+            ]}>
               {item.role}
             </Text>
-            <Text style={styles.badgeTrust}>
+            <Text style={[styles.badgeTrust, { backgroundColor: colors.successMuted, color: colors.primary }]}>
               Trust: {item.trust_score.toFixed(2)}
             </Text>
           </View>
@@ -107,11 +114,11 @@ export default function AdminUsers() {
   );
 
   return (
-    <View style={styles.container} testID="admin-users">
+    <View style={[styles.container, { backgroundColor: colors.bg }]} testID="admin-users">
       <Text style={styles.heading}>Users ({total})</Text>
       <View style={styles.searchRow}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: colors.border }]}
           value={search}
           onChangeText={setSearch}
           placeholder="Search users..."
@@ -121,8 +128,8 @@ export default function AdminUsers() {
         <Button onPress={handleSearch} size="small">Search</Button>
       </View>
       {loading && items.length === 0 ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+        <View style={[styles.centered, { backgroundColor: colors.bg }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -141,13 +148,12 @@ export default function AdminUsers() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   heading: { fontSize: 18, fontWeight: "700", padding: 16, paddingBottom: 8 },
   searchRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginBottom: 8 },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 8,
     padding: 8,
     fontSize: 14,
@@ -156,10 +162,10 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   userRow: { flexDirection: "row", alignItems: "center" },
   userName: { fontSize: 15, fontWeight: "600" },
-  userEmail: { fontSize: 12, color: "#888", marginTop: 2 },
+  userEmail: { fontSize: 12, marginTop: 2 },
   badges: { flexDirection: "row", gap: 6, marginTop: 4 },
   badge: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: "hidden" },
-  badgeRole: { backgroundColor: "#e5e5e5", color: "#555" },
-  badgeBanned: { backgroundColor: "#fee2e2", color: "#dc2626" },
-  badgeTrust: { backgroundColor: "#dcfce7", color: "#22c55e" },
+  badgeRole: {},
+  badgeBanned: {},
+  badgeTrust: {},
 });

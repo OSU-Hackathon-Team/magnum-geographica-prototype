@@ -14,10 +14,12 @@ import { Card } from "../../src/components/ui/Card";
 import { Form } from "../../src/components/ui/Form";
 import { useAuthStore } from "../../src/stores/authStore";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
+import { useTheme } from "../../src/providers/ThemeProvider";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,7 +48,7 @@ export default function LoginScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       contentContainerStyle={styles.content}
       testID="login-screen"
       keyboardShouldPersistTaps="handled"
@@ -55,13 +57,13 @@ export default function LoginScreen() {
         <Form onSubmit={handleLogin}>
         <Text style={styles.heading}>Welcome Back</Text>
         {error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorBox, { backgroundColor: colors.dangerMuted }]}>
+            <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
           </View>
         )}
         <Text style={styles.label}>Email</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
           value={email}
           onChangeText={setEmail}
           placeholder="you@example.com"
@@ -77,7 +79,7 @@ export default function LoginScreen() {
         />
         <Text style={styles.label}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
           value={password}
           onChangeText={setPassword}
           placeholder="Your password"
@@ -98,11 +100,11 @@ export default function LoginScreen() {
             testID="login-submit"
             style={{ flex: 1 }}
           >
-            {loading ? <ActivityIndicator color="#fff" size="small" /> : "Log In"}
+            {loading ? <ActivityIndicator color={colors.textInverse} size="small" /> : "Log In"}
           </Button>
         </View>
         </Form>
-        <Link href="/auth/register" style={styles.link} testID="login-to-register">
+        <Link href="/auth/register" style={[styles.link, { color: colors.primary }]} testID="login-to-register">
           Don&apos;t have an account? Create one
         </Link>
       </Card>
@@ -111,25 +113,22 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   content: { padding: 16, gap: 12 },
   heading: { fontSize: 20, fontWeight: "700", marginBottom: 12 },
   label: { fontSize: 14, fontWeight: "600", marginBottom: 4, marginTop: 8 },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 8,
     padding: 10,
     fontSize: 15,
-    backgroundColor: "#fafafa",
   },
   buttonRow: { marginTop: 16, flexDirection: "row", gap: 8 },
-  link: { color: "#22c55e", fontSize: 14, textAlign: "center", marginTop: 12 },
+  link: { fontSize: 14, textAlign: "center", marginTop: 12 },
   errorBox: {
-    backgroundColor: "#fee2e2",
     padding: 10,
     borderRadius: 8,
     marginBottom: 8,
   },
-  errorText: { color: "#dc2626", fontSize: 13 },
+  errorText: { fontSize: 13 },
 });

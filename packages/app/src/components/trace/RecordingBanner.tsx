@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTraceStore, sessionElapsedMs } from "../../stores/traceStore";
+import { useTheme } from "../../providers/ThemeProvider";
 
 /**
  * Persistent indicator shown above all tab content while a trace is
@@ -19,6 +20,7 @@ import { useTraceStore, sessionElapsedMs } from "../../stores/traceStore";
 export function RecordingBanner() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors } = useTheme();
   const status = useTraceStore((s) => s.status);
   const startedAt = useTraceStore((s) => s.startedAt);
   const totalPausedMs = useTraceStore((s) => s.totalPausedMs);
@@ -54,8 +56,7 @@ export function RecordingBanner() {
       onPress={() => router.push("/record" as never)}
       style={({ pressed }) => [
         styles.banner,
-        { paddingTop: insets.top + 10 },
-        isPaused ? styles.bannerPaused : styles.bannerRecording,
+        { paddingTop: insets.top + 10, backgroundColor: isPaused ? colors.warning : colors.danger, shadowColor: colors.shadow },
         pressed ? styles.bannerPressed : null,
       ]}
       testID="recording-banner"
@@ -67,17 +68,17 @@ export function RecordingBanner() {
       <View
         style={[
           styles.dot,
-          { backgroundColor: isPaused ? "#f59e0b" : "#ef4444" },
+          { backgroundColor: isPaused ? colors.warning : colors.danger },
         ]}
         testID="recording-banner-dot"
       />
-      <Text style={styles.label} testID="recording-banner-label">
+      <Text style={[styles.label, { color: colors.textInverse }]} testID="recording-banner-label">
         {isPaused ? "Paused" : "Recording"}
       </Text>
-      <Text style={styles.duration} testID="recording-banner-duration">
+      <Text style={[styles.duration, { color: colors.textInverse }]} testID="recording-banner-duration">
         {formatDuration(Math.floor(elapsedMs / 1000))}
       </Text>
-      <Ionicons name="chevron-forward" size={16} color="#fff" style={{ marginLeft: "auto" }} />
+      <Ionicons name="chevron-forward" size={16} color={colors.textInverse} style={{ marginLeft: "auto" }} />
     </Pressable>
   );
 }
@@ -102,16 +103,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     zIndex: 100,
-    shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 6,
   },
-  bannerRecording: { backgroundColor: "#ef4444" },
-  bannerPaused: { backgroundColor: "#f59e0b" },
   bannerPressed: { opacity: 0.85 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  label: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  duration: { color: "#fff", fontSize: 13, fontWeight: "500", opacity: 0.9 },
+  label: { fontSize: 13, fontWeight: "700" },
+  duration: { fontSize: 13, fontWeight: "500", opacity: 0.9 },
 });

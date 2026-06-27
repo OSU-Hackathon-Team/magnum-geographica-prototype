@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View, ActivityIndicator } from "react-native";
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
 import { useAuthStore } from "../../src/stores/authStore";
@@ -16,6 +17,8 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
+  const { colors } = useTheme();
+  const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,81 +40,93 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#22c55e" />
+      <View style={[styles.centered, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       contentContainerStyle={styles.content}
       testID="admin-dashboard"
     >
       <Text style={styles.heading}>Admin Dashboard</Text>
       <View style={styles.statsGrid}>
         <Card testID="admin-stat-users">
-          <Text style={styles.statLabel}>Users</Text>
-          <Text style={styles.statValue}>{stats?.userCount ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Users</Text>
+          <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.userCount ?? 0}</Text>
         </Card>
         <Card testID="admin-stat-revisions">
-          <Text style={styles.statLabel}>Revisions</Text>
-          <Text style={styles.statValue}>{stats?.revisionCount ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Revisions</Text>
+          <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.revisionCount ?? 0}</Text>
         </Card>
         <Card testID="admin-stat-trails">
-          <Text style={styles.statLabel}>Trails</Text>
-          <Text style={styles.statValue}>{stats?.trailCount ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Trails</Text>
+          <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.trailCount ?? 0}</Text>
         </Card>
         <Card testID="admin-stat-features">
-          <Text style={styles.statLabel}>Features</Text>
-          <Text style={styles.statValue}>{stats?.featureCount ?? 0}</Text>
+          <Text style={[styles.statLabel, { color: colors.textMuted }]}>Features</Text>
+          <Text style={[styles.statValue, { color: colors.primary }]}>{stats?.featureCount ?? 0}</Text>
         </Card>
       </View>
 
       <View style={styles.links}>
-        <Link href="/admin/revisions" asChild>
-          <Button variant="secondary" testID="admin-link-revisions">
-            View Revisions
-          </Button>
-        </Link>
-        <Link href="/admin/users" asChild>
-          <Button variant="secondary" testID="admin-link-users">
-            Manage Users
-          </Button>
-        </Link>
-        <Link href="/admin/patrol" asChild>
-          <Button variant="secondary" testID="admin-link-patrol">
-            Patrol Feed
-          </Button>
-        </Link>
-        <Link href="/admin/presets" asChild>
-          <Button variant="secondary" testID="admin-link-presets">
-            Manage Presets
-          </Button>
-        </Link>
-        <Link href="/admin/synthesis" asChild>
-          <Button variant="secondary" testID="admin-link-synthesis">
-            Synthesis Proposals
-          </Button>
-        </Link>
-        <Link href="/admin/import" asChild>
-          <Button variant="secondary" testID="admin-link-import">
-            Premium Import
-          </Button>
-        </Link>
+        <Button
+          variant="secondary"
+          testID="admin-link-revisions"
+          onPress={() => router.push("/admin/revisions")}
+        >
+          View Revisions
+        </Button>
+        <Button
+          variant="secondary"
+          testID="admin-link-users"
+          onPress={() => router.push("/admin/users")}
+        >
+          Manage Users
+        </Button>
+        <Button
+          variant="secondary"
+          testID="admin-link-patrol"
+          onPress={() => router.push("/admin/patrol")}
+        >
+          Patrol Feed
+        </Button>
+        <Button
+          variant="secondary"
+          testID="admin-link-presets"
+          onPress={() => router.push("/admin/presets")}
+        >
+          Manage Presets
+        </Button>
+        <Button
+          variant="secondary"
+          testID="admin-link-synthesis"
+          onPress={() => router.push("/admin/synthesis")}
+        >
+          Synthesis Proposals
+        </Button>
+        <Button
+          variant="secondary"
+          testID="admin-link-import"
+          onPress={() => router.push("/admin/import")}
+        >
+          Premium Import
+        </Button>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   content: { padding: 16, gap: 12 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   heading: { fontSize: 22, fontWeight: "700", marginBottom: 4 },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  statLabel: { fontSize: 12, color: "#888" },
-  statValue: { fontSize: 28, fontWeight: "700", color: "#22c55e" },
+  statLabel: { fontSize: 12 },
+  statValue: { fontSize: 28, fontWeight: "700" },
   links: { gap: 8, marginTop: 8 },
 });

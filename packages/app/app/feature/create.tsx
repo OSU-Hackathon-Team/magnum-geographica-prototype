@@ -3,6 +3,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { createMagnumClient } from "@magnum/shared";
 import { FeatureForm, type FeatureFormData } from "../../src/components/feature/FeatureForm";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { useOfflineStore } from "../../src/stores/offlineStore";
 import { useAuthStore } from "../../src/stores/authStore";
 import { addPendingContribution, getPendingCount } from "../../src/services/offlineDataService";
@@ -22,6 +23,7 @@ export default function CreateFeatureScreen() {
   const isOnline = useOfflineStore((s) => s.isOnline);
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
+  const { colors } = useTheme();
 
   const parsedLon = Number(lon);
   const parsedLat = Number(lat);
@@ -90,13 +92,13 @@ export default function CreateFeatureScreen() {
     <>
       <Stack.Screen options={{ title: "Add Feature", headerBackTitle: "Map" }} />
       {error ? (
-        <View style={styles.errorBanner} testID="create-feature-error">
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.errorBanner, { backgroundColor: colors.dangerMuted }]} testID="create-feature-error">
+          <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
         </View>
       ) : null}
       {!isOnline ? (
-        <View style={styles.offlineBanner} testID="create-feature-offline-banner">
-          <Text style={styles.offlineText}>
+        <View style={[styles.offlineBanner, { backgroundColor: colors.warningMuted }]} testID="create-feature-offline-banner">
+          <Text style={[styles.offlineText, { color: colors.warning }]}>
             Offline — feature will be saved locally and synced when back online.
           </Text>
         </View>
@@ -116,8 +118,8 @@ export default function CreateFeatureScreen() {
 }
 
 const styles = StyleSheet.create({
-  errorBanner: { backgroundColor: "#fef2f2", padding: 10 },
-  errorText: { color: "#ef4444", fontSize: 13 },
-  offlineBanner: { backgroundColor: "#fef9c3", padding: 10 },
-  offlineText: { color: "#854d0e", fontSize: 12 },
+  errorBanner: { padding: 10 },
+  errorText: { fontSize: 13 },
+  offlineBanner: { padding: 10 },
+  offlineText: { fontSize: 12 },
 });

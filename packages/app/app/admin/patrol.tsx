@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useTheme } from "../../src/providers/ThemeProvider";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 import { useAuthStore } from "../../src/stores/authStore";
 import { Card } from "../../src/components/ui/Card";
@@ -38,6 +39,7 @@ const REASON_LABELS: Record<PatrolFlagReason, string> = {
 };
 
 export default function AdminPatrolScreen() {
+  const { colors } = useTheme();
   const token = useAuthStore((s) => s.token);
   const [items, setItems] = useState<PatrolEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,15 +112,15 @@ export default function AdminPatrolScreen() {
       <Card testID={`patrol-entry-${item.id}`}>
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.reason}>{REASON_LABELS[item.reason] ?? item.reason}</Text>
-            <Text style={styles.meta}>
+            <Text style={[styles.reason, { color: colors.text }]}>{REASON_LABELS[item.reason] ?? item.reason}</Text>
+            <Text style={[styles.meta, { color: colors.textMuted }]}>
               {item.revision_target_type}/{String(item.revision_target_id ?? "").slice(0, 8)} ·{" "}
               {item.revision_action}
             </Text>
             {item.revision_summary ? (
-              <Text style={styles.summary}>{item.revision_summary}</Text>
+              <Text style={[styles.summary, { color: colors.textMuted }]}>{item.revision_summary}</Text>
             ) : null}
-            <Text style={styles.timestamp}>
+            <Text style={[styles.timestamp, { color: colors.textMuted }]}>
               {new Date(item.created_at).toLocaleString()}
             </Text>
           </View>
@@ -132,7 +134,7 @@ export default function AdminPatrolScreen() {
               Resolve
             </Button>
           ) : (
-            <Text style={styles.resolved}>✓ Resolved</Text>
+            <Text style={[styles.resolved, { color: colors.primary }]}>✓ Resolved</Text>
           )}
         </View>
       </Card>
@@ -141,7 +143,7 @@ export default function AdminPatrolScreen() {
   );
 
   return (
-    <View style={styles.container} testID="admin-patrol">
+    <View style={[styles.container, { backgroundColor: colors.bg }]} testID="admin-patrol">
       <View style={styles.filterRow}>
         <Text style={styles.heading}>Patrol ({total})</Text>
         <View style={styles.filterButtons}>
@@ -158,9 +160,9 @@ export default function AdminPatrolScreen() {
           ))}
         </View>
       </View>
-      {loading && items.length === 0 ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#22c55e" />
+       {loading && items.length === 0 ? (
+        <View style={[styles.centered, { backgroundColor: colors.bg }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -177,7 +179,7 @@ export default function AdminPatrolScreen() {
           onEndReachedThreshold={0.5}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={styles.empty}>No patrol flags. 🎉</Text>
+              <Text style={[styles.empty, { color: colors.textMuted }]}>No patrol flags. 🎉</Text>
             </View>
           }
         />
@@ -187,7 +189,7 @@ export default function AdminPatrolScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center" },
   heading: { fontSize: 18, fontWeight: "700" },
   filterRow: {
@@ -200,12 +202,12 @@ const styles = StyleSheet.create({
   filterButtons: { flexDirection: "row", gap: 6 },
   list: { paddingHorizontal: 16, gap: 8, paddingBottom: 32 },
   row: { flexDirection: "row", alignItems: "center" },
-  reason: { fontSize: 14, fontWeight: "600", color: "#111" },
-  meta: { fontSize: 12, color: "#666", marginTop: 2 },
-  summary: { fontSize: 12, color: "#888", marginTop: 2 },
-  timestamp: { fontSize: 11, color: "#aaa", marginTop: 4 },
-  resolved: { fontSize: 12, color: "#22c55e" },
-  empty: { color: "#888" },
+  reason: { fontSize: 14, fontWeight: "600" },
+  meta: { fontSize: 12, marginTop: 2 },
+  summary: { fontSize: 12, marginTop: 2 },
+  timestamp: { fontSize: 11, marginTop: 4 },
+  resolved: { fontSize: 12 },
+  empty: {},
 });
 
 // Suppress unused warning for the constant import (used in dev for type lookup).

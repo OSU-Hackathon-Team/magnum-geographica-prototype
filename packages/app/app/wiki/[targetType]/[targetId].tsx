@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { createMagnumClient, type WikiPage, type Revision, type Citation } from "@magnum/shared";
+import { useTheme } from "../../../src/providers/ThemeProvider";
 import { WikiPageView } from "../../../src/components/wiki/WikiPageView";
 import { useOfflineStore } from "../../../src/stores/offlineStore";
 import {
@@ -13,6 +14,7 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export default function WikiPageScreen() {
   const { targetType, targetId } = useLocalSearchParams<{ targetType: string; targetId: string }>();
+  const { colors } = useTheme();
   const router = useRouter();
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [revisionCount, setRevisionCount] = useState(0);
@@ -115,7 +117,7 @@ export default function WikiPageScreen() {
   if (error) {
     return (
       <View style={styles.centered} testID="wiki-page-error">
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
       </View>
     );
   }
@@ -125,8 +127,8 @@ export default function WikiPageScreen() {
       <>
         <Stack.Screen options={{ title: "Wiki" }} />
         <View style={styles.centered} testID="wiki-page-not-found">
-          <Text style={styles.emptyTitle}>No wiki page yet</Text>
-          <Text style={styles.emptySub}>There is no wiki page for this {targetType}.</Text>
+          <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>No wiki page yet</Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>There is no wiki page for this {targetType}.</Text>
         </View>
       </>
     );
@@ -143,7 +145,7 @@ export default function WikiPageScreen() {
   return (
     <>
       <Stack.Screen options={{ title: wikiPage.title }} />
-      <ScrollView style={styles.container} testID="wiki-page-screen">
+      <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} testID="wiki-page-screen">
         <WikiPageView
           wikiPage={wikiPage}
           citationCount={citationCount}
@@ -158,9 +160,9 @@ export default function WikiPageScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1 },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
-  errorText: { color: "#ef4444", fontSize: 14 },
-  emptyTitle: { fontSize: 18, fontWeight: "600", color: "#666" },
-  emptySub: { fontSize: 13, color: "#999", marginTop: 4 },
+  errorText: { fontSize: 14 },
+  emptyTitle: { fontSize: 18, fontWeight: "600" },
+  emptySub: { fontSize: 13, marginTop: 4 },
 });

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { ReactNode } from "react";
 import { FeatureTypeIcon } from "./FeatureTypeIcon";
 import { Card } from "../ui/Card";
+import { useTheme } from "../../providers/ThemeProvider";
 
 export interface FeatureCardProps {
   id: string;
@@ -22,6 +23,7 @@ export function FeatureCard({
   rightElement,
   testID,
 }: FeatureCardProps) {
+  const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} testID={testID}>
       <Card testID={`feature-card-${id}`}>
@@ -29,10 +31,10 @@ export function FeatureCard({
           <View style={styles.left}>
             <View style={styles.nameRow}>
               <FeatureTypeIcon type={typeTag} size={14} />
-              <Text style={styles.name}>{name}</Text>
+              <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
             </View>
             {description ? (
-              <Text style={styles.desc} numberOfLines={2}>
+              <Text style={[styles.desc, { color: colors.textSecondary }]} numberOfLines={2}>
                 {description}
               </Text>
             ) : null}
@@ -53,5 +55,5 @@ const styles = StyleSheet.create({
   left: { flex: 1, gap: 4 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   name: { fontSize: 15, fontWeight: "600" },
-  desc: { fontSize: 13, color: "#555", marginTop: 4 },
+  desc: { fontSize: 13, marginTop: 4 },
 });

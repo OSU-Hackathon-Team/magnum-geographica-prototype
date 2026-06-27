@@ -2015,6 +2015,7 @@ $ANDROID_HOME/emulator/emulator -avd test_device -no-audio -no-window -gpu swift
 # 4. Port forwarding (run once per emulator boot)
 adb reverse tcp:8081 tcp:8081   # Metro
 adb reverse tcp:3000 tcp:3000   # API
+adb reverse tcp:3001 tcp:3001   # Martin tiles
 ```
 
 ### 20.2 Dev Scripts
