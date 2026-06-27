@@ -85,9 +85,9 @@ tracesRoute.get("/heat", async (c) => {
     return c.json({ error: "invalid_zoom", message: "zoom must be 2-18" }, 400);
   }
 
-  // Segment length in meters: point every ~8 screen pixels at the given zoom.
-  // Cap at 2000m (low zoom) and floor at 15m (very high zoom).
-  const segLen = Math.max(15, Math.min(2000, Math.round((156543 / Math.pow(2, zoom)) * 8)));
+  // Segment length in meters: point every ~4 screen pixels at the given zoom.
+  // Cap at 2000m (low zoom) and floor at 10m (very high zoom).
+  const segLen = Math.max(10, Math.min(2000, Math.round((156543 / Math.pow(2, zoom)) * 4)));
 
   try {
     const result = await getHeatmapPoints(bbox, segLen);

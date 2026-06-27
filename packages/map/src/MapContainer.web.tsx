@@ -491,13 +491,17 @@ export default function MapContainer({
           containerRef.current.dataset.mapZoom = String(zoom);
         }
       }
-      // Refresh heatmap when visible
+      // Refresh heatmap when visible — also scale radius/blur by zoom
       if (heatmapLayer && heatmapVisibleRef.current && merged.apiUrl) {
         heatmapAbortRef.current?.abort();
         const ctrl = new AbortController();
         heatmapAbortRef.current = ctrl;
         const ext = view.calculateExtent();
         if (ext) {
+          const res = view.getResolution();
+          const r = typeof res === "number" ? Math.max(5, Math.min(25, Math.round(80 / res))) : 8;
+          heatmapLayer.setRadius(r);
+          heatmapLayer.setBlur(Math.round(r * 0.7));
           const [minLon, minLat, maxLon, maxLat] = transformExtent(ext, "EPSG:3857", "EPSG:4326");
           loadHeatmapPoints(heatmapLayer, merged.apiUrl, [minLon!, minLat!, maxLon!, maxLat!], zoom, ctrl.signal)
             .catch(() => {});
@@ -654,6 +658,10 @@ export default function MapContainer({
           const ctrl = new AbortController();
           heatmapAbortRef.current = ctrl;
           const view = map.getView();
+          const res = view.getResolution();
+          const r = typeof res === "number" ? Math.max(5, Math.min(25, Math.round(80 / res))) : 8;
+          heatmapLayer.setRadius(r);
+          heatmapLayer.setBlur(Math.round(r * 0.7));
           const ext = view.calculateExtent();
           if (ext) {
             const [minLon, minLat, maxLon, maxLat] = transformExtent(ext, "EPSG:3857", "EPSG:4326");

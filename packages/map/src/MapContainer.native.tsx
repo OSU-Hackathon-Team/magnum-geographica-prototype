@@ -492,8 +492,13 @@ function buildMapHtml(
       // not in scope from a sibling function defined inside the object).
       function refreshHeatmap(){
         if(!heatmapLayer || !heatmapVisible || !apiUrl || !map) return;
-        var ext = ol.proj.transformExtent(map.getView().calculateExtent(), 'EPSG:3857', 'EPSG:4326');
-        var z = Math.round(map.getView().getZoom());
+        var view = map.getView();
+        var res = view.getResolution();
+        var r = typeof res === 'number' ? Math.max(5, Math.min(25, Math.round(80 / res))) : 8;
+        heatmapLayer.setRadius(r);
+        heatmapLayer.setBlur(Math.round(r * 0.7));
+        var ext = ol.proj.transformExtent(view.calculateExtent(), 'EPSG:3857', 'EPSG:4326');
+        var z = Math.round(view.getZoom());
         var url = apiUrl + '/api/traces/heat?bbox=' + ext.join(',') + '&zoom=' + z;
         fetch(url).then(function(r){ return r.json(); }).then(function(geojson){
           var features = (new ol.format.GeoJSON()).readFeatures(geojson, {featureProjection:'EPSG:3857'});
