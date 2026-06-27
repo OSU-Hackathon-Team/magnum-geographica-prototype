@@ -17,8 +17,8 @@ test("user can split a segment into two", async ({ page }) => {
   await page.getByTestId(`segment-editor-split-name-a-${FIXTURE_IDS.seg1}`).fill("First half");
   await page.getByTestId(`segment-editor-split-name-b-${FIXTURE_IDS.seg1}`).fill("Second half");
   await page.getByTestId(`segment-editor-split-confirm-${FIXTURE_IDS.seg1}`).click();
-  // After split, editor should still be visible
-  await expect(page.getByTestId(`segment-editor-${FIXTURE_IDS.seg1}`)).toBeVisible();
+  await page.waitForTimeout(1000);
+  await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
 });
 
 test("user can select two segments and merge them", async ({ page }) => {

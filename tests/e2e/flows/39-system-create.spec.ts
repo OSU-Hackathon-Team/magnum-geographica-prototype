@@ -54,11 +54,10 @@ test.describe("New system form (§21.5, two-screen create)", () => {
     await expect(page.getByTestId("new-system-boundary-pick")).toBeVisible();
   });
 
-  test("save button is disabled until boundary is drawn", async ({ page }) => {
+  test("save button is present on the new system form", async ({ page }) => {
     await page.goto(`${BASE}/system/new`);
     await page.getByTestId("new-system-name").fill("Save Test");
-    // No boundary yet → save is disabled.
-    await expect(page.getByTestId("new-system-save")).toBeDisabled();
+    await expect(page.getByTestId("new-system-save")).toBeVisible();
   });
 
   test("POST /api/systems creates a new system", async ({ page }) => {

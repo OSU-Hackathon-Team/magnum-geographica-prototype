@@ -12,36 +12,31 @@ test.afterEach(() => {
   resetApi();
 });
 
-async function openSystemOverflowMenu(page: Page) {
-  await page.getByTestId("system-overflow").click();
-  await expect(page.getByTestId("system-overflow-sheet")).toBeVisible();
+async function openMoveToSheet(page: Page) {
+  await page.getByTestId("system-move-to").click();
+  await expect(page.getByTestId("system-move-to-sheet")).toBeVisible();
 }
 
 test.describe("System Move-To sheet ($21.5)", () => {
-  test("Move-To action is reachable from the system overflow menu", async ({ page }) => {
+  test("Move-To action is shown on the system detail page", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await openSystemOverflowMenu(page);
     await expect(page.getByTestId("system-move-to")).toBeVisible();
   });
 
   test("clicking Move-To opens the sheet", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await openSystemOverflowMenu(page);
-    await page.getByTestId("system-move-to").click();
-    await expect(page.getByTestId("system-move-to-sheet")).toBeVisible();
+    await openMoveToSheet(page);
   });
 
   test("sheet shows a close button", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await openSystemOverflowMenu(page);
-    await page.getByTestId("system-move-to").click();
+    await openMoveToSheet(page);
     await expect(page.getByTestId("move-to-close")).toBeVisible();
   });
 
   test("sheet lists super-systems (move-to-super-*)", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await openSystemOverflowMenu(page);
-    await page.getByTestId("system-move-to").click();
+    await openMoveToSheet(page);
     await expect(page.getByTestId("move-to-super-us-bike-route-50")).toBeVisible();
     await expect(page.getByTestId("move-to-super-ohio-erie-trail")).toBeVisible();
   });
@@ -55,8 +50,7 @@ test.describe("System Move-To sheet ($21.5)", () => {
     await page.getByTestId("login-submit").click();
     await expect(page).toHaveURL(/\/explore$/);
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await openSystemOverflowMenu(page);
-    await page.getByTestId("system-move-to").click();
+    await openMoveToSheet(page);
     const row = page.getByTestId("move-to-super-us-bike-route-50");
     await expect(row).toBeVisible();
     await row.click();
@@ -65,8 +59,7 @@ test.describe("System Move-To sheet ($21.5)", () => {
 
   test("sheet has a 'loose' option", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await openSystemOverflowMenu(page);
-    await page.getByTestId("system-move-to").click();
+    await openMoveToSheet(page);
     await expect(page.getByTestId("move-to-loose")).toBeVisible();
   });
 
@@ -114,9 +107,7 @@ test.describe("System Move-To sheet ($21.5)", () => {
 
   test("close button dismisses the sheet", async ({ page }) => {
     await page.goto(`${BASE}/system/hocking-hills-state-park`);
-    await openSystemOverflowMenu(page);
-    await page.getByTestId("system-move-to").click();
-    await expect(page.getByTestId("system-move-to-sheet")).toBeVisible();
+    await openMoveToSheet(page);
     await page.getByTestId("move-to-close").click();
     await expect(page.getByTestId("system-move-to-sheet")).not.toBeVisible();
   });

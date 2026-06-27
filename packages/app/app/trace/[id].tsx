@@ -15,14 +15,17 @@ const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001"
 
 interface TraceData {
   id: string;
-  contributor_name: string;
+  contributor_name?: string;
+  contributorName?: string;
   source: string;
   weight: number;
   upvotes: number;
   downvotes: number;
   status: string;
-  recorded_at: string | null;
-  created_at: string;
+  recorded_at?: string | null;
+  recordedAt?: string | null;
+  created_at?: string;
+  createdAt?: string;
 }
 
 interface TraceSegmentData {
@@ -159,7 +162,7 @@ export default function TraceDetail() {
 
   return (
     <>
-      <Stack.Screen options={{ title: `Trace · ${trace.contributor_name}`, headerShown: true }} />
+      <Stack.Screen options={{ title: `Trace · ${trace.contributor_name ?? trace.contributorName ?? ""}`, headerShown: true }} />
       <ScrollView style={[styles.root, { backgroundColor: colors.bg }]}>
         <View style={styles.mapWrap}>
           <MapContainer
@@ -175,7 +178,7 @@ export default function TraceDetail() {
 
         <View style={styles.section}>
           <View style={styles.headerRow}>
-            <Text style={[textTokens.h2, { color: colors.text }]}>{trace.contributor_name}</Text>
+            <Text style={[textTokens.h2, { color: colors.text }]}>{trace.contributor_name ?? trace.contributorName ?? ""}</Text>
           </View>
           <View style={styles.metaRow}>
             <View style={[styles.badge, { backgroundColor: colors.surfaceMutedStrong }]}>
@@ -186,9 +189,9 @@ export default function TraceDetail() {
               />
               <Text style={[styles.badgeText, { color: colors.textMuted }]}>{trace.source}</Text>
             </View>
-            {trace.recorded_at ? (
+            {trace.recorded_at || trace.recordedAt ? (
               <Text style={[styles.dateText, { color: colors.textMuted }]}>
-                {new Date(trace.recorded_at).toLocaleDateString()}
+                {new Date(trace.recorded_at ?? trace.recordedAt ?? "").toLocaleDateString()}
               </Text>
             ) : null}
             <View style={[styles.badge, { backgroundColor: colors.surfaceMutedStrong }]}>

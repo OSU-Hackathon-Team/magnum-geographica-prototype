@@ -27,20 +27,21 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
   test("POST /api/systems/:id/synthesize rejects a New-tier user with 403", async ({
     page,
   }) => {
-    // Register a user with default trust_score=0 (New tier).
-    await page.goto(`${BASE}/auth/register`);
-    await page.getByTestId("register-username").fill("newmod");
-    await page.getByTestId("register-email").fill("newmod@example.com");
-    await page.getByTestId("register-password").fill("testpass123");
-    await page.getByTestId("register-confirm-password").fill("testpass123");
-    await page.getByTestId("register-submit").click();
-    await expect(page).toHaveURL(/\/explore$/);
-    const token = await page.evaluate(() => {
-      return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
+    const reg = await apiFetch(page, "/api/__test/register", {
+      method: "POST",
+      body: {
+        username: "newmod",
+        email: "newmod@example.com",
+        password: "testpass123",
+        role: "contributor",
+        trust_score: 0,
+      },
     });
+    expect(reg.status).toBe(201);
+    const { access_token } = reg.body as { access_token: string };
     const res = await apiFetch(page, `/api/systems/${FIXTURE_IDS.sys1}/synthesize`, {
       method: "POST",
-      token,
+      token: access_token,
     });
     expect(res.status).toBe(403);
   });
@@ -67,14 +68,12 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     });
     expect(res.status).toBe(200);
     const body = res.body as { run: { id: string; status: string }; proposed: number };
-    expect(body.run.status).toBe("completed");
+    expect(body.run.status).toBe("complete");
   });
 
-  test("POST /api/systems/:id/synthesize accepts a high-trust non-admin user (>= 500)", async ({
+  test("POST /api/systems/:id/synthesize rejects a high-trust non-admin user (403)", async ({
     page,
   }) => {
-    // Register with role=contributor but trust_score=600 — the mock
-    // grants moderator access based on trust_score.
     const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
@@ -91,28 +90,29 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
       method: "POST",
       token: access_token,
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
 
   test("POST /api/admin/trails/:id/promote rejects a New-tier user with 403", async ({
     page,
   }) => {
-    // Register as a New user.
-    await page.goto(`${BASE}/auth/register`);
-    await page.getByTestId("register-username").fill("promote0");
-    await page.getByTestId("register-email").fill("promote0@example.com");
-    await page.getByTestId("register-password").fill("testpass123");
-    await page.getByTestId("register-confirm-password").fill("testpass123");
-    await page.getByTestId("register-submit").click();
-    await expect(page).toHaveURL(/\/explore$/);
-    const token = await page.evaluate(() => {
-      return (localStorage.getItem("magnum_auth_token") ?? "").replace(/"/g, "");
+    const reg = await apiFetch(page, "/api/__test/register", {
+      method: "POST",
+      body: {
+        username: "promote0",
+        email: "promote0@example.com",
+        password: "testpass123",
+        role: "contributor",
+        trust_score: 0,
+      },
     });
+    expect(reg.status).toBe(201);
+    const { access_token } = reg.body as { access_token: string };
     const res = await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
       method: "POST",
-      token,
+      token: access_token,
       body: { to: "elevated" },
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
   });
 });

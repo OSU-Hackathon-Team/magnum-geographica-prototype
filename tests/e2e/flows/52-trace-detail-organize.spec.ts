@@ -16,6 +16,7 @@ async function loginAsAdmin(page: Page) {
   await page.getByTestId("login-password").fill("adminpass");
   await page.getByTestId("login-submit").click();
   await expect(page).toHaveURL(/\/explore$/);
+  await page.waitForTimeout(2000);
 }
 
 test.describe("Trace detail screen (§21.6)", () => {

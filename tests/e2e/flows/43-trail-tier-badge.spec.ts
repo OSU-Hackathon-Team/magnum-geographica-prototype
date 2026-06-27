@@ -55,8 +55,6 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
   test("synthesized trail with derived_from_segments shows the derived-from text", async ({
     page,
   }) => {
-    // Approve a synthesis proposal — that creates a synthesized trail
-    // with derived_from_segments. Use the admin token to call the API.
     const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
@@ -69,10 +67,9 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    // Approve proposal prop-1 to create a synthetic trail.
     const approve = await apiFetch(
       page,
-      "/api/admin/synthesis-proposals/seg-prop-1/approve",
+      `/api/admin/synthesis-proposals/${FIXTURE_IDS.traceSeg3}/approve`,
       {
         method: "POST",
         token: access_token,
@@ -82,7 +79,6 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     expect(approve.status).toBe(200);
     const body = approve.body as { id: string; slug: string; tier: string };
     expect(body.tier).toBe("synthesized");
-    // The mock returns the synthetic trail; the page can be opened.
     const synthDetail = await apiFetch(page, `/api/trails/${body.id}`);
     expect(synthDetail.status).toBe(200);
   });
@@ -103,7 +99,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     // First create a synthetic trail via approve.
     const approve = await apiFetch(
       page,
-      "/api/admin/synthesis-proposals/seg-prop-2/approve",
+      `/api/admin/synthesis-proposals/${FIXTURE_IDS.traceSeg2}/approve`,
       {
         method: "POST",
         token: access_token,
@@ -112,8 +108,9 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     );
     expect(approve.status).toBe(200);
     const newId = (approve.body as { id: string }).id;
+    const newSlug = (approve.body as { slug: string }).slug;
     // Navigate to the new trail detail.
-    await page.goto(`${BASE}/trail/eagle-ridge`);
+    await page.goto(`${BASE}/trail/${newSlug}`);
     await expect(page.getByTestId("trail-tier-badge-synthesized")).toBeVisible();
     // Promote via API.
     const promote = await apiFetch(page, `/api/admin/trails/${newId}/promote`, {
@@ -123,7 +120,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     });
     expect(promote.status).toBe(200);
     // Reload — the badge should now read "elevated".
-    await page.goto(`${BASE}/trail/eagle-ridge`);
+    await page.goto(`${BASE}/trail/${newSlug}`);
     await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
     await expect(page.getByTestId("trail-tier-label")).toHaveText("Elevated");
   });

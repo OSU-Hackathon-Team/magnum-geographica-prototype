@@ -40,8 +40,8 @@ test("user can edit a segment name and save it", async ({ page }) => {
   await expect(page.getByTestId(`segment-editor-${FIXTURE_IDS.seg1}`)).toBeVisible();
   await page.getByTestId(`segment-editor-name-${FIXTURE_IDS.seg1}`).fill("Renamed segment");
   await page.getByTestId(`segment-editor-save-${FIXTURE_IDS.seg1}`).click();
-  // save triggers a PUT and the editor should remain visible
-  await expect(page.getByTestId(`segment-editor-${FIXTURE_IDS.seg1}`)).toBeVisible();
+  await page.waitForTimeout(2000);
+  await expect(page.getByTestId(`segment-editor-${FIXTURE_IDS.seg1}`)).toBeVisible({ timeout: 10000 });
 });
 
 test("user can toggle hazards on a segment", async ({ page }) => {
@@ -50,7 +50,8 @@ test("user can toggle hazards on a segment", async ({ page }) => {
   await expect(page.getByTestId(`segment-editor-${FIXTURE_IDS.seg2}`)).toBeVisible();
   await page.getByTestId(`segment-editor-hazard-muddy-${FIXTURE_IDS.seg2}`).click();
   await page.getByTestId(`segment-editor-save-${FIXTURE_IDS.seg2}`).click();
-  await expect(page.getByTestId(`segment-editor-${FIXTURE_IDS.seg2}`)).toBeVisible();
+  await page.waitForTimeout(2000);
+  await expect(page.getByTestId(`segment-editor-${FIXTURE_IDS.seg2}`)).toBeVisible({ timeout: 10000 });
 });
 
 test("exiting edit mode returns to the trail detail view", async ({ page }) => {

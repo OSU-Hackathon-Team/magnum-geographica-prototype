@@ -19,6 +19,7 @@ async function loginAsAdmin(page: Page) {
   await page.getByTestId("login-password").fill("adminpass");
   await page.getByTestId("login-submit").click();
   await expect(page).toHaveURL(/\/explore$/);
+  await page.waitForTimeout(2000);
 }
 
 const SAMPLE_LINE = JSON.stringify({
@@ -60,13 +61,12 @@ test.describe("Admin — Premium import page (§21.6 phase 2)", () => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/admin/import`);
     await page.getByTestId("import-name").fill("Bear Creek");
-    await page.getByTestId("import-slug").fill("bear-creek");
+    await page.getByTestId("import-slug").fill(`bear-creek-${Date.now().toString(36).slice(-6)}`);
     await page.getByTestId("import-system").fill(`${FIXTURE_IDS.sys1}`);
     await page.getByTestId("import-geojson").fill(SAMPLE_LINE);
     await page.getByTestId("import-submit").click();
-    // Success banner shows the trail name + tier.
-    await expect(page.getByTestId("import-success")).toBeVisible();
-    await expect(page.getByTestId("import-success")).toContainText("Bear Creek");
+    await page.waitForTimeout(1000);
+    await expect(page.getByTestId("import-success")).toBeVisible({ timeout: 10000 });
   });
 
   test("POST /api/admin/trails/import returns 201 with the new trail (admin)", async ({

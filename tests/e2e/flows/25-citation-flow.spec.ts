@@ -21,9 +21,8 @@ test("user can add a citation to a wiki page and then delete it", async ({ page 
   await page.getByTestId("wiki-editor-content").fill("Use this page to add practical info.");
   await page.getByTestId("wiki-editor-summary").fill("initial page");
   await page.getByTestId("wiki-editor-save").click();
+  await page.waitForTimeout(1500);
 
-  // The editor may stay on the edit page or redirect — both are valid.
-  // Navigate to the edit page explicitly for the citation test.
   await page.goto(`/wiki/edit/trail/${FIXTURE_IDS.trail1}`);
   await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15_000 });
   await page.getByTestId("wiki-tab-citations").click();
@@ -33,7 +32,6 @@ test("user can add a citation to a wiki page and then delete it", async ({ page 
   await page.getByTestId("citation-input-url").fill("https://ohiodnr.gov/hocking");
   await page.getByTestId("citation-add-button").click();
 
-  // Citation IDs are server-generated UUIDs. Exclude citation-form wrapper.
   const citationRow = page.locator('[data-testid^="citation-"]:not([data-testid="citation-form"]):not([data-testid="citations-empty"])').filter({ hasText: "ODNR official site" });
   await expect(citationRow).toBeVisible({ timeout: 10_000 });
   await expect(citationRow).toContainText("https://ohiodnr.gov/hocking");
