@@ -2,16 +2,17 @@ import HeatmapLayer from "ol/layer/Heatmap.js";
 import VectorSource from "ol/source/Vector.js";
 import GeoJSON from "ol/format/GeoJSON.js";
 
-export const HEATMAP_RADIUS = 18;
-export const HEATMAP_BLUR = 14;
+export const HEATMAP_RADIUS = 22;
+export const HEATMAP_BLUR = 18;
 
 const GRADIENT = [
   "rgba(0,0,0,0)",
-  "rgba(34,197,94,0.35)",
-  "rgba(132,204,22,0.55)",
-  "rgba(250,204,21,0.7)",
-  "rgba(249,115,22,0.85)",
-  "rgba(239,68,68,0.95)",
+  "rgba(34,197,94,0.12)",
+  "rgba(34,197,94,0.18)",
+  "rgba(132,204,22,0.22)",
+  "rgba(250,204,21,0.25)",
+  "rgba(249,115,22,0.28)",
+  "rgba(239,68,68,0.32)",
 ];
 
 export const HEATMAP_LAYER_NAME = "traces_heatmap";

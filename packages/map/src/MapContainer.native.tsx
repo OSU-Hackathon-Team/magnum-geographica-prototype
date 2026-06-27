@@ -265,9 +265,9 @@ function buildMapHtml(
             heatmapSource = new ol.source.Vector();
             heatmapLayer = new ol.layer.Heatmap({
               source: heatmapSource,
-              radius: 18,
-              blur: 14,
-              gradient: ['rgba(0,0,0,0)','rgba(34,197,94,0.35)','rgba(132,204,22,0.55)','rgba(250,204,21,0.7)','rgba(249,115,22,0.85)','rgba(239,68,68,0.95)'],
+              radius: 22,
+              blur: 18,
+              gradient: ['rgba(0,0,0,0)','rgba(34,197,94,0.12)','rgba(34,197,94,0.18)','rgba(132,204,22,0.22)','rgba(250,204,21,0.25)','rgba(249,115,22,0.28)','rgba(239,68,68,0.32)'],
               weight: function(f){ var w = Number(f.get('weight')); return isFinite(w) ? Math.max(0, Math.min(1, w)) : 0; },
               visible: false
             });
