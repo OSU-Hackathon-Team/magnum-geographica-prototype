@@ -181,12 +181,11 @@ export async function installApi(page?: Page): Promise<void> {
   const api = await startWorkerApi();
   if (page) {
     // Match any request to the web app's API base, regardless of
-    // host (localhost vs 127.0.0.1) or port. We use a regex so
-    // the match is exact on the host:port prefix.
-    const base = new URL(WEB_APP_API_BASE);
-    const pattern = new RegExp(
-      `^${base.protocol}//${base.host.replace(/\./g, "\\.")}(:\\d+)?/api/`,
-    );
+    // host (localhost vs 127.0.0.1) or port. The web app may be
+    // built with one host while the test runner's
+    // EXPO_PUBLIC_API_URL points at the other, so we intercept
+    // both variants.
+    const pattern = /^https?:\/\/((127\.0\.0\.1)|localhost)(:\d+)?\/api\//;
     await page.route(pattern, async (route) => {
       const request = route.request();
       const originalUrl = new URL(request.url());

@@ -1,0 +1,13 @@
+{
+  "active": true,
+  "iteration": 1,
+  "minIterations": 5,
+  "maxIterations": 0,
+  "completionPromise": "COMPLETE",
+  "tasksMode": false,
+  "taskPromise": "READY_FOR_NEXT_TASK",
+  "prompt": "see /tmp/comp.md",
+  "startedAt": "2026-06-27T19:35:20.761Z",
+  "model": "",
+  "agent": "opencode"
+}
