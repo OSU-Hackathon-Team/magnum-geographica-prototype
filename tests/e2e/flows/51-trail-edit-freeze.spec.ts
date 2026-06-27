@@ -88,6 +88,7 @@ test.describe("Trail freeze / unfreeze (§21.6)", () => {
       token: access_token,
       body: { to: "elevated" },
     });
+    await page.waitForTimeout(500);
     await page.goto("/trail/buckeye-trail");
     await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
     await page.getByTestId("trail-unfreeze").click();

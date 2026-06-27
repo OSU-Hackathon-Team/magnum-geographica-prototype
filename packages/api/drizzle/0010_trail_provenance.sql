@@ -1,13 +1,47 @@
 -- 0010_trail_provenance.sql
 -- Add provenance columns and tier CHECK constraint to trails.
-ALTER TABLE trails
-  ADD COLUMN IF NOT EXISTS source TEXT,
-  ADD COLUMN IF NOT EXISTS source_date DATE,
-  ADD COLUMN IF NOT EXISTS external_url TEXT,
-  ADD COLUMN IF NOT EXISTS last_synthesized_at TIMESTAMPTZ;
-
--- Add a CHECK constraint on tier to enforce only valid values at the DB level.
-ALTER TABLE trails
-  DROP CONSTRAINT IF EXISTS trails_tier_check;
-ALTER TABLE trails
-  ADD CONSTRAINT trails_tier_check CHECK (tier IN ('premium', 'elevated', 'synthesized'));
+ALTER TABLE "trails" ADD COLUMN IF NOT EXISTS "source" text;--> statement-breakpoint
+ALTER TABLE "trails" ADD COLUMN IF NOT EXISTS "source_date" date;--> statement-breakpoint
+ALTER TABLE "trails" ADD COLUMN IF NOT EXISTS "external_url" text;--> statement-breakpoint
+ALTER TABLE "trails" ADD COLUMN IF NOT EXISTS "last_synthesized_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "trails" DROP CONSTRAINT IF EXISTS trails_tier_check;--> statement-breakpoint
+ALTER TABLE "trails" ADD CONSTRAINT trails_tier_check CHECK (tier IN ('premium', 'elevated', 'synthesized'));--> statement-breakpoint
+-- Update Martin tiles function to emit tier + provenance columns.
+CREATE OR REPLACE FUNCTION trails(
+  z integer, x integer, y integer
+)
+RETURNS bytea
+AS $$
+  WITH bounds AS (
+    SELECT ST_TileEnvelope(z, x, y) AS geom
+  ),
+    tile AS (
+      SELECT
+        t.id,
+        t.name,
+        t.slug,
+        t.tier,
+        t.difficulty,
+        t.verified,
+        t.length_meters::float8 AS length_m,
+        t.source,
+        t.source_date,
+        t.external_url,
+        t.last_synthesized_at,
+        COALESCE(
+          (SELECT ts.surface_type FROM trail_segments ts
+           WHERE ts.trail_id = t.id ORDER BY ts.sort_order LIMIT 1),
+          'natural'
+        ) AS surface_type,
+        ST_AsMVTGeom(
+          ST_Transform(t.geometry, 3857),
+          bounds.geom,
+          4096, 64, true
+        ) AS geometry
+      FROM trails t, bounds
+      WHERE t.geometry IS NOT NULL
+        AND t.geometry && ST_Transform(bounds.geom, 4326)
+    )
+  SELECT ST_AsMVT(tile, 'trails', 4096, 'geometry')
+  FROM tile;
+$$ LANGUAGE sql STABLE PARALLEL SAFE;
