@@ -21,11 +21,12 @@ import { MoveToSheet } from "../../src/components/hierarchy/MoveToSheet";
 import { TrailTracesTab } from "../../src/components/trace/TrailTracesTab";
 import { getAllDownloadedSystems } from "../../src/services/offlineDataService";
 import { useOfflineStore } from "../../src/stores/offlineStore";
+import { useMapStore } from "../../src/stores/mapStore";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
-function SystemMapPreview({ center, boundary }: { center?: { lon: number; lat: number } | null; boundary?: unknown }) {
+function SystemMapPreview({ center, boundary, systemTileVersion }: { center?: { lon: number; lat: number } | null; boundary?: unknown; systemTileVersion?: number }) {
   return (
     <View style={styles.mapPreview}>
       <MapContainer
@@ -35,6 +36,7 @@ function SystemMapPreview({ center, boundary }: { center?: { lon: number; lat: n
           initialZoom: 10,
         }}
         fitGeometry={boundary ?? null}
+        systemTileVersion={systemTileVersion}
       />
     </View>
   );
@@ -51,6 +53,7 @@ export default function SystemDetail() {
   const [showMoveTo, setShowMoveTo] = useState(false);
   const isOnline = useOfflineStore((s) => s.isOnline);
   const offlineRegions = useOfflineStore((s) => s.offlineRegions);
+  const systemTileVersion = useMapStore((s) => s.systemTileVersion);
 
   useFocusEffect(
     useCallback(() => {
@@ -141,7 +144,7 @@ export default function SystemDetail() {
     <>
       <Stack.Screen options={{ title: system.name, headerShown: true }} />
       <ScrollView style={styles.container} testID="system-detail-screen">
-        <SystemMapPreview center={system.center} boundary={system.boundary} />
+        <SystemMapPreview center={system.center} boundary={system.boundary} systemTileVersion={systemTileVersion} />
 
         <View style={styles.section} testID="system-meta">
           <Text style={styles.title} testID="system-name">

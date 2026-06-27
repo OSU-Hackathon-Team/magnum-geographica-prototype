@@ -581,44 +581,45 @@ export default function MapContainer({
     });
   }, [fitGeometry]);
 
+  // Per-layer tile cache busting.  When a layer's version increments,
+  // the URL for that layer's tile source gets `?_v=N` appended.  The
+  // HTTP cache sees a different URL and the layer re-fetches from
+  // Martin.  Martin itself must be configured with cache_size_mb: 0
+  // in development so it serves fresh PostGIS data every time.
   const prevSlotVersions = useRef<
-    Record<string, number | undefined>
+    Record<string, number>
   >({});
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    const layers = map.getLayers().getArray();
-    // Map Martin source names to the tile version that last flipped them.
-    const swaps: Record<string, { slot: number; regex: RegExp }> = {
-      systemTileVersion:   { slot: (systemTileVersion   ?? 0) % 2, regex: /\/systems_\d\//g },
-      trailTileVersion:    { slot: (trailTileVersion    ?? 0) % 2, regex: /\/trails_\d\//g },
-      segmentTileVersion:  { slot: (segmentTileVersion  ?? 0) % 2, regex: /\/segments_\d\//g },
-      featureTileVersion:  { slot: (featureTileVersion  ?? 0) % 2, regex: /\/features_\d\//g },
-      heatmapTileVersion:  { slot: (heatmapTileVersion  ?? 0) % 2, regex: /\/traces_heatmap_\d\//g },
-      superSystemTileVersion: { slot: (superSystemTileVersion ?? 0) % 2, regex: /\/super_systems_\d\//g },
-    };
+    // Which regex matches which layer's URL, and which version to embed.
+    const layers: { key: string; version: number; regex: RegExp }[] = [
+      { key: "system",    version: systemTileVersion   ?? 0, regex: /\/systems\// },
+      { key: "trail",     version: trailTileVersion    ?? 0, regex: /\/trails\// },
+      { key: "segment",   version: segmentTileVersion  ?? 0, regex: /\/segments\// },
+      { key: "feature",   version: featureTileVersion  ?? 0, regex: /\/features\// },
+      { key: "heatmap",   version: heatmapTileVersion  ?? 0, regex: /\/traces_heatmap\// },
+      { key: "super",     version: superSystemTileVersion ?? 0, regex: /\/super_systems\// },
+    ];
 
-    for (const layer of layers) {
-      const src = (layer as unknown as { getSource?: () => unknown }).getSource?.();
+    for (const olLayer of map.getLayers().getArray()) {
+      const src = (olLayer as unknown as { getSource?: () => unknown }).getSource?.();
       if (!src || typeof (src as { getUrls?: () => string[] }).getUrls !== "function") continue;
       const s = src as unknown as { getUrls: () => string[]; setUrl: (url: string) => void };
       const urls = s.getUrls();
       if (!urls?.[0]) continue;
 
-      const prev = prevSlotVersions.current;
-      let url = urls[0];
-      for (const [key, { slot, regex }] of Object.entries(swaps)) {
-        if (!regex.test(url)) continue;
-        const lastSlot = prev[key];
-        if (lastSlot !== undefined && lastSlot === slot) continue; // no change
-        prev[key] = slot;
-        url = url.replace(regex, (m) => {
-          const name = m.replace(/_\d\//, "");
-          return `${name}_${slot}/`;
-        });
-        s.setUrl(url);
-        break; // each source belongs to at most one layer
+      for (const { key, version, regex } of layers) {
+        if (!regex.test(urls[0])) continue;
+        const lastV = prevSlotVersions.current[key];
+        if (lastV === version) continue; // no change for this layer
+        prevSlotVersions.current[key] = version;
+        // Strip old `?_v=` params + append fresh `?_v=N`
+        const clean = urls[0].replace(/[?&]_v=\d+/g, "");
+        const sep = clean.includes("?") ? "&" : "?";
+        s.setUrl(`${clean}${sep}_v=${version}`);
+        break;
       }
     }
   }, [

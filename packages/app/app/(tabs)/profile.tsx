@@ -145,6 +145,39 @@ export default function ProfileScreen() {
             <Text style={[textTokens.meta, { color: colors.textMuted, marginTop: spacing.xxs }]}>
               {user.email}
             </Text>
+            <View
+              style={[
+                styles.roleBadge,
+                {
+                  backgroundColor: user.role === "admin"
+                    ? colors.dangerMuted
+                    : user.role === "moderator"
+                    ? colors.primaryMuted
+                    : colors.surfaceMuted,
+                  borderColor: user.role === "admin"
+                    ? colors.danger
+                    : user.role === "moderator"
+                    ? colors.primary
+                    : colors.border,
+                },
+              ]}
+              testID="profile-role"
+            >
+              <Text
+                style={[
+                  textTokens.small,
+                  {
+                    color: user.role === "admin"
+                      ? colors.danger
+                      : user.role === "moderator"
+                      ? colors.primary
+                      : colors.textSecondary,
+                  },
+                ]}
+              >
+                {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+              </Text>
+            </View>
             <View style={styles.buttonRow}>
               <Button
                 onPress={handleLogout}
@@ -347,4 +380,12 @@ const styles = StyleSheet.create({
   },
   karmaStatValue: { fontSize: 18, fontWeight: "600" },
   karmaStatLabel: { fontSize: 10 },
+  roleBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    marginTop: spacing.xs,
+  },
 });

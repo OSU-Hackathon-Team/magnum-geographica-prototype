@@ -2,9 +2,6 @@
 #
 # Server started with:  martin --config /etc/martin.yaml
 # See https://maplibre.org/martin/configuration
-#
-# Uses the Martin v1.x config format with explicit PostGIS function sources
-# and file-based MBTiles sources.
 
 postgres:
   connection_string: ${DATABASE_URL}
@@ -12,40 +9,22 @@ postgres:
     tables: false
     functions: false
   functions:
-    super_systems_0:
+    super_systems:
       schema: public
       function: super_systems
-    super_systems_1:
-      schema: public
-      function: super_systems
-    systems_0:
+    systems:
       schema: public
       function: systems
-    systems_1:
-      schema: public
-      function: systems
-    trails_0:
+    trails:
       schema: public
       function: trails
-    trails_1:
-      schema: public
-      function: trails
-    segments_0:
+    segments:
       schema: public
       function: segments
-    segments_1:
-      schema: public
-      function: segments
-    features_0:
+    features:
       schema: public
       function: features
-    features_1:
-      schema: public
-      function: features
-    traces_heatmap_0:
-      schema: public
-      function: traces_heatmap
-    traces_heatmap_1:
+    traces_heatmap:
       schema: public
       function: traces_heatmap
 

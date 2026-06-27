@@ -528,31 +528,22 @@ function ActiveView({
       </View>
 
       <View style={[styles.mapWrap, { backgroundColor: colors.surfaceMutedStrong }]} testID="record-map">
-        {!isWeb ? (
-          <MapContainer
-            config={{
-              martinTilesUrl: MARTIN_URL,
-              initialCenter: [mapCenter[0]!, mapCenter[1]!],
-              initialZoom: 15,
-            }}
-            liveRoute={
-              liveRouteCoords.length >= 2
-                ? {
-                    coordinates: liveRouteCoords,
-                    followLon: followTarget?.lon ?? null,
-                    followLat: followTarget?.lat ?? null,
-                  }
-                : null
-            }
-          />
-        ) : (
-          <View style={styles.webMapPlaceholder}>
-            <Text style={[styles.webMapText, { color: colors.textMuted }]}>
-              Map preview unavailable in the browser build. The native app shows the live route
-              here.
-            </Text>
-          </View>
-        )}
+        <MapContainer
+          config={{
+            martinTilesUrl: MARTIN_URL,
+            initialCenter: [mapCenter[0]!, mapCenter[1]!],
+            initialZoom: 15,
+          }}
+          liveRoute={
+            liveRouteCoords.length >= 2
+              ? {
+                  coordinates: liveRouteCoords,
+                  followLon: followTarget?.lon ?? null,
+                  followLat: followTarget?.lat ?? null,
+                }
+              : null
+          }
+        />
       </View>
 
       <View style={styles.statsRow}>
@@ -818,13 +809,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
   },
-  webMapPlaceholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  webMapText: { fontSize: 12, textAlign: "center", lineHeight: 18 },
   statsRow: { flexDirection: "row", gap: 8 },
   statBox: {
     flex: 1,

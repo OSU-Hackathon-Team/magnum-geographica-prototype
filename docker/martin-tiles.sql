@@ -144,6 +144,18 @@ $$ LANGUAGE sql STABLE PARALLEL SAFE;
 -- which stores tile-level counts at zoom 14. The function subdivides
 -- each requested tile into an 8x8 grid and aggregates counts from the
 -- zoom-14 base level. Only cells with density > 0 are returned.
+--
+-- Each grid cell (gx, gy) within tile (x, y, z) sits at zoom z+3, i.e.
+-- global tile coord (x*8+gx, y*8+gy). The zoom-14 tile range it covers
+-- is derived with a float scale s = 2^(14-z-3):
+--   - z <= 11: s >= 1, so the cell spans many zoom-14 tiles (aggregate).
+--   - z >= 12: s < 1,  so the cell sits inside a single zoom-14 tile.
+-- floor()/ceil() handle both cases without the integer truncation that
+-- previously produced empty ranges (BETWEEN 0 AND -1) at z >= 12.
+--
+-- Note: ST_AsMVT is called with only 4 positional args. A 5th arg would
+-- be interpreted as the feature-ID column, which strips `density` out of
+-- the feature properties and makes it unreadable on the client side.
 
 CREATE OR REPLACE FUNCTION traces_heatmap(
   z integer, x integer, y integer
@@ -156,8 +168,6 @@ AS $$
   grid AS (
     SELECT
       gx, gy,
-      (x * 8 + gx)::integer AS cell_x,
-      (y * 8 + gy)::integer AS cell_y,
       ST_MakeEnvelope(
         ST_XMin(bounds.geom) + gx * (ST_XMax(bounds.geom) - ST_XMin(bounds.geom)) / 8.0,
         ST_YMin(bounds.geom) + gy * (ST_YMax(bounds.geom) - ST_YMin(bounds.geom)) / 8.0,
@@ -176,14 +186,14 @@ AS $$
     FROM grid g
     LEFT JOIN trace_heatmap h ON
       h.zoom = 14
-      AND h.tile_x BETWEEN (x * 8 + g.gx) * POWER(2, 14 - z - 3)::integer
-                       AND (x * 8 + g.gx + 1) * POWER(2, 14 - z - 3)::integer - 1
-      AND h.tile_y BETWEEN (y * 8 + g.gy) * POWER(2, 14 - z - 3)::integer
-                       AND (y * 8 + g.gy + 1) * POWER(2, 14 - z - 3)::integer - 1
-    GROUP BY g.cell_x, g.cell_y, g.cell_geom
+      AND h.tile_x BETWEEN floor((x * 8 + g.gx) * POWER(2::float8, 14 - z - 3))::integer
+                       AND (ceil((x * 8 + g.gx + 1) * POWER(2::float8, 14 - z - 3)) - 1)::integer
+      AND h.tile_y BETWEEN floor((y * 8 + g.gy) * POWER(2::float8, 14 - z - 3))::integer
+                       AND (ceil((y * 8 + g.gy + 1) * POWER(2::float8, 14 - z - 3)) - 1)::integer
+    GROUP BY g.cell_geom
     HAVING COALESCE(SUM(h.trace_count), 0) > 0
   )
-  SELECT ST_AsMVT(tile, 'traces_heatmap', 4096, 'cell_geom', 'density')
+  SELECT ST_AsMVT(tile, 'traces_heatmap', 4096, 'cell_geom')
   FROM tile;
 $$ LANGUAGE sql STABLE PARALLEL SAFE;
 

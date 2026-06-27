@@ -57,6 +57,13 @@
       "when": 1782517205024,
       "tag": "0007_trace_heatmap",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782528000000,
+      "tag": "0008_traces_heatmap_fix",
+      "breakpoints": true
     }
   ]
 }
