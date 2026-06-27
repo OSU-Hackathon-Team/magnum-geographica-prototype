@@ -13,12 +13,22 @@ import { Hono } from "hono";
 import { setupRealDb } from "./helpers/db.js";
 import { mediaRoute } from "../src/routes/media.js";
 import { features, systems, trails, users, media } from "../src/db/schema.js";
+import { signToken } from "../src/middleware/auth.js";
 
 const { db, reset } = setupRealDb();
 
 beforeEach(async () => {
   await reset();
 });
+
+let userCounter = 0;
+async function seedUser() {
+  userCounter++;
+  const [u] = await db.insert(users).values({
+    username: `tester${userCounter}`, email: `t${userCounter}@t.com`, passwordHash: "hash",
+  }).returning();
+  return u;
+}
 
 async function seedFeature() {
   const [u] = await db.insert(users).values({
@@ -55,7 +65,7 @@ describe("POST /api/media", () => {
   test("rejects missing body with 400", async () => {
     const res = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -64,7 +74,7 @@ describe("POST /api/media", () => {
   test("rejects when data field is missing", async () => {
     const res = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ mime_type: "image/png", feature_id: "ignored" }),
     });
     expect(res.status).toBe(400);
@@ -75,7 +85,7 @@ describe("POST /api/media", () => {
   test("rejects when mime_type is missing", async () => {
     const res = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ data: onePixelPngBase64, feature_id: "ignored" }),
     });
     expect(res.status).toBe(400);
@@ -84,7 +94,7 @@ describe("POST /api/media", () => {
   test("rejects when zero of (feature, trail, system) are provided", async () => {
     const res = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ data: onePixelPngBase64, mime_type: "image/png" }),
     });
     expect(res.status).toBe(400);
@@ -97,7 +107,7 @@ describe("POST /api/media", () => {
     const trail = await seedTrail();
     const res = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         data: onePixelPngBase64,
         mime_type: "image/png",
@@ -112,7 +122,7 @@ describe("POST /api/media", () => {
     const { feature } = await seedFeature();
     const res = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         data: onePixelPngBase64,
         mime_type: "image/png",
@@ -157,7 +167,7 @@ describe("GET /api/media/:id", () => {
     const { feature } = await seedFeature();
     const created = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         data: onePixelPngBase64,
         mime_type: "image/png",
@@ -187,7 +197,7 @@ describe("GET /api/media (list)", () => {
     const { feature } = await seedFeature();
     await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         data: onePixelPngBase64,
         mime_type: "image/png",
@@ -202,10 +212,14 @@ describe("GET /api/media (list)", () => {
 
 describe("DELETE /api/media/:id", () => {
   test("deletes the media row and returns ok", async () => {
+    const user = await seedUser();
+    const token = await signToken({
+      id: user.id, username: user.username, email: user.email, role: user.role ?? "contributor", karma: 0, tier: "new",
+    });
     const { feature } = await seedFeature();
     const created = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         data: onePixelPngBase64,
         mime_type: "image/png",
@@ -214,7 +228,10 @@ describe("DELETE /api/media/:id", () => {
     });
     const { id } = (await created.json()) as { id: string };
 
-    const res = await buildApp().request(`/api/media/${id}`, { method: "DELETE" });
+    const res = await buildApp().request(`/api/media/${id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` },
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
@@ -227,7 +244,7 @@ describe("DELETE /api/media/:id", () => {
     const { feature } = await seedFeature();
     const created = await buildApp().request("/api/media", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         data: onePixelPngBase64,
         mime_type: "image/png",

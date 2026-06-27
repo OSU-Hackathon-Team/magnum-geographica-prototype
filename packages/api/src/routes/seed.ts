@@ -7,8 +7,8 @@ export const seedRoute = new Hono();
 seedRoute.post("/", async (c) => {
   const adminSecret = process.env.ADMIN_SECRET ?? "dev-secret-change-me";
   const provided = c.req.header("x-admin-secret");
-  if (process.env.NODE_ENV === "production" && provided !== adminSecret) {
-    return c.json({ error: "unauthorized", message: "admin secret required in production" }, 401);
+  if (!provided || provided !== adminSecret) {
+    return c.json({ error: "unauthorized", message: "admin secret required" }, 401);
   }
 
   try {

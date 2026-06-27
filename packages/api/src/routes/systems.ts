@@ -6,9 +6,14 @@ import {
   createSystemInputSchema,
   updateSystemInputSchema,
 } from "@magnum/shared";
-import { authRequired, type AuthUser } from "../middleware/auth.js";
+import {
+  authRequired,
+  optionalAuth,
+  actorRequired,
+  type AuthUser,
+} from "../middleware/auth.js";
 import { recordRevision } from "../services/revisions.js";
-import { resolveContributorName } from "../services/identity.js";
+import { resolveActor } from "../services/identity.js";
 import { canWrite, getProtection, refreshProtection } from "../services/protection.js";
 import { evaluateAction } from "../services/patrol.js";
 import { updateSystem, deleteSystem } from "../services/hierarchy.js";
@@ -169,9 +174,7 @@ function boundarySql(geojson: unknown) {
   return sql`ST_Multi(ST_GeomFromGeoJSON(${JSON.stringify(geojson)}))`;
 }
 
-systemsRoute.post("/", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+systemsRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createSystemInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -201,20 +204,13 @@ systemsRoute.post("/", authRequired(), async (c) => {
     return c.json({ error: "internal", message: "failed to insert system" }, 500);
   }
 
-  // Revision log. `contributorName` falls back to `IP:<address>` for
-  // unauthenticated calls (the auth middleware still authenticates
-  // the JWT; this is for the case where a future change relaxes auth
-  // for system create). Today this is always the user's username.
-  const contributorName = resolveContributorName({
-    req: c.req,
-    get: c.get.bind(c),
-  });
+  const actor = resolveActor(c);
   await recordRevision({
     targetType: "system",
     targetId: created.id,
     action: "create",
-    actorId: authUser.id,
-    contributorName,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: `Created system ${created.name}`,
     payloadAfter: {
       name: created.name,
@@ -227,16 +223,13 @@ systemsRoute.post("/", authRequired(), async (c) => {
 });
 
 /**
- * §21.5 — PATCH a system. Any logged-in user can update; the
- * protection service gate is applied automatically via
- * `refreshProtection` + `canWrite` (so popular entities require a
- * higher trust tier). Boundary is wrapped through
- * `ST_GeomFromGeoJSON` so the DB column stays a PostGIS
+ * §21.5 — PATCH a system. Any contributor (including IP users) may
+ * update normal-protection systems. The protection service gate
+ * enforces semi/full protection by tier. Boundary is wrapped
+ * through `ST_GeomFromGeoJSON` so the DB column stays a PostGIS
  * MultiPolygon.
  */
-systemsRoute.put("/:id", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+systemsRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = updateSystemInputSchema.safeParse(body);
@@ -247,28 +240,35 @@ systemsRoute.put("/:id", authRequired(), async (c) => {
     );
   }
 
+  const actor = resolveActor(c);
+
   // Protection gate.
   await refreshProtection("system", id);
   const prot = await getProtection("system", id);
-  const actorRow = await db
-    .select({ karma: users.trustScore, role: users.role })
-    .from(users)
-    .where(eq(users.id, authUser.id))
-    .limit(1);
+
+  let role: string | undefined;
+  let karma = 0;
+  if (actor.kind === "user" && actor.userId) {
+    const actorRow = await db
+      .select({ karma: users.trustScore, role: users.role })
+      .from(users)
+      .where(eq(users.id, actor.userId))
+      .limit(1);
+    role = actorRow[0]?.role ?? undefined;
+    karma = Number(actorRow[0]?.karma ?? 0);
+  }
   const allowed = canWrite(prot.level, {
-    role: actorRow[0]?.role ?? null,
-    karma: Number(actorRow[0]?.karma ?? 0),
-    loggedIn: true,
+    role: role ?? null,
+    karma,
+    loggedIn: actor.kind === "user",
+    kind: actor.kind,
   });
   if (!allowed) {
-    return c.json(
-      {
-        error: "forbidden",
-        message: `protection level '${prot.level}' requires higher trust tier`,
-        protection: prot.level,
-      },
-      403,
-    );
+    const msg =
+      actor.kind === "ip"
+        ? "IP users cannot edit semi-protected or full-protected entities"
+        : `protection level '${prot.level}' requires higher trust tier`;
+    return c.json({ error: "forbidden", message: msg, protection: prot.level }, 403);
   }
 
   // Snapshot the pre-image so the revision log records what changed.
@@ -284,25 +284,18 @@ systemsRoute.put("/:id", authRequired(), async (c) => {
     patch.ownershipSource = parsed.data.ownership_source;
   if (parsed.data.source_date !== undefined) patch.sourceDate = parsed.data.source_date;
   if (parsed.data.boundary !== undefined) {
-    // The updateSystem service handles the GeoJSON → PostGIS
-    // wrapping via ST_GeomFromGeoJSON internally; we hand it the
-    // raw object and let the service stringify.
     patch.boundary = parsed.data.boundary;
   }
 
   const updated = await updateSystem(id, patch);
   if (!updated) return c.json({ error: "not_found" }, 404);
 
-  const contributorName = resolveContributorName({
-    req: c.req,
-    get: c.get.bind(c),
-  });
   await recordRevision({
     targetType: "system",
     targetId: id,
     action: "update",
-    actorId: authUser.id,
-    contributorName,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: "Updated system",
     payloadBefore: before
       ? {
@@ -316,13 +309,12 @@ systemsRoute.put("/:id", authRequired(), async (c) => {
     },
   });
 
-  // Patrol: surface the action for low-trust actors (the patrol
-  // service decides whether to flag). Best-effort.
+  // Patrol: surface the action for low-trust actors. Best-effort.
   await evaluateAction({
     revisionId: "00000000-0000-0000-0000-000000000000",
-    actorId: authUser.id,
-    actorKarma: Number(actorRow[0]?.karma ?? 0),
-    actorRole: authUser.role,
+    actorId: actor.userId ?? "",
+    actorKarma: karma,
+    actorRole: role ?? null,
     targetType: "system",
     targetId: id,
     action: "reassign",
@@ -351,16 +343,28 @@ systemsRoute.delete("/:id", authRequired(), async (c) => {
     .from(users)
     .where(eq(users.id, authUser.id))
     .limit(1);
-  const allowed = canWrite(
-    (await getProtection("system", id)).level,
-    {
-      role: actorRow[0]?.role ?? null,
-      karma: Number(actorRow[0]?.karma ?? 0),
-      loggedIn: true,
-    },
+  const actorKarma = Number(actorRow[0]?.karma ?? 0);
+  const actorRole = actorRow[0]?.role ?? null;
+
+  const prot = await getProtection("system", id);
+  const creatorRow = await db
+    .select({ createdByUserId: systems.createdByUserId })
+    .from(systems)
+    .where(eq(systems.id, id))
+    .limit(1);
+  const isCreator = creatorRow[0]?.createdByUserId === authUser.id;
+  const children = await import("../services/protection.js").then(
+    (m) => m.countChildren("system", id),
   );
-  if (!allowed) {
-    return c.json({ error: "forbidden", message: "protection level requires higher trust tier" }, 403);
+  const del = await import("../services/protection.js").then((m) =>
+    m.canDelete(
+      prot.level,
+      { role: actorRole, karma: actorKarma, loggedIn: true, isCreator },
+      children,
+    ),
+  );
+  if (!del.ok) {
+    return c.json({ error: "forbidden", message: del.reason }, 403);
   }
 
   const snapshot = await db
@@ -373,15 +377,13 @@ systemsRoute.delete("/:id", authRequired(), async (c) => {
   if (!deleted) return c.json({ error: "not_found" }, 404);
 
   if (snapshot[0]) {
+    const actor = resolveActor(c);
     await recordRevision({
       targetType: "system",
       targetId: id,
       action: "delete",
-      actorId: authUser.id,
-      contributorName: resolveContributorName({
-        req: c.req,
-        get: c.get.bind(c),
-      }),
+      actorId: actor.userId ?? null,
+      contributorName: actor.contributorName,
       editSummary: `Deleted system '${snapshot[0].name}' (${snapshot[0].slug})`,
       payloadBefore: { name: snapshot[0].name, slug: snapshot[0].slug },
       payloadAfter: null,

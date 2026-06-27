@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { citations } from "../db/schema.js";
 import { createCitationInputSchema } from "@magnum/shared";
+import { authRequired, optionalAuth, actorRequired } from "../middleware/auth.js";
 
 export const citationsRoute = new Hono();
 
-citationsRoute.post("/", async (c) => {
+citationsRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createCitationInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -32,7 +33,7 @@ citationsRoute.post("/", async (c) => {
   return c.json(rows[0], 201);
 });
 
-citationsRoute.delete("/:id", async (c) => {
+citationsRoute.delete("/:id", authRequired(), async (c) => {
   const id = c.req.param("id");
 
   const existing = await db

@@ -9,6 +9,16 @@ import {
   splitSegmentInputSchema,
   mergeSegmentsInputSchema,
 } from "@magnum/shared";
+import {
+  authRequired,
+  optionalAuth,
+  actorRequired,
+  type AuthUser,
+} from "../middleware/auth.js";
+import { resolveActor } from "../services/identity.js";
+import { recordRevision } from "../services/revisions.js";
+import { canWrite, getProtection, refreshProtection } from "../services/protection.js";
+import { users } from "../db/schema.js";
 
 const baseSegmentSelect = {
   id: trailSegments.id,
@@ -62,8 +72,10 @@ function toMultiLineStringWkt(geometry: unknown): string | null {
   return null;
 }
 
-export const segmentDetailRoute = new Hono();
-export const trailSegmentsRoute = new Hono();
+type Variables = { user?: AuthUser };
+
+export const segmentDetailRoute = new Hono<{ Variables: Variables }>();
+export const trailSegmentsRoute = new Hono<{ Variables: Variables }>();
 
 segmentDetailRoute.get("/:id", async (c) => {
   const id = c.req.param("id");
@@ -77,7 +89,7 @@ segmentDetailRoute.get("/:id", async (c) => {
   return c.json(seg);
 });
 
-segmentDetailRoute.put("/:id", async (c) => {
+segmentDetailRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = updateSegmentInputSchema.safeParse(body);
@@ -120,16 +132,62 @@ segmentDetailRoute.put("/:id", async (c) => {
     .where(eq(trailSegments.id, id))
     .limit(1);
 
+  const actor = resolveActor(c);
+  await recordRevision({
+    targetType: "trail",
+    targetId: id,
+    action: "update",
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: "Updated segment",
+  });
+
   return c.json(out[0] ?? rows[0]);
 });
 
-segmentDetailRoute.delete("/:id", async (c) => {
+segmentDetailRoute.delete("/:id", authRequired(), async (c) => {
   const id = c.req.param("id");
+  const authUser = c.get("user");
+  // Protection gate.
+  const seg = await db
+    .select({ trailId: trailSegments.trailId })
+    .from(trailSegments)
+    .where(eq(trailSegments.id, id))
+    .limit(1);
+  if (seg[0]?.trailId) {
+    await refreshProtection("trail", seg[0].trailId);
+    const prot = await getProtection("trail", seg[0].trailId);
+    const actorRow = await db
+      .select({ karma: users.trustScore, role: users.role })
+      .from(users)
+      .where(eq(users.id, authUser?.id ?? ""))
+      .limit(1);
+    const allowed = canWrite(prot.level, {
+      role: actorRow[0]?.role ?? null,
+      karma: Number(actorRow[0]?.karma ?? 0),
+      loggedIn: true,
+    });
+    if (!allowed) {
+      return c.json(
+        { error: "forbidden", message: `protection level requires higher trust tier`, protection: prot.level },
+        403,
+      );
+    }
+  }
   await db.delete(trailSegments).where(eq(trailSegments.id, id));
+  const actor = resolveActor(c);
+  await recordRevision({
+    targetType: "trail",
+    targetId: id,
+    action: "delete",
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: "Deleted segment",
+  });
   return c.json({ ok: true });
 });
 
-trailSegmentsRoute.post("/:id/segments", async (c) => {
+trailSegmentsRoute.post("/:id/segments", optionalAuth(), actorRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = createSegmentInputSchema.safeParse(body);
@@ -188,6 +246,16 @@ trailSegmentsRoute.post("/:id/segments", async (c) => {
     return c.json({ error: "internal", message: "failed to create segment" }, 500);
   }
 
+  const actor = resolveActor(c);
+  await recordRevision({
+    targetType: "trail",
+    targetId: seg.id,
+    action: "create",
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: "Added segment",
+  });
+
   const out = await db
     .select(baseSegmentSelect)
     .from(trailSegments)
@@ -197,7 +265,7 @@ trailSegmentsRoute.post("/:id/segments", async (c) => {
   return c.json(out[0] ?? seg, 201);
 });
 
-trailSegmentsRoute.post("/:id/segments/reorder", async (c) => {
+trailSegmentsRoute.post("/:id/segments/reorder", optionalAuth(), actorRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = reorderSegmentsInputSchema.safeParse(body);
@@ -234,6 +302,16 @@ trailSegmentsRoute.post("/:id/segments/reorder", async (c) => {
       .where(eq(trailSegments.id, sid));
   }
 
+  const actor = resolveActor(c);
+  await recordRevision({
+    targetType: "trail",
+    targetId: trailId,
+    action: "update",
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: "Reordered segments",
+  });
+
   const items = await db
     .select(baseSegmentSelect)
     .from(trailSegments)
@@ -243,7 +321,7 @@ trailSegmentsRoute.post("/:id/segments/reorder", async (c) => {
   return c.json({ items, total: items.length });
 });
 
-trailSegmentsRoute.post("/:id/segments/split", async (c) => {
+trailSegmentsRoute.post("/:id/segments/split", optionalAuth(), actorRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = splitSegmentInputSchema.safeParse(body);
@@ -330,10 +408,20 @@ trailSegmentsRoute.post("/:id/segments/split", async (c) => {
     .where(eq(trailSegments.trailId, trailId))
     .orderBy(asc(trailSegments.sortOrder));
 
+  const actor = resolveActor(c);
+  await recordRevision({
+    targetType: "trail",
+    targetId: trailId,
+    action: "update",
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: "Split segment",
+  });
+
   return c.json({ items, total: items.length });
 });
 
-trailSegmentsRoute.post("/:id/segments/merge", async (c) => {
+trailSegmentsRoute.post("/:id/segments/merge", optionalAuth(), actorRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = mergeSegmentsInputSchema.safeParse(body);
@@ -417,6 +505,16 @@ trailSegmentsRoute.post("/:id/segments/merge", async (c) => {
     .from(trailSegments)
     .where(eq(trailSegments.id, lo.id))
     .limit(1);
+
+  const actor = resolveActor(c);
+  await recordRevision({
+    targetType: "trail",
+    targetId: trailId,
+    action: "update",
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: "Merged segments",
+  });
 
   return c.json(out[0]);
 });

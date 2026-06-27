@@ -1,17 +1,15 @@
-import { describe, expect, test } from "bun:test";
-import { mock } from "bun:test";
-import { createMockDb } from "./helpers/mockDb.js";
+import { describe, expect, test, beforeEach } from "bun:test";
+import { eq, sql } from "drizzle-orm";
+import { Hono } from "hono";
+import { setupRealDb } from "./helpers/db.js";
+import { adminRoute } from "../src/routes/admin.js";
+import { users, wikiPages, features } from "../src/db/schema.js";
 
-const { db, state } = createMockDb();
+const { db, reset } = setupRealDb();
 
-mock.module("../src/db/index.js", () => ({
-  db,
-  pool: { end: () => Promise.resolve() },
-  schema: {},
-}));
-
-const { Hono } = await import("hono");
-const { adminRoute } = await import("../src/routes/admin.js");
+beforeEach(async () => {
+  await reset();
+});
 
 const buildApp = () => {
   const app = new Hono();
@@ -28,17 +26,11 @@ describe("GET /api/admin/dashboard", () => {
   });
 
   test("returns dashboard stats with admin secret", async () => {
-    state.executeRouter.length = 0;
-    state.executeRouter.push({ match: "count(*)", rows: [{ count: 5 }] });
-    state.executeRouter.push({ match: "count(*)", rows: [{ count: 42 }] });
-    state.executeRouter.push({ match: "count(*)", rows: [{ count: 15 }] });
-    state.executeRouter.push({ match: "count(*)", rows: [{ count: 8 }] });
-
     const res = await buildApp().request("/api/admin/dashboard", {
       headers: ADMIN_HEADERS,
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body).toHaveProperty("userCount");
     expect(body).toHaveProperty("revisionCount");
     expect(body).toHaveProperty("trailCount");
@@ -48,47 +40,53 @@ describe("GET /api/admin/dashboard", () => {
 
 describe("GET /api/admin/users", () => {
   test("returns user list", async () => {
-    state.users.length = 0;
-    state.users.push({
-      id: "00000000-0000-0000-0000-000000000001",
+    await db.insert(users).values({
       username: "hiker1",
       email: "hiker1@example.com",
-      role: "contributor",
-      trust_score: 0.5,
-      display_name: null,
-      created_at: "2026-01-01T00:00:00.000Z",
+      passwordHash: "hash",
     });
-
-    state.executeRouter.length = 0;
-    state.executeRouter.push({ match: "count(*)", rows: [{ count: 1 }] });
 
     const res = await buildApp().request("/api/admin/users", {
       headers: ADMIN_HEADERS,
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.items.length).toBe(1);
-    expect(body.items[0].username).toBe("hiker1");
+    const body = (await res.json()) as { items: Array<{ username: string }> };
+    expect(body.items.length).toBeGreaterThanOrEqual(1);
+    expect(body.items.some((u) => u.username === "hiker1")).toBe(true);
   });
 });
 
 describe("POST /api/admin/users/:id/ban", () => {
   test("bans a user", async () => {
-    state.updateCalls.length = 0;
-    const res = await buildApp().request("/api/admin/users/00000000-0000-0000-0000-000000000001/ban", {
+    const [u] = await db.insert(users).values({
+      username: "toban",
+      email: "ban@example.com",
+      passwordHash: "hash",
+    }).returning();
+
+    const res = await buildApp().request(`/api/admin/users/${u!.id}/ban`, {
       method: "POST",
       headers: ADMIN_HEADERS,
     });
     expect(res.status).toBe(200);
-    expect(state.updateCalls.length).toBe(1);
-    expect(state.updateCalls[0]?.table).toBe("users");
+
+    const stored = await db.select().from(users).where(
+      eq(users.id, u!.id),
+    );
+    expect(stored[0]?.role).toBe("banned");
   });
 });
 
 describe("POST /api/admin/users/:id/unban", () => {
   test("unbans a user", async () => {
-    state.updateCalls.length = 0;
-    const res = await buildApp().request("/api/admin/users/00000000-0000-0000-0000-000000000001/unban", {
+    const [u] = await db.insert(users).values({
+      username: "tounban",
+      email: "unban@example.com",
+      passwordHash: "hash",
+      role: "banned",
+    }).returning();
+
+    const res = await buildApp().request(`/api/admin/users/${u!.id}/unban`, {
       method: "POST",
       headers: ADMIN_HEADERS,
     });
@@ -98,24 +96,43 @@ describe("POST /api/admin/users/:id/unban", () => {
 
 describe("DELETE /api/admin/wiki-pages/:id", () => {
   test("deletes a wiki page", async () => {
-    state.deleteCalls.length = 0;
-    const res = await buildApp().request("/api/admin/wiki-pages/test-page-id", {
+    const [page] = await db.insert(wikiPages).values({
+      targetType: "trail",
+      targetId: "00000000-0000-0000-0000-000000000001",
+      title: "Test Page",
+      contentMd: "# test",
+    }).returning();
+
+    const res = await buildApp().request(`/api/admin/wiki-pages/${page!.id}`, {
       method: "DELETE",
       headers: ADMIN_HEADERS,
     });
     expect(res.status).toBe(200);
-    expect(state.deleteCalls.length).toBe(1);
+
+    const stored = await db.select().from(wikiPages).where(
+      eq(wikiPages.id, page!.id),
+    );
+    expect(stored.length).toBe(0);
   });
 });
 
 describe("DELETE /api/admin/features/:id", () => {
   test("deletes a feature", async () => {
-    state.deleteCalls.length = 0;
-    const res = await buildApp().request("/api/admin/features/test-feature-id", {
+    const [feat] = await db.insert(features).values({
+      name: "Test Feature",
+      typeTag: "bench",
+      point: sql`ST_SetSRID(ST_MakePoint(-82.5, 39.4), 4326)`,
+    }).returning();
+
+    const res = await buildApp().request(`/api/admin/features/${feat!.id}`, {
       method: "DELETE",
       headers: ADMIN_HEADERS,
     });
     expect(res.status).toBe(200);
-    expect(state.deleteCalls.length).toBe(1);
+
+    const stored = await db.select().from(features).where(
+      eq(features.id, feat!.id),
+    );
+    expect(stored.length).toBe(0);
   });
 });

@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
@@ -10,7 +10,6 @@ import {
 } from "@magnum/shared/schemas";
 import { castVote, getScore, retractVote, onVoteChange } from "../services/votes.js";
 import { tierFromKarma } from "../services/karma.js";
-import { resolveContributorName } from "../services/identity.js";
 import { authRequired, type AuthUser } from "../middleware/auth.js";
 
 type Variables = { user?: AuthUser };
@@ -18,41 +17,32 @@ type Variables = { user?: AuthUser };
 export const votesRoute = new Hono<{ Variables: Variables }>();
 
 async function loadActorContext(
-  c: { req: Context["req"]; get: Context["get"] },
-  user: AuthUser | undefined,
+  user: AuthUser,
 ): Promise<{
-  userId: string | null;
+  userId: string;
   karma: number;
   tier: ReturnType<typeof tierFromKarma>;
   contributorName: string;
 }> {
-  if (user) {
-    const rows = await db
-      .select({ karma: users.trustScore, username: users.username })
-      .from(users)
-      .where(eq(users.id, user.id))
-      .limit(1);
-    const karma = Number(rows[0]?.karma ?? 0);
-    return {
-      userId: user.id,
-      karma,
-      tier: tierFromKarma(karma),
-      contributorName: user.username,
-    };
-  }
+  const rows = await db
+    .select({ karma: users.trustScore, username: users.username })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+  const karma = Number(rows[0]?.karma ?? 0);
   return {
-    userId: null,
-    karma: 0,
-    tier: "new",
-    // Never trust the `x-contributor-name` header the client may send —
-    // resolve the name from the request IP so anonymous votes can't be
-    // spoofed to look like a different user.
-    contributorName: resolveContributorName(c),
+    userId: user.id,
+    karma,
+    tier: tierFromKarma(karma),
+    contributorName: user.username,
   };
 }
 
 // Cast a vote. Body: { target_type, target_id, value: 1 | -1 }.
-votesRoute.post("/", async (c) => {
+// Voting requires authentication — IP users cannot vote (§perm restructure).
+votesRoute.post("/", authRequired(), async (c) => {
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
   const body = await c.req.json().catch(() => null);
   const parsed = castVoteInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -61,11 +51,7 @@ votesRoute.post("/", async (c) => {
       400,
     );
   }
-  const authUser = c.get("user");
-  const actor = await loadActorContext(c, authUser);
-  if (!actor.userId && !actor.contributorName) {
-    return c.json({ error: "unauthorized", message: "login or set contributor name" }, 401);
-  }
+  const actor = await loadActorContext(authUser);
   const result = await castVote({
     targetType: parsed.data.target_type,
     targetId: parsed.data.target_id,
@@ -86,17 +72,15 @@ votesRoute.post("/", async (c) => {
   });
 });
 
-// Retract a vote.
-votesRoute.delete("/:targetType/:targetId", async (c) => {
+// Retract a vote. Requires authentication.
+votesRoute.delete("/:targetType/:targetId", authRequired(), async (c) => {
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
   const targetTypeParsed = voteTargetTypeSchema.safeParse(c.req.param("targetType"));
   if (!targetTypeParsed.success) {
     return c.json({ error: "invalid_input", message: "unknown target_type" }, 400);
   }
   const targetId = c.req.param("targetId");
-  const authUser = c.get("user");
-  if (!authUser) {
-    return c.json({ error: "unauthorized", message: "login required" }, 401);
-  }
   const result = await retractVote(targetTypeParsed.data, targetId, authUser.id);
   await onVoteChange(targetTypeParsed.data, targetId);
   return c.json({

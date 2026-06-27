@@ -3,9 +3,9 @@ import { eq, and, ilike, sql, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { trails, trailSystems, trailSegments, features } from "../db/schema.js";
 import { createTrailInputSchema, updateTrailInputSchema } from "@magnum/shared";
-import { authRequired, type AuthUser } from "../middleware/auth.js";
+import { optionalAuth, actorRequired, type AuthUser } from "../middleware/auth.js";
+import { resolveActor } from "../services/identity.js";
 import { recordRevision } from "../services/revisions.js";
-import { resolveContributorName } from "../services/identity.js";
 
 type Variables = { user?: AuthUser };
 
@@ -180,10 +180,7 @@ trailsRoute.get("/:id/features", async (c) => {
   return c.json({ items, total: items.length });
 });
 
-trailsRoute.post("/", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
-
+trailsRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createTrailInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -192,6 +189,8 @@ trailsRoute.post("/", authRequired(), async (c) => {
       400,
     );
   }
+
+  const actor = resolveActor(c);
 
   const rows = await db
     .insert(trails)
@@ -202,29 +201,30 @@ trailsRoute.post("/", authRequired(), async (c) => {
       difficulty: parsed.data.difficulty ?? null,
       lengthMeters: parsed.data.length_meters ?? null,
       elevationGainMeters: parsed.data.elevation_gain_meters ?? null,
-      createdByUserId: authUser.id,
+      createdByUserId: actor.userId,
     })
     .returning();
 
-  const trail = rows[0];
-  if (!trail) return c.json({ error: "internal" }, 500);
+  const created = rows[0];
+  if (!created) {
+    return c.json({ error: "internal", message: "failed to create trail" }, 500);
+  }
 
   await recordRevision({
     targetType: "trail",
-    targetId: trail.id,
+    targetId: created.id,
     action: "create",
-    actorId: authUser.id,
-    contributorName: resolveContributorName(c),
-    editSummary: `Created trail "${trail.name}"`,
-    payloadAfter: { name: trail.name, slug: trail.slug, difficulty: trail.difficulty },
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
+    editSummary: `Created trail ${created.name}`,
+    payloadAfter: { name: created.name, slug: created.slug },
   });
 
-  return c.json(trail, 201);
+  return c.json(created, 201);
 });
 
-trailsRoute.put("/:id", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+trailsRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
+  const actor = resolveActor(c);
   const id = c.req.param("id");
 
   const body = await c.req.json().catch(() => null);
@@ -273,8 +273,8 @@ trailsRoute.put("/:id", authRequired(), async (c) => {
     targetType: "trail",
     targetId: id,
     action: "update",
-    actorId: authUser.id,
-    contributorName: resolveContributorName(c),
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: `Updated trail metadata`,
     payloadAfter: updates,
   });
@@ -287,9 +287,9 @@ trailsRoute.put("/:id", authRequired(), async (c) => {
   return c.json(withCenter(rows[0]!));
 });
 
-trailsRoute.delete("/:id", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+trailsRoute.delete("/:id", optionalAuth(), actorRequired(), async (c) => {
+  const actor = resolveActor(c);
+  const user = c.get("user");
   const id = c.req.param("id");
 
   const [trail] = await db
@@ -299,8 +299,8 @@ trailsRoute.delete("/:id", authRequired(), async (c) => {
     .limit(1);
   if (!trail) return c.json({ error: "not_found", message: `trail ${id} not found` }, 404);
 
-  // Premium trails can only be deleted by moderators+.
-  if (trail.tier === "premium" && authUser.tier !== "moderator") {
+  // Premium trails can only be deleted by authenticated moderators+.
+  if (trail.tier === "premium" && (!user || user.tier !== "moderator")) {
     return c.json({ error: "forbidden", message: "premium trails require moderator permission to delete" }, 403);
   }
 
@@ -309,8 +309,8 @@ trailsRoute.delete("/:id", authRequired(), async (c) => {
     targetType: "trail",
     targetId: id,
     action: "delete",
-    actorId: authUser.id,
-    contributorName: resolveContributorName(c),
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: `Deleted trail "${trail.name}"`,
   });
   return c.json({ ok: true });

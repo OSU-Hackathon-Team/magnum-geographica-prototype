@@ -95,7 +95,7 @@ describe("POST /api/features", () => {
     });
     const res = await buildApp().request("/api/features", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({ name: "" }), // missing point and either preset_id/type_tag
     });
     expect(res.status).toBe(400);
@@ -113,7 +113,7 @@ describe("POST /api/features", () => {
     });
     const res = await buildApp().request("/api/features", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({
         name: "Cave",
         point: { type: "Point", coordinates: [-82.54, 39.43] },
@@ -136,7 +136,7 @@ describe("POST /api/features", () => {
     });
     const res = await buildApp().request("/api/features", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({ name: "x", type_tag: "viewpoint", point: {} }),
     });
     expect(res.status).toBe(400);
@@ -155,7 +155,7 @@ describe("POST /api/features", () => {
     });
     const res = await buildApp().request("/api/features", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({
         name: "Cedar Falls",
         type_tag: "scenic_point",
@@ -199,7 +199,7 @@ describe("POST /api/features", () => {
 
     const ok = await buildApp().request("/api/features", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({
         name: "Cedar Falls",
         preset_id: preset.id,
@@ -215,7 +215,7 @@ describe("POST /api/features", () => {
 
     const bad = await buildApp().request("/api/features", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({
         name: "Wrong type",
         preset_id: preset.id,
@@ -240,7 +240,7 @@ describe("POST /api/features", () => {
     });
     const res = await buildApp().request("/api/features", {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify({
         name: "x",
         preset_id: "00000000-0000-0000-0000-000000000099",
@@ -279,7 +279,7 @@ describe("PUT /api/features/:id", () => {
     const f = await seedFeaturePoint();
     const res = await buildApp().request(`/api/features/${f.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ name: "" }),
     });
     expect(res.status).toBe(400);
@@ -289,7 +289,7 @@ describe("PUT /api/features/:id", () => {
     const f = await seedFeaturePoint();
     const res = await buildApp().request(`/api/features/${f.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -301,7 +301,7 @@ describe("PUT /api/features/:id", () => {
     const f = await seedFeaturePoint();
     const res = await buildApp().request(`/api/features/${f.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ name: "Updated name", description: "new desc" }),
     });
     expect(res.status).toBe(200);
@@ -322,7 +322,7 @@ describe("PUT /api/features/:id", () => {
     const f = await seedFeaturePoint();
     const res = await buildApp().request(`/api/features/${f.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         point: { type: "Point", coordinates: [-83.0, 40.0] },
       }),
@@ -337,7 +337,7 @@ describe("PUT /api/features/:id", () => {
       "/api/features/00000000-0000-0000-0000-000000000099",
       {
         method: "PUT",
-        headers: { "content-type": "application/json" },
+        headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
         body: JSON.stringify({ name: "x" }),
       },
     );
@@ -349,7 +349,7 @@ describe("PUT /api/features/:id", () => {
     const f = await seedFeaturePoint({ presetId: preset.id });
     const res = await buildApp().request(`/api/features/${f.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ answers: { panoramic: "not-a-boolean" } }),
     });
     expect(res.status).toBe(400);
@@ -360,8 +360,15 @@ describe("PUT /api/features/:id", () => {
 
 describe("DELETE /api/features/:id", () => {
   test("removes the feature row", async () => {
+    const user = await seedUser();
+    const token = await signToken({
+      id: user.id, username: user.username, email: user.email, role: user.role, karma: 0, tier: "new",
+    });
     const f = await seedFeaturePoint();
-    const res = await buildApp().request(`/api/features/${f.id}`, { method: "DELETE" });
+    const res = await buildApp().request(`/api/features/${f.id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` },
+    });
     expect(res.status).toBe(200);
     const after = await db.select().from(features).where(eq(features.id, f.id));
     expect(after.length).toBe(0);

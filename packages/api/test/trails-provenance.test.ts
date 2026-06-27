@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { setupRealDb } from "./helpers/db.js";
 import { trailsRoute } from "../src/routes/trails.js";
-import { trails, trailSystems } from "../src/db/schema.js";
+import { trails, trailSystems, users } from "../src/db/schema.js";
 import { signToken } from "../src/middleware/auth.js";
 
 const { db, reset } = setupRealDb();
@@ -35,6 +35,11 @@ let modToken: string;
 
 beforeEach(async () => {
   await reset();
+  // Seed test users so FK constraints are satisfied.
+  await db.insert(users).values([
+    { id: TEST_USER.id, username: TEST_USER.username, email: TEST_USER.email, passwordHash: "x" },
+    { id: TEST_MOD.id, username: TEST_MOD.username, email: TEST_MOD.email, passwordHash: "x" },
+  ]);
   authToken = await signToken(TEST_USER);
   modToken = await signToken(TEST_MOD);
 });

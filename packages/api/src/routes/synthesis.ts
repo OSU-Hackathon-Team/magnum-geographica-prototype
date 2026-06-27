@@ -40,7 +40,7 @@ type Variables = { user?: AuthUser };
 
 export const synthesisRoute = new Hono<{ Variables: Variables }>();
 
-synthesisRoute.post("/systems/:id/synthesize", authRequired(), moderatorRequired(), async (c) => {
+synthesisRoute.post("/systems/:id/synthesize", moderatorRequired(), async (c) => {
   const systemId = String(c.req.param("id"));
   const authUser = c.get("user");
   if (!authUser) return c.json({ error: "unauthorized" }, 401);
@@ -75,7 +75,7 @@ synthesisRoute.post("/systems/:id/synthesize", authRequired(), moderatorRequired
   }
 });
 
-synthesisRoute.get("/admin/synthesis-proposals", authRequired(), moderatorRequired(), async (c) => {
+synthesisRoute.get("/admin/synthesis-proposals", moderatorRequired(), async (c) => {
   const systemId = c.req.query("system_id");
   if (!systemId) return c.json({ error: "system_id is required" }, 400);
   const proposals = await listProposals(systemId);
@@ -89,7 +89,6 @@ const approveBody = z.object({
 
 synthesisRoute.post(
   "/admin/synthesis-proposals/:segmentId/approve",
-  authRequired(),
   moderatorRequired(),
   async (c) => {
     const body = await c.req.json().catch(() => ({}));
@@ -105,7 +104,6 @@ synthesisRoute.post(
 
 synthesisRoute.post(
   "/admin/synthesis-proposals/:segmentId/reject",
-  authRequired(),
   moderatorRequired(),
   async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { system_id?: string };
@@ -200,7 +198,7 @@ const importBody = z.object({
   geometry: z.unknown(),
 });
 
-synthesisRoute.post("/admin/trails/import", authRequired(), moderatorRequired(), async (c) => {
+synthesisRoute.post("/admin/trails/import", moderatorRequired(), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = importBody.safeParse(body);
   if (!parsed.success) {

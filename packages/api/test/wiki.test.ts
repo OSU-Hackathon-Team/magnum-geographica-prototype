@@ -13,6 +13,17 @@ mock.module("../src/db/index.js", () => ({
 const { Hono } = await import("hono");
 const { wikiRoute } = await import("../src/routes/wiki.js");
 const { citationsRoute } = await import("../src/routes/citations.js");
+const { signToken } = await import("../src/middleware/auth.js");
+
+const IP_HEADERS = { "x-forwarded-for": "127.0.0.1" };
+const TEST_USER = {
+  id: "00000000-0000-0000-0000-000000000001",
+  username: "tester",
+  email: "t@t.com",
+  role: "contributor" as const,
+  karma: 0,
+  tier: "new" as const,
+};
 
 const buildApp = () => {
   const app = new Hono();
@@ -66,7 +77,7 @@ describe("POST /api/wiki-pages", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/wiki-pages", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -87,7 +98,7 @@ describe("POST /api/wiki-pages", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/wiki-pages", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         target_type: "trail",
         target_id: TARGET_UUID,
@@ -103,7 +114,7 @@ describe("POST /api/wiki-pages", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/wiki-pages", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         target_type: "trail",
         target_id: TARGET_UUID,
@@ -123,7 +134,7 @@ describe("POST /api/wiki-pages", () => {
     const res = await buildApp().request("/api/wiki-pages", {
       method: "POST",
       headers: {
-        "content-type": "application/json",
+        ...IP_HEADERS, "content-type": "application/json",
         "x-forwarded-for": "203.0.113.5",
       },
       body: JSON.stringify({
@@ -148,7 +159,7 @@ describe("PUT /api/wiki-pages/:id", () => {
     state.wikiPages.length = 0;
     const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         title: "Updated",
         content_md: "new content",
@@ -175,7 +186,7 @@ describe("PUT /api/wiki-pages/:id", () => {
 
     const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         title: "Updated Title",
         content_md: "updated content",
@@ -204,7 +215,7 @@ describe("PUT /api/wiki-pages/:id", () => {
     const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}`, {
       method: "PUT",
       headers: {
-        "content-type": "application/json",
+        ...IP_HEADERS, "content-type": "application/json",
         "x-forwarded-for": "198.51.100.7",
       },
       body: JSON.stringify({
@@ -302,7 +313,7 @@ describe("POST /api/wiki-pages/:id/revert", () => {
     state.wikiPages.length = 0;
     const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}/revert`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         revision_id: REV_UUID,
         contributor_name: "reverter",
@@ -324,7 +335,7 @@ describe("POST /api/wiki-pages/:id/revert", () => {
     state.revisions.length = 0;
     const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}/revert`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         revision_id: REV_UUID,
         contributor_name: "reverter",
@@ -358,7 +369,7 @@ describe("POST /api/wiki-pages/:id/revert", () => {
 
     const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}/revert`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         revision_id: REV_UUID,
         contributor_name: "reverter",
@@ -393,7 +404,7 @@ describe("POST /api/wiki-pages/:id/revert", () => {
     const res = await buildApp().request(`/api/wiki-pages/${WIKI_UUID}/revert`, {
       method: "POST",
       headers: {
-        "content-type": "application/json",
+        ...IP_HEADERS, "content-type": "application/json",
         "x-forwarded-for": "192.0.2.42",
       },
       body: JSON.stringify({
@@ -414,7 +425,7 @@ describe("POST /api/citations", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/citations", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -424,7 +435,7 @@ describe("POST /api/citations", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/citations", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...IP_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({
         wiki_page_id: WIKI_UUID,
         title: "Official Site",
@@ -438,15 +449,18 @@ describe("POST /api/citations", () => {
 
 describe("DELETE /api/citations/:id", () => {
   test("returns 404 for non-existent citation", async () => {
+    const token = await signToken(TEST_USER);
     const CITATION_UUID = "99999999-9999-9999-9999-999999999999";
     state.citations.length = 0;
     const res = await buildApp().request(`/api/citations/${CITATION_UUID}`, {
       method: "DELETE",
+      headers: { authorization: `Bearer ${token}`, ...IP_HEADERS },
     });
     expect(res.status).toBe(404);
   });
 
   test("deletes a citation", async () => {
+    const token = await signToken(TEST_USER);
     const CITATION_UUID = "99999999-9999-9999-9999-999999999999";
     state.citations.length = 0;
     state.citations.push({
@@ -461,6 +475,7 @@ describe("DELETE /api/citations/:id", () => {
     state.deleteCalls.length = 0;
     const res = await buildApp().request(`/api/citations/${CITATION_UUID}`, {
       method: "DELETE",
+      headers: { authorization: `Bearer ${token}`, ...IP_HEADERS },
     });
     expect(res.status).toBe(200);
     expect(state.deleteCalls.length).toBeGreaterThanOrEqual(1);

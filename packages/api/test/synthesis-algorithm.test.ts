@@ -9,7 +9,7 @@ import { setupRealDb } from "./helpers/db.js";
 import { synthesisRoute } from "../src/routes/synthesis.js";
 import {
   systems, trails, trailSystems, gpsTraces, gpsTraceSegments,
-  traceSystems, traceSegmentVotes, synthesisRuns,
+  traceSystems, traceSegmentVotes, synthesisRuns, users,
 } from "../src/db/schema.js";
 import { signToken } from "../src/middleware/auth.js";
 
@@ -28,6 +28,9 @@ let modToken: string;
 
 beforeEach(async () => {
   await reset();
+  await db.insert(users).values({
+    id: TEST_MOD.id, username: TEST_MOD.username, email: TEST_MOD.email, passwordHash: "x", role: "moderator",
+  });
   modToken = await signToken(TEST_MOD);
 });
 

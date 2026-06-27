@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { media } from "../db/schema.js";
+import { authRequired, optionalAuth, actorRequired } from "../middleware/auth.js";
+import { resolveActor } from "../services/identity.js";
 
 export const mediaRoute = new Hono();
 
-mediaRoute.post("/", async (c) => {
+mediaRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return c.json({ error: "invalid_input", message: "body required" }, 400);
@@ -123,7 +125,7 @@ mediaRoute.get("/", async (c) => {
   return c.json({ items, total: items.length });
 });
 
-mediaRoute.delete("/:id", async (c) => {
+mediaRoute.delete("/:id", authRequired(), async (c) => {
   const id = c.req.param("id");
   await db.delete(media).where(eq(media.id, id));
   return c.json({ ok: true });

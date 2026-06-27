@@ -6,7 +6,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { Hono } from "hono";
 import { setupRealDb } from "./helpers/db.js";
 import { traceSegmentsRoute } from "../src/routes/traces.js";
-import { gpsTraces, gpsTraceSegments, trails } from "../src/db/schema.js";
+import { gpsTraces, gpsTraceSegments, trails, users } from "../src/db/schema.js";
 import { signToken } from "../src/middleware/auth.js";
 
 const { db, reset } = setupRealDb();
@@ -24,6 +24,9 @@ let authToken: string;
 
 beforeEach(async () => {
   await reset();
+  await db.insert(users).values({
+    id: TEST_USER.id, username: TEST_USER.username, email: TEST_USER.email, passwordHash: "x",
+  });
   authToken = await signToken(TEST_USER);
 });
 
@@ -168,6 +171,10 @@ describe("GET /api/trace-segments/:id/votes", () => {
       role: "contributor",
       karma: 0,
       tier: "new" as const,
+    });
+    await db.insert(users).values({
+      id: "00000000-0000-4000-a000-000000000088",
+      username: "user2", email: "u2@test.com", passwordHash: "x",
     });
     await buildApp().request(`/api/trace-segments/${seg.id}/vote`, {
       method: "POST",

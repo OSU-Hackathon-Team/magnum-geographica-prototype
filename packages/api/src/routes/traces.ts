@@ -21,11 +21,16 @@ import {
   voteOnTrace,
   getHeatmapPoints,
 } from "../services/traces.js";
-import { authRequired, type AuthUser } from "../middleware/auth.js";
+import {
+  authRequired,
+  optionalAuth,
+  actorRequired,
+  type AuthUser,
+} from "../middleware/auth.js";
 import { evaluateAction } from "../services/patrol.js";
 import { recordRevision } from "../services/revisions.js";
 import { tierFromKarma } from "../services/karma.js";
-import { resolveContributorName } from "../services/identity.js";
+import { resolveContributorName, resolveActor } from "../services/identity.js";
 
 type Variables = { user?: AuthUser };
 
@@ -109,11 +114,9 @@ tracesRoute.get("/:id", async (c) => {
 /**
  * Create a trace from raw coordinates (the recorder path). The route
  * runs auto-tag synchronously so the response can include tagged
- * system ids.
+ * system ids. IP users may submit traces (Wikipedia-style).
  */
-tracesRoute.post("/", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+tracesRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createTraceInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -123,21 +126,20 @@ tracesRoute.post("/", authRequired(), async (c) => {
     );
   }
   const coords = parsed.data.geometry.coordinates;
-  // `contributor_name` from the body is ignored — derive it from auth
-  // context so a malicious client can't spoof the trace attribution.
+  const actor = resolveActor(c);
   const { trace, taggedSystemIds } = await createTrace({
     coordinates: coords,
     source: parsed.data.source,
-    contributorName: resolveContributorName(c),
-    userId: authUser.id,
+    contributorName: actor.contributorName,
+    userId: actor.userId ?? null,
     recordedAt: parsed.data.recorded_at,
   });
   await recordRevision({
     targetType: "trace",
     targetId: trace.id,
     action: "create",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: `Recorded trace (${coords.length} pts)`,
     payloadAfter: { source: parsed.data.source, points: coords.length, tagged: taggedSystemIds },
   });
@@ -146,11 +148,9 @@ tracesRoute.post("/", authRequired(), async (c) => {
 
 /**
  * Import a GPX file or a GeoJSON LineString/MultiLineString.
- * Same response shape as POST /.
+ * Same response shape as POST /. IP users may import traces.
  */
-tracesRoute.post("/import", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+tracesRoute.post("/import", optionalAuth(), actorRequired(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = importTraceInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -159,17 +159,18 @@ tracesRoute.post("/import", authRequired(), async (c) => {
       400,
     );
   }
+  const actor = resolveActor(c);
   const result = await importTrace(parsed.data.format, parsed.data.payload, {
-    contributorName: resolveContributorName(c),
-    userId: authUser.id,
+    contributorName: actor.contributorName,
+    userId: actor.userId ?? null,
     recordedAt: parsed.data.recorded_at,
   });
   await recordRevision({
     targetType: "trace",
     targetId: result.trace.id,
     action: "create",
-    actorId: authUser.id,
-    contributorName: authUser.username,
+    actorId: actor.userId ?? null,
+    contributorName: actor.contributorName,
     editSummary: `Imported ${parsed.data.format.toUpperCase()} trace (${result.points} pts, ${result.lengthMeters.toFixed(0)}m)`,
     payloadAfter: {
       format: parsed.data.format,
@@ -247,11 +248,9 @@ tracesRoute.post("/:id/remove", authRequired(), async (c) => {
 /**
  * Cut trace into segments (Douglas-Peucker simplify + turn split).
  * Triggered automatically on import; this route is for re-cuts after
- * segmenter config changes.
+ * segmenter config changes. IP users may re-cut their traces.
  */
-tracesRoute.post("/:id/segments", authRequired(), async (c) => {
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+tracesRoute.post("/:id/segments", optionalAuth(), actorRequired(), async (c) => {
   const id = c.req.param("id");
   const trace = await getTraceById(id);
   if (!trace) return c.json({ error: "not_found" }, 404);

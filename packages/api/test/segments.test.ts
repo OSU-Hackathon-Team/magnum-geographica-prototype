@@ -12,9 +12,24 @@ mock.module("../src/db/index.js", () => ({
 
 const { Hono } = await import("hono");
 const { segmentDetailRoute, trailSegmentsRoute } = await import("../src/routes/segments.js");
+const { signToken } = await import("../src/middleware/auth.js");
+
+const IP_HEADERS = { "x-forwarded-for": "127.0.0.1" };
+const TEST_USER = {
+  id: "00000000-0000-0000-0000-000000000001",
+  username: "tester",
+  email: "t@t.com",
+  role: "contributor",
+  karma: 0,
+  tier: "new" as const,
+};
+
+let authToken = "";
 
 const buildApp = () =>
   new Hono().route("/api/segments", segmentDetailRoute).route("/api/trails", trailSegmentsRoute);
+
+signToken(TEST_USER).then((t) => { authToken = t; });
 
 describe("GET /api/segments/:id", () => {
   test("returns 404 when segment not found", async () => {
@@ -27,7 +42,7 @@ describe("PUT /api/segments/:id", () => {
   test("rejects empty body with 400", async () => {
     const res = await buildApp().request("/api/segments/00000000-0000-0000-0000-000000000001", {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...IP_HEADERS },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -36,7 +51,7 @@ describe("PUT /api/segments/:id", () => {
   test("rejects unknown surface_type", async () => {
     const res = await buildApp().request("/api/segments/00000000-0000-0000-0000-000000000001", {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...IP_HEADERS },
       body: JSON.stringify({ surface_type: "moon-dust" }),
     });
     expect(res.status).toBe(400);
@@ -45,8 +60,10 @@ describe("PUT /api/segments/:id", () => {
 
 describe("DELETE /api/segments/:id", () => {
   test("deletes a segment successfully", async () => {
+    const token = await signToken(TEST_USER);
     const res = await buildApp().request("/api/segments/00000000-0000-0000-0000-000000000001", {
       method: "DELETE",
+      headers: { authorization: `Bearer ${token}`, ...IP_HEADERS },
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
@@ -60,7 +77,7 @@ describe("POST /api/trails/:id/segments", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...IP_HEADERS },
         body: JSON.stringify({
           geometry: {
             type: "LineString",
@@ -80,7 +97,7 @@ describe("POST /api/trails/:id/segments", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...IP_HEADERS },
         body: JSON.stringify({
           surface_type: "lava",
           geometry: {
@@ -103,7 +120,7 @@ describe("POST /api/trails/:id/segments/reorder", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/reorder",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...IP_HEADERS },
         body: JSON.stringify({}),
       },
     );
@@ -117,7 +134,7 @@ describe("POST /api/trails/:id/segments/split", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/split",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...IP_HEADERS },
         body: JSON.stringify({ split_at: 0.5 }),
       },
     );
@@ -129,7 +146,7 @@ describe("POST /api/trails/:id/segments/split", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/split",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...IP_HEADERS },
         body: JSON.stringify({
           segment_id: "00000000-0000-0000-0000-000000000001",
           split_at: 1.5,
@@ -146,7 +163,7 @@ describe("POST /api/trails/:id/segments/merge", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/merge",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...IP_HEADERS },
         body: JSON.stringify({ segment_id_a: "00000000-0000-0000-0000-000000000001" }),
       },
     );
@@ -158,7 +175,7 @@ describe("POST /api/trails/:id/segments/merge", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/merge",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...IP_HEADERS },
         body: JSON.stringify({
           segment_id_a: "00000000-0000-0000-0000-000000000001",
           segment_id_b: "00000000-0000-0000-0000-000000000001",

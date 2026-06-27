@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../providers/ThemeProvider";
+import { hexToRgba } from "../../theme/hexToRgba";
 import { radii, spacing, text, elevation } from "../../theme/tokens";
 
 export interface OverflowMenuItem {
@@ -75,7 +76,7 @@ export function OverflowMenu({ items, testID, tint = "default" }: OverflowMenuPr
         testID={testID ? `${testID}-modal` : undefined}
       >
         <Pressable
-          style={styles.backdrop}
+          style={[styles.backdrop, { backgroundColor: hexToRgba(colors.shadow, 0.45) }]}
           onPress={() => setOpen(false)}
           testID={testID ? `${testID}-backdrop` : "overflow-menu-backdrop"}
           accessibilityLabel="Close menu"
@@ -142,7 +143,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.45)",
     justifyContent: "flex-end",
   },
   sheet: {

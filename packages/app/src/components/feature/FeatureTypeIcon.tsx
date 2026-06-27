@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FEATURE_ICONS, FEATURE_TYPES } from "@magnum/shared";
+import { useTheme } from "../../providers/ThemeProvider";
 
 /**
  * Fallback map for legacy `type_tag`-based features. The new code path
@@ -156,11 +157,15 @@ export function FeatureTypeIcon({
   style,
   testID,
 }: FeatureTypeIconProps) {
+  const { colors } = useTheme();
   const { name, color } = resolveIcon(type, preset);
   const displayLabel =
     label ?? preset?.presetKey ?? type ?? "?";
   return (
-    <View style={[styles.container, style]} testID={testID}>
+    <View
+      style={[styles.container, { backgroundColor: colors.surfaceMuted }, style]}
+      testID={testID}
+    >
       <Ionicons name={name as never} size={size} color={color} />
       <Text
         style={[
@@ -182,7 +187,6 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 3,
-    backgroundColor: "#f8fafc",
     borderRadius: 4,
   },
   label: { fontWeight: "600" },

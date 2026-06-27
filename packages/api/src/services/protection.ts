@@ -1,19 +1,20 @@
 /**
  * Entity protection gating (§21.8).
  *
- * Protection levels (per Wikipedia-style escalation):
- *   - normal:  default; any logged-in contributor can edit/revert.
- *   - semi:   popular entities (≥10 net upvotes OR ≥3 children). Only
- *             Established+ users (50+ karma) can edit/revert.
- *   - full:   very popular (≥100 upvotes) OR moderator-set. Only Moderators
- *             can edit/revert.
+ * Protection levels (Wikipedia-style escalation):
+ *   - normal:  default; any logged-in contributor OR IP user can edit/revert.
+ *   - semi:    popular entities (≥10 net upvotes OR ≥3 children). Only
+ *              Established+ users (50+ karma) can edit/revert. IP users
+ *              are blocked.
+ *   - full:    very popular (≥100 upvotes) OR moderator-set. Only Moderators
+ *              can edit/revert.
  *
  * The level is computed from `entity_stats` (net upvotes) and the entity's
  * child count. A moderator can pin a level higher than the auto-derived one.
  *
  * Hard rule (always enforced): if a user is the *creator* of an entity, they
  * can delete it regardless of protection — provided they pass the "no other
- * contributors' children" check.
+ * contributors' children" check. IP users can never delete.
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -82,15 +83,18 @@ export function minTierForProtection(level: ProtectionLevel): TrustTier {
 /**
  * Whether `user` (with optional role and karma) may perform a write operation
  * (create/update/delete/revert) against an entity with protection `level`.
- * The actor is allowed if:
+ *
+ * IP users (kind="ip") are allowed only on `normal`-protection entities.
+ * Logged-in users follow the tier-based gating:
  *   - they are a moderator (always), OR
  *   - the protection is `normal` and they're logged in, OR
  *   - their tier is at or above the minimum for this level.
  */
 export function canWrite(
   level: ProtectionLevel,
-  actor: { role?: string | null; karma?: number; loggedIn: boolean },
+  actor: { role?: string | null; karma?: number; loggedIn: boolean; kind?: "user" | "ip" },
 ): boolean {
+  if (actor.kind === "ip") return level === "normal";
   if (!actor.loggedIn) return false;
   if (isModerator(actor.role ?? null)) return true;
   const required = minTierForProtection(level);
@@ -108,13 +112,15 @@ function tierWeightFor(tier: TrustTier): number {
 /**
  * Whether `actor` may *delete* an entity. Adds the hard rule: a system with
  * ≥2 trails they did not create cannot be deleted by a non-moderator.
- * Caller is responsible for the children-count check.
+ * IP users (kind="ip") can never delete. Caller is responsible for the
+ * children-count check.
  */
 export function canDelete(
   level: ProtectionLevel,
-  actor: { role?: string | null; karma?: number; loggedIn: boolean; isCreator: boolean },
+  actor: { role?: string | null; karma?: number; loggedIn: boolean; isCreator: boolean; kind?: "user" | "ip" },
   childrenNotOwnedByActor: number,
 ): { ok: boolean; reason?: string } {
+  if (actor.kind === "ip") return { ok: false, reason: "IP users cannot delete entities" };
   if (!canWrite(level, actor)) {
     return { ok: false, reason: "protection level too high" };
   }

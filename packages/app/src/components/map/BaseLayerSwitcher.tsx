@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useBaseLayerStore } from "../../stores/baseLayerStore";
 import { useTheme } from "../../providers/ThemeProvider";
+import { hexToRgba } from "../../theme/hexToRgba";
 import type { BaseLayerDef } from "@magnum/map";
 
 interface BaseLayerSwitcherProps {
@@ -11,13 +12,6 @@ interface BaseLayerSwitcherProps {
 
 const TRIGGER_HEIGHT = 36;
 const ITEM_HEIGHT = 40;
-
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
 
 export function BaseLayerSwitcher({ layers, testID }: BaseLayerSwitcherProps) {
   const { colors } = useTheme();

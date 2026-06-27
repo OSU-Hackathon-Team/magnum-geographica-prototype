@@ -15,6 +15,7 @@ import { MapContainer } from "@magnum/map";
 import { createMagnumClient, type Trail, type System } from "@magnum/shared";
 import { useAuthStore } from "../../../src/stores/authStore";
 import { useTheme } from "../../../src/providers/ThemeProvider";
+import { hexToRgba } from "../../../src/theme/hexToRgba";
 import { Button } from "../../../src/components/ui/Button";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -227,7 +228,7 @@ export default function SystemOrganize() {
         transparent
         onRequestClose={() => setSelectedSegment(null)}
       >
-          <View style={styles.modalBackdrop}>
+          <View style={[styles.modalBackdrop, { backgroundColor: hexToRgba(colors.shadow, 0.4) }]}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]} testID="proposal-sheet">
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -295,7 +296,10 @@ export default function SystemOrganize() {
       </Modal>
 
       {synthLoading ? (
-        <View style={[styles.overlay, { backgroundColor: "rgba(0,0,0,0.5)" }]} testID="organize-loading">
+        <View
+          style={[styles.overlay, { backgroundColor: hexToRgba(colors.shadow, 0.5) }]}
+          testID="organize-loading"
+        >
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : null}
@@ -328,7 +332,7 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1 },
   rowTitle: { fontWeight: "600" },
   rowSub: { fontSize: 12 },
-  modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  modalBackdrop: { flex: 1, justifyContent: "flex-end" },
   modalCard: {
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,

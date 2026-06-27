@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveContributorName } from "../src/services/identity.js";
+import { resolveContributorName, resolveActor } from "../src/services/identity.js";
 
 type FakeContext = Parameters<typeof resolveContributorName>[0];
 
@@ -58,13 +58,12 @@ describe("resolveContributorName", () => {
     expect(name).toBe("IP:198.51.100.42");
   });
 
-  test("returns 'anonymous' when neither user nor IP is available", () => {
-    // No x-forwarded-for / x-real-ip headers and no authenticated user.
+  test("returns IP:0.0.0.0 when neither user nor IP is available", () => {
     const name = resolveContributorName(fakeCtx({}));
-    expect(name).toBe("anonymous");
+    expect(name).toBe("IP:0.0.0.0");
   });
 
-  test("returns 'anonymous' for an authenticated user without a username (defensive)", () => {
+  test("falls back to IP when user has no username (defensive)", () => {
     // Malformed JWT: user is on the context but has no username. Don't
     // fall through to the IP — that would be confusing attribution.
     const name = resolveContributorName(
@@ -74,5 +73,33 @@ describe("resolveContributorName", () => {
       ),
     );
     expect(name).toBe("IP:198.51.100.7");
+  });
+});
+
+describe("resolveActor", () => {
+  test("returns kind=user for authenticated user", () => {
+    const actor = resolveActor(
+      fakeCtx(
+        {},
+        {
+          id: "u-1",
+          username: "hiker99",
+          email: "h@x",
+          role: "contributor",
+          karma: 0,
+          tier: "new",
+        },
+      ),
+    );
+    expect(actor.kind).toBe("user");
+    expect(actor.userId).toBe("u-1");
+    expect(actor.contributorName).toBe("hiker99");
+  });
+
+  test("returns kind=ip for unauthenticated request with x-forwarded-for", () => {
+    const actor = resolveActor(fakeCtx({ "x-forwarded-for": "198.51.100.7" }));
+    expect(actor.kind).toBe("ip");
+    expect(actor.userId).toBeNull();
+    expect(actor.contributorName).toBe("IP:198.51.100.7");
   });
 });

@@ -76,7 +76,7 @@ export const systems = pgTable(
     description: text("description"),
     externalUrl: text("external_url"),
     // §21.7 / §21.5 — system author for karma attribution.
-    createdByUserId: uuid("created_by_user_id"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
     contributorName: text("contributor_name").notNull().default("anonymous"),
     hidden: boolean("hidden").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -136,7 +136,7 @@ export const trails = pgTable(
     externalUrl: text("external_url"),
     lastSynthesizedAt: timestamp("last_synthesized_at", { withTimezone: true }),
     // Trail creator — for karma attribution on upvotes.
-    createdByUserId: uuid("created_by_user_id"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -218,7 +218,7 @@ export const features = pgTable(
     trailId: uuid("trail_id").references(() => trails.id, { onDelete: "set null" }),
     systemId: uuid("system_id").references(() => systems.id, { onDelete: "set null" }),
     // §21.7 — feature author for karma attribution.
-    createdByUserId: uuid("created_by_user_id"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id),
     contributorName: text("contributor_name").notNull().default("anonymous"),
     description: text("description"),
     hidden: boolean("hidden").notNull().default(false),
@@ -252,7 +252,7 @@ export const presets = pgTable(
     questions: jsonb("questions").notNull().default(sql`'[]'::jsonb`),
     upstreamable: boolean("upstreamable").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(100),
-    createdBy: uuid("created_by"),
+    createdBy: uuid("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -306,7 +306,7 @@ export const revisions = pgTable(
     revertedFromId: uuid("reverted_from_id"),
     contentMd: text("content_md"),
     contributorName: text("contributor_name").notNull().default("anonymous"),
-    authorId: uuid("author_id"),
+    authorId: uuid("author_id").references(() => users.id),
     editSummary: text("edit_summary"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -326,9 +326,7 @@ export const votes = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     targetType: text("target_type").notNull(),
     targetId: uuid("target_id").notNull(),
-    // null = anonymous vote (karma cannot be awarded for these in the
-    // backward-compatible MVP path; counted for tally but not karma).
-    userId: uuid("user_id"),
+    userId: uuid("user_id").notNull().references(() => users.id),
     value: integer("value").notNull(),
     voterKarma: doublePrecision("voter_karma").notNull().default(0),
     voterTier: text("voter_tier").notNull().default("new"),
@@ -403,7 +401,9 @@ export const gpsTraces = pgTable(
   "gps_traces",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id"),
+    userId: uuid("user_id").references(() => users.id),
+
+
     contributorName: text("contributor_name").notNull().default("anonymous"),
     geometry: multiLineString("geometry").notNull(),
     source: text("source").notNull(),
@@ -464,7 +464,9 @@ export const traceSegmentVotes = pgTable(
     segmentId: uuid("segment_id")
       .notNull()
       .references(() => gpsTraceSegments.id, { onDelete: "cascade" }),
-    userId: uuid("user_id"),
+    userId: uuid("user_id").references(() => users.id),
+
+
     trailId: uuid("trail_id").references(() => trails.id, { onDelete: "set null" }),
     // vote = +1 (agrees), -1 (disagrees). NULL trailId + vote=-1 = "propose new".
     vote: integer("vote").notNull(),

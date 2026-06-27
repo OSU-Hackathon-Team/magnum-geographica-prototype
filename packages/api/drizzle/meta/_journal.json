@@ -78,6 +78,13 @@
       "when": 1782586379613,
       "tag": "0010_trail_provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783000000000,
+      "tag": "0011_auth_restructure",
+      "breakpoints": true
     }
   ]
 }

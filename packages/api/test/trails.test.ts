@@ -47,7 +47,7 @@ describe("POST /api/trails", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         name: "X",
         slug: "x",
@@ -62,7 +62,7 @@ describe("POST /api/trails", () => {
     state.insertCalls.length = 0;
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         name: "Buckeye",
         slug: "buckeye",

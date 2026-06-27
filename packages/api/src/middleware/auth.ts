@@ -1,12 +1,12 @@
 import type { Context, MiddlewareHandler } from "hono";
 import * as jose from "jose";
+import { readClientIp } from "../services/identity.js";
+import type { TrustTier } from "@magnum/shared/constants";
 
 const JWT_SECRET_BYTES = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? process.env.ADMIN_SECRET ?? "dev-secret-change-me",
+  process.env.JWT_SECRET ?? "dev-secret-change-me",
 );
 const JWT_ALG = "HS256";
-
-export type TrustTier = "new" | "established" | "trusted" | "moderator";
 
 export interface AuthUser {
   id: string;
@@ -72,6 +72,50 @@ export function authRequired(): MiddlewareHandler {
   };
 }
 
+/**
+ * Optional auth: verifies Bearer token if present and sets `c.get("user")`,
+ * but never returns 401. Always continues to the next handler so routes
+ * can accept both authenticated and IP-attributed requests.
+ */
+export function optionalAuth(): MiddlewareHandler {
+  return async (c: Context, next) => {
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const user = await verifyToken(token);
+      if (user) {
+        c.set("user", user);
+      }
+    }
+    await next();
+  };
+}
+
+/**
+ * Requires a resolvable actor: either an authenticated user (set by
+ * optionalAuth or authRequired) or an identifiable IP address.
+ * Returns 401 only if neither is present — i.e. the request is from an
+ * unresolvable source with no token. This replaces authRequired on
+ * content-edit routes so IP users (Wikipedia-style) can contribute.
+ */
+export function actorRequired(): MiddlewareHandler {
+  return async (c: Context, next) => {
+    const user = c.get("user");
+    if (user) {
+      await next();
+      return;
+    }
+    const ip = readClientIp(c);
+    if (!ip || ip === "0.0.0.0") {
+      return c.json(
+        { error: "unauthorized", message: "login or identifiable IP required" },
+        401,
+      );
+    }
+    await next();
+  };
+}
+
 export function adminOnly(): MiddlewareHandler {
   return async (c: Context, next) => {
     const authHeader = c.req.header("Authorization");
@@ -95,18 +139,22 @@ export function adminOnly(): MiddlewareHandler {
 }
 
 /**
- * Moderator-or-higher guard. Builds on `authRequired` (so the user
- * is on the context) and rejects anyone whose tier isn't at least
- * moderator. §21.6 phase 2 routes (synthesis, promote, premium
- * import) use this — the consensus is that synthesis actions are
- * moderator-level, not just authenticated.
+ * Moderator-or-higher guard. Self-contained: performs its own
+ * Bearer-token verification and rejects anyone whose tier isn't at
+ * least moderator. Does not depend on authRequired being called first.
  */
 export function moderatorRequired(): MiddlewareHandler {
   return async (c: Context, next) => {
-    const user = c.get("user");
-    if (!user) {
+    const authHeader = c.req.header("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
       return c.json({ error: "unauthorized", message: "authentication required" }, 401);
     }
+    const token = authHeader.slice(7);
+    const user = await verifyToken(token);
+    if (!user) {
+      return c.json({ error: "unauthorized", message: "invalid or expired token" }, 401);
+    }
+    c.set("user", user);
     if (user.tier !== "moderator") {
       return c.json(
         { error: "forbidden", message: "moderator tier required" },

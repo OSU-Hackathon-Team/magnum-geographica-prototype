@@ -65,7 +65,7 @@ describe("POST /api/sync/contributions", () => {
   test("returns an empty results array when no contributions are sent", async () => {
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({ contributions: [] }),
     });
     expect(res.status).toBe(200);
@@ -77,7 +77,7 @@ describe("POST /api/sync/contributions", () => {
     const targetId = "11111111-1111-1111-1111-111111111111";
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {
@@ -111,7 +111,7 @@ describe("POST /api/sync/contributions", () => {
       .from(revisions)
       .where(eq(revisions.wikiPageId, stored[0]!.id));
     expect(revs.length).toBe(1);
-    expect(revs[0]?.contributorName).toBe("alice");
+    expect(revs[0]?.contributorName).toBe("IP:127.0.0.1");
   });
 
   test("updates a wiki_page and creates a new revision", async () => {
@@ -128,7 +128,7 @@ describe("POST /api/sync/contributions", () => {
 
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {
@@ -173,7 +173,7 @@ describe("POST /api/sync/contributions", () => {
     const headByDate = r1[r1.length - 1]; // oldest = the "base" the client claims
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {
@@ -202,7 +202,7 @@ describe("POST /api/sync/contributions", () => {
   test("creates a feature with a real point geometry", async () => {
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {
@@ -234,7 +234,7 @@ describe("POST /api/sync/contributions", () => {
   test("rejects a feature create with no coordinates", async () => {
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {
@@ -254,7 +254,7 @@ describe("POST /api/sync/contributions", () => {
     const { seg1, seg2 } = await seedTrailWithSegments();
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {
@@ -279,7 +279,7 @@ describe("POST /api/sync/contributions", () => {
     const { seg1, seg2 } = await seedTrailWithSegments();
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {
@@ -308,7 +308,7 @@ describe("POST /api/sync/contributions", () => {
   test("returns error for unknown entity types without throwing", async () => {
     const res = await buildApp().request("/api/sync/contributions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "x-forwarded-for": "127.0.0.1", "content-type": "application/json" },
       body: JSON.stringify({
         contributions: [
           {

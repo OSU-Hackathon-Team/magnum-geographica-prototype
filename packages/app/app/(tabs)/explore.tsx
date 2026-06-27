@@ -24,6 +24,7 @@ import { useBaseLayerStore } from "../../src/stores/baseLayerStore";
 import { useAuthStore } from "../../src/stores/authStore";
 import { usePresetStore } from "../../src/stores/presetStore";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { hexToRgba } from "../../src/theme/hexToRgba";
 import {
   loadOfflineMapData,
   getDownloadedRegionIds,
@@ -493,7 +494,18 @@ export default function ExploreScreen() {
         />
         <BaseLayerSwitcher layers={baseLayerDefs} testID="explore-base-layer-switcher" />
         <Pressable
-          style={[styles.heatmapToggle, showHeatmap && styles.heatmapToggleActive, { shadowColor: colors.shadow }]}
+          style={[
+            styles.heatmapToggle,
+            {
+              backgroundColor: hexToRgba(colors.surface, 0.95),
+              borderColor: hexToRgba(colors.shadow, 0.08),
+              shadowColor: colors.shadow,
+            },
+            showHeatmap && {
+              backgroundColor: colors.warningMuted,
+              borderColor: hexToRgba(colors.warning, 0.3),
+            },
+          ]}
           onPress={toggleHeatmap}
           testID="explore-heatmap-toggle"
           accessibilityLabel="Toggle trace heatmap"
@@ -507,7 +519,10 @@ export default function ExploreScreen() {
       </View>
 
       {deepLink ? (
-        <View style={styles.coordsBadge} testID="explore-coords">
+        <View
+          style={[styles.coordsBadge, { backgroundColor: hexToRgba(colors.shadow, 0.65) }]}
+          testID="explore-coords"
+        >
           <Text style={[styles.coordsText, { color: colors.textInverse }]}>
             {deepLink.lat.toFixed(4)}, {deepLink.lon.toFixed(4)} · z{deepLink.zoom}
           </Text>
@@ -567,7 +582,7 @@ export default function ExploreScreen() {
           <Text style={[styles.placingText, { color: colors.textInverse }]}>Tap on the map to place your feature</Text>
           <Pressable
             onPress={handleCancelPlacing}
-            style={styles.placingCancel}
+            style={[styles.placingCancel, { backgroundColor: hexToRgba(colors.surface, 0.2) }]}
             testID="explore-placing-cancel"
           >
             <Text style={[styles.placingCancelText, { color: colors.textInverse }]}>Cancel</Text>
@@ -578,7 +593,7 @@ export default function ExploreScreen() {
           <Text style={[styles.placingText, { color: colors.textInverse }]}>Drag to select download area</Text>
           <Pressable
             onPress={handleCancelDraw}
-            style={styles.placingCancel}
+            style={[styles.placingCancel, { backgroundColor: hexToRgba(colors.surface, 0.2) }]}
             testID="explore-draw-cancel"
           >
             <Text style={[styles.placingCancelText, { color: colors.textInverse }]}>Cancel</Text>
@@ -671,7 +686,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 24,
     alignSelf: "center",
-    backgroundColor: "rgba(0,0,0,0.65)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -765,7 +779,6 @@ const styles = StyleSheet.create({
   placingCancel: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 6,
   },
   placingCancelText: {
@@ -825,9 +838,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.95)",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
     alignItems: "center",
     justifyContent: "center",
     shadowOpacity: 0.12,
@@ -835,8 +846,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 3,
   },
-  heatmapToggleActive: {
-    backgroundColor: "rgba(255,237,213,0.95)",
-    borderColor: "rgba(249,115,22,0.3)",
-  },
+  heatmapToggleActive: {},
 });

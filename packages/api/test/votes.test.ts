@@ -11,6 +11,8 @@ mock.module("../src/db/index.js", () => ({
 }));
 
 const { castVote, retractVote, getScore } = await import("../src/services/votes.js");
+const { Hono } = await import("hono");
+const { votesRoute } = await import("../src/routes/votes.js");
 
 // Set up an "authored" feature row so karma math has a target to attribute to.
 const FEATURE_ID = "00000000-0000-0000-0000-0000000000aa";
@@ -134,18 +136,18 @@ describe("castVote", () => {
     expect(flipped.karmaAwarded).toBe(-2);
   });
 
-  test("anonymous vote tallies but does not award karma", async () => {
-    const res = await castVote({
-      targetType: "feature",
-      targetId: FEATURE_ID,
-      value: 1,
-      userId: null,
-      voterKarma: 0,
-      voterTier: "new",
-      contributorName: "anon",
+  test("unauthenticated vote returns 401", async () => {
+    const app = new Hono().route("/api/votes", votesRoute);
+    const res = await app.request("/api/votes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        target_type: "feature",
+        target_id: FEATURE_ID,
+        value: 1,
+      }),
     });
-    expect(res.upvotes).toBe(1);
-    expect(res.karmaAwarded).toBe(0);
+    expect(res.status).toBe(401);
   });
 });
 
