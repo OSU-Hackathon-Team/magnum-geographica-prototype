@@ -8,8 +8,8 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
 });
 
-test.afterEach(() => {
-  resetApi();
+test.afterEach(async () => {
+  await resetApi();
 });
 
 
@@ -60,10 +60,10 @@ test.describe("Admin — Premium import page (§21.6 phase 2)", () => {
   test("submitting valid form shows success banner with the created trail", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto(`${BASE}/admin/import`);
-    await page.getByTestId("import-name").fill("Bear Creek");
-    await page.getByTestId("import-slug").fill(`bear-creek-${Date.now().toString(36).slice(-6)}`);
-    await page.getByTestId("import-system").fill(`${FIXTURE_IDS.sys1}`);
-    await page.getByTestId("import-geojson").fill(SAMPLE_LINE);
+    await page.getByTestId("import-name").pressSequentially("Bear Creek");
+    await page.getByTestId("import-slug").pressSequentially(`bear-creek-${Date.now().toString(36).slice(-6)}`);
+    await page.getByTestId("import-system").pressSequentially(`${FIXTURE_IDS.sys1}`);
+    await page.getByTestId("import-geojson").pressSequentially(SAMPLE_LINE);
     await page.getByTestId("import-submit").click();
     await page.waitForTimeout(1000);
     await expect(page.getByTestId("import-success")).toBeVisible({ timeout: 10000 });

@@ -8,8 +8,8 @@ test.beforeEach(async ({ page }) => {
   await installApi(page);
 });
 
-test.afterEach(() => {
-  resetApi();
+test.afterEach(async () => {
+  await resetApi();
 });
 
 
@@ -66,8 +66,10 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
     await expect(rows.first()).toBeVisible({ timeout: 10000 });
     const initialCount = await rows.count();
     await rows.first().click();
-    await page.getByTestId("synthesis-name").fill("Approved Trail");
+    await expect(page.getByTestId("synthesis-name")).toBeVisible();
+    await page.getByTestId("synthesis-name").pressSequentially("Approved Trail");
     await page.getByTestId("synthesis-approve").click();
+    await page.waitForTimeout(2000);
     const newCount = await page.locator('[data-testid^="synthesis-row-"]').count();
     expect(newCount).toBe(initialCount - 1);
   });
@@ -81,7 +83,9 @@ test.describe("Admin — Synthesis proposals page (§21.6 phase 2)", () => {
     await expect(rows.first()).toBeVisible({ timeout: 10000 });
     const initialCount = await rows.count();
     await rows.first().click();
+    await expect(page.getByTestId("synthesis-reject")).toBeVisible();
     await page.getByTestId("synthesis-reject").click();
+    await page.waitForTimeout(2000);
     const newCount = await page.locator('[data-testid^="synthesis-row-"]').count();
     expect(newCount).toBe(initialCount - 1);
   });
