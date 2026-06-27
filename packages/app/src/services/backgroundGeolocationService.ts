@@ -1,6 +1,6 @@
 import { PermissionsAndroid, Platform } from "react-native";
 import { createMagnumClient } from "@magnum/shared";
-import BackgroundGeolocation, { type Config } from "react-native-background-geolocation";
+import type { BGGModule, Config } from "react-native-background-geolocation";
 import { useAuthStore } from "../stores/authStore";
 import { useTraceStore } from "../stores/traceStore";
 import { useOfflineStore } from "../stores/offlineStore";
@@ -48,18 +48,20 @@ export interface BGGLocation {
   uuid?: string;
 }
 
-let bggInstance: typeof BackgroundGeolocation | null = null;
+let bggInstance: BGGModule | null = null;
 
-function loadBGG(): typeof BackgroundGeolocation | null {
+async function loadBGG(): Promise<BGGModule | null> {
   if (Platform.OS === "web") return null;
   if (!bggInstance) {
-    bggInstance = BackgroundGeolocation;
-    console.log("[trace] BGG loaded statically, hasReady:", typeof (BackgroundGeolocation as unknown as Record<string, unknown>).ready === "function", "hasStart:", typeof (BackgroundGeolocation as unknown as Record<string, unknown>).start === "function");
+    const mod = await import("react-native-background-geolocation");
+    bggInstance = mod.default as unknown as BGGModule;
+    console.log("[trace] BGG loaded dynamically, hasReady:", typeof bggInstance.ready === "function", "hasStart:", typeof bggInstance.start === "function");
   }
   return bggInstance;
 }
 
 const SESSION_LIVE_KEY = "magnum.activeTraceSession";
+const DESIRED_ACCURACY_HIGH = 0;
 
 /**
  * Build the config for the location manager. Tuned for foot-traces
@@ -77,7 +79,7 @@ const SESSION_LIVE_KEY = "magnum.activeTraceSession";
  */
 function bggConfig(sessionId: string): Config {
   return {
-    desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
+    desiredAccuracy: DESIRED_ACCURACY_HIGH,
     distanceFilter: 2, // meters
     stopOnTerminate: false,
     startOnBoot: true,

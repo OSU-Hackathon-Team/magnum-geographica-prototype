@@ -44,7 +44,7 @@ declare module "react-native-background-geolocation" {
     extras?: Record<string, unknown>;
   }
 
-  interface BGGModule {
+  export interface BGGModule {
     ready: (config: Config) => Promise<void>;
     start: () => Promise<void>;
     stop: () => Promise<void>;
