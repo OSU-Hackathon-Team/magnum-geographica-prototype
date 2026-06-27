@@ -191,6 +191,9 @@ test.describe("Auth flow — successful login", () => {
     await page.getByTestId("register-confirm-password").fill("mypassword123");
     await page.getByTestId("register-submit").click();
 
+    // Should redirect to tabs after successful registration
+    await expect(page).toHaveURL(/\/explore$/);
+
     // Then log out
     await page.goto("/profile");
     await page.getByTestId("profile-logout").click();
@@ -210,6 +213,6 @@ test.describe("Auth flow — successful login", () => {
     // Should redirect to tabs
     await expect(page).toHaveURL(/\/explore$/);
     await page.getByRole("tab", { name: "Profile" }).click();
-    await expect(page.getByTestId("profile-username")).toHaveText("hiker99");
+    await expect(page.getByTestId("profile-username").first()).toHaveText("hiker99");
   });
 });
