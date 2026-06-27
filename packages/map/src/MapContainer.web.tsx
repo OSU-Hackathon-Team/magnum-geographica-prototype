@@ -20,7 +20,6 @@ import { applyBaseLayer } from "./layers/BaseLayer.js";
 import {
   createShapeLayer,
   rebuildShapeSource,
-  shapeHitTest,
   SHAPE_VERTEX_RADIUS,
 } from "./layers/ShapeLayer.js";
 import type { MapContainerProps } from "./types.js";
@@ -57,8 +56,28 @@ function asPixel(p: number[] | ArrayLike<number>): [number, number] {
   return [p[0] ?? 0, p[1] ?? 0] as [number, number];
 }
 
-const LONG_PRESS_MS = 250;
 const DRAG_SLOP_PX = 8;
+
+/** Squared distance from point P to segment AB in 2D. */
+function segDistSq(
+  p: [number, number],
+  a: [number, number],
+  b: [number, number],
+): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const lenSq = dx * dx + dy * dy;
+  let t = 0;
+  if (lenSq > 0) {
+    t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+  }
+  const projX = a[0] + t * dx;
+  const projY = a[1] + t * dy;
+  const ddx = p[0] - projX;
+  const ddy = p[1] - projY;
+  return ddx * ddx + ddy * ddy;
+}
 
 export default function MapContainer({
   config,
@@ -186,122 +205,177 @@ export default function MapContainer({
 
     applyBaseLayer(map, baseLayerDefs, defaultBaseLayerId);
 
-    // ── Shape-editor drag via capture-phase DOM listeners ──────────
-    // MUST use capture‑phase (3rd arg = true) so we run BEFORE OL's
-    // built‑in DragPan interaction.  On a vertex hit we stopPropagation,
-    // preventing OL from ever seeing the event.  The OL click handler
-    // below continues to handle empty‑map clicks (appendVertex),
-    // edge clicks (splitEdge / openEdge), and delete‑mode actions.
+    // ── Shape editor interactions ──────────────────────────────────
+    //
+    // Why DOM listeners instead of OL events?
+    //   OL's MapBrowserEventEmitter does NOT emit "pointerdown".
+    //   The old code used map.on("pointerdown", ...) which silently
+    //   did nothing — the handler was never called, so drag was dead.
+    //
+    //   We use capture-phase addEventListener on the viewport element
+    //   so we run BEFORE OL's own event processing.  On a vertex hit
+    //   we stopPropagation, preventing OL from ever seeing the event.
+    //
+    // Why manual hit testing instead of getFeaturesAtPixel?
+    //   getFeaturesAtPixel depends on OL having rendered the features.
+    //   After a synchronous source rebuild the rendering may not have
+    //   caught up, causing false negatives.  Manual pixel-distance
+    //   testing against the shape data is deterministic and works
+    //   immediately.
 
     const viewport = map.getViewport();
+    const HIT_RADIUS = SHAPE_VERTEX_RADIUS + 14; // 22px tap target
+
+    // Drag state
     let dragRing = -1;
     let dragVtx = -1;
     let dragDownPixel: [number, number] = [0, 0];
-    let dragTimer: ReturnType<typeof setTimeout> | null = null;
-    let dragActive = false;
+    let dragMoved = false;
 
-    function pixelFromPointer(e: PointerEvent): [number, number] {
+    function ptrPixel(e: { clientX: number; clientY: number }): [number, number] {
       const rect = viewport.getBoundingClientRect();
       return [e.clientX - rect.left, e.clientY - rect.top];
     }
 
-    viewport.addEventListener(
-      "pointerdown",
-      (e: PointerEvent) => {
-        const curShape = liveShapeRef?.current ?? shapeRef.current;
-        if (!curShape || !shapeCtx || !shapeModeRef.current) return;
-        rebuildShapeSource(shapeCtx.source, { rings: curShape.rings });
-        const pixel = pixelFromPointer(e);
-        const hit = shapeHitTest(map, shapeCtx.layer, pixel, SHAPE_VERTEX_RADIUS + 12);
-        if (hit.kind !== "vertex" || hit.ringIndex < 0) return; // let OL handle it
-
-        e.stopPropagation();
-        e.preventDefault();
-
-        if (shapeModeRef.current === "delete") {
-          onShapeActionRef.current?.({
-            type: "deleteVertex",
-            ringIndex: hit.ringIndex,
-            vertexIndex: hit.vertexIndex,
-          });
-          return;
-        }
-
-        // Normal mode — start long-press timer for potential vertex drag.
-        dragRing = hit.ringIndex;
-        dragVtx = hit.vertexIndex;
-        dragDownPixel = pixel;
-        dragActive = false;
-        dragTimer = setTimeout(() => {
-          dragTimer = null;
-          dragActive = true;
-          viewport.setPointerCapture?.(e.pointerId);
-        }, LONG_PRESS_MS);
-      },
-      true,
-    );
-
-    viewport.addEventListener(
-      "pointermove",
-      (e: PointerEvent) => {
-        if (dragRing < 0) return;
-        const pixel = pixelFromPointer(e);
-        if (dragTimer) {
-          // Cancel long-press if the finger moves beyond slop.
-          const dx = pixel[0] - dragDownPixel[0];
-          const dy = pixel[1] - dragDownPixel[1];
-          if (dx * dx + dy * dy > DRAG_SLOP_PX * DRAG_SLOP_PX) {
-            clearTimeout(dragTimer);
-            dragTimer = null;
+    /** Manual vertex hit test — projects each vertex lon/lat to a
+     *  screen pixel and checks pixel distance.  Returns the closest
+     *  vertex within HIT_RADIUS, or null. */
+    function hitVertex(
+      shape: { rings: Array<{ vertices: Array<[number, number]> }> },
+      pixel: [number, number],
+    ): { ringIndex: number; vertexIndex: number } | null {
+      let best: { ringIndex: number; vertexIndex: number; distSq: number } | null = null;
+      for (let ri = 0; ri < shape.rings.length; ri++) {
+        const ring = shape.rings[ri]!;
+        for (let vi = 0; vi < ring.vertices.length; vi++) {
+          const [lon, lat] = ring.vertices[vi]!;
+          const proj = fromLonLat([lon, lat]);
+          const vp = map.getPixelFromCoordinate(proj);
+          if (!vp) continue;
+          const dx = pixel[0] - (vp[0] ?? 0);
+          const dy = pixel[1] - (vp[1] ?? 0);
+          const distSq = dx * dx + dy * dy;
+          if (distSq <= HIT_RADIUS * HIT_RADIUS && (best === null || distSq < best.distSq)) {
+            best = { ringIndex: ri, vertexIndex: vi, distSq };
           }
-          return;
         }
-        if (!dragActive) return;
-        e.stopPropagation();
-        e.preventDefault();
-        const coord = map.getCoordinateFromPixel(pixel);
-        if (!coord) return;
-        const [lon, lat] = toLonLat(coord);
-        if (typeof lon !== "number" || typeof lat !== "number") return;
+      }
+      return best ? { ringIndex: best.ringIndex, vertexIndex: best.vertexIndex } : null;
+    }
+
+    /** Manual edge hit test — projects each edge segment to pixel
+     *  space and computes the pixel distance from the click to the
+     *  segment.  Returns the nearest edge within HIT_RADIUS. */
+    function nearestEdgePixel(
+      rings: Array<{ vertices: Array<[number, number]>; closed: boolean }>,
+      clickPx: [number, number],
+    ): { ringIndex: number; insertAfter: number; distSq: number } | null {
+      let best: { ringIndex: number; insertAfter: number; distSq: number } | null = null;
+      for (let ri = 0; ri < rings.length; ri++) {
+        const ring = rings[ri]!;
+        const n = ring.vertices.length;
+        const edgeCount = ring.closed ? n : n - 1;
+        for (let i = 0; i < edgeCount; i++) {
+          const a = ring.vertices[i]!;
+          const b = ring.vertices[(i + 1) % n]!;
+          const aPx = map.getPixelFromCoordinate(fromLonLat([a[0], a[1]]));
+          const bPx = map.getPixelFromCoordinate(fromLonLat([b[0], b[1]]));
+          if (!aPx || !bPx) continue;
+          const distSq = segDistSq(
+            clickPx,
+            [aPx[0] ?? 0, aPx[1] ?? 0],
+            [bPx[0] ?? 0, bPx[1] ?? 0],
+          );
+          if (
+            distSq <= HIT_RADIUS * HIT_RADIUS &&
+            (best === null || distSq < best.distSq)
+          ) {
+            best = { ringIndex: ri, insertAfter: i, distSq };
+          }
+        }
+      }
+      return best;
+    }
+
+    // ── pointerdown ────────────────────────────────────────────────
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      const curShape = liveShapeRef?.current ?? shapeRef.current;
+      if (!curShape || !shapeCtx || !shapeModeRef.current) return;
+
+      const pixel = ptrPixel(e);
+      const hit = hitVertex(curShape, pixel);
+      if (!hit) return; // empty map or edge — let OL handle the click
+
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (shapeModeRef.current === "delete") {
         onShapeActionRef.current?.({
-          type: "moveVertex",
-          ringIndex: dragRing,
-          vertexIndex: dragVtx,
-          lon,
-          lat,
+          type: "deleteVertex",
+          ringIndex: hit.ringIndex,
+          vertexIndex: hit.vertexIndex,
         });
-      },
-      true,
-    );
+        return;
+      }
 
-    viewport.addEventListener(
-      "pointerup",
-      () => {
-        if (dragTimer) {
-          clearTimeout(dragTimer);
-          dragTimer = null;
-          // Short click on a vertex — check for close gesture.
-          const curShape = liveShapeRef?.current ?? shapeRef.current;
-          if (dragRing >= 0) {
-            const ring = curShape?.rings[dragRing];
-            if (
-              ring &&
-              !ring.closed &&
-              dragVtx === 0 &&
-              ring.vertices.length >= 3
-            ) {
-              onShapeActionRef.current?.({ type: "closeRing" });
-            }
-          }
+      // Normal mode — start a potential drag.
+      dragRing = hit.ringIndex;
+      dragVtx = hit.vertexIndex;
+      dragDownPixel = pixel;
+      dragMoved = false;
+    };
+
+    // ── pointermove ────────────────────────────────────────────────
+    const onPointerMove = (e: PointerEvent) => {
+      if (dragRing < 0) return;
+      const pixel = ptrPixel(e);
+      if (!dragMoved) {
+        // Check if movement exceeds slop threshold to start drag.
+        const dx = pixel[0] - dragDownPixel[0];
+        const dy = pixel[1] - dragDownPixel[1];
+        if (dx * dx + dy * dy <= DRAG_SLOP_PX * DRAG_SLOP_PX) return;
+        dragMoved = true;
+        viewport.setPointerCapture?.(e.pointerId);
+      }
+      // Drag is active — move the vertex.
+      e.stopPropagation();
+      e.preventDefault();
+      const coord = map.getCoordinateFromPixel(pixel);
+      if (!coord) return;
+      const [lon, lat] = toLonLat(coord);
+      if (typeof lon !== "number" || typeof lat !== "number") return;
+      onShapeActionRef.current?.({
+        type: "moveVertex",
+        ringIndex: dragRing,
+        vertexIndex: dragVtx,
+        lon,
+        lat,
+      });
+    };
+
+    // ── pointerup ──────────────────────────────────────────────────
+    const onPointerUp = (e: PointerEvent) => {
+      if (dragRing < 0) return;
+      if (!dragMoved) {
+        // Short click on a vertex (no drag happened).
+        const curShape = liveShapeRef?.current ?? shapeRef.current;
+        const ring = curShape?.rings[dragRing];
+        if (ring && !ring.closed && dragVtx === 0 && ring.vertices.length >= 3) {
+          onShapeActionRef.current?.({ type: "closeRing" });
         }
-        dragRing = -1;
-        dragVtx = -1;
-        dragActive = false;
-      },
-      true,
-    );
+      }
+      dragRing = -1;
+      dragVtx = -1;
+      dragMoved = false;
+    };
 
-    // ── OL click handler (append, split, delete, feature select) ──
+    viewport.addEventListener("pointerdown", onPointerDown, true);
+    viewport.addEventListener("pointermove", onPointerMove, true);
+    viewport.addEventListener("pointerup", onPointerUp, true);
+    viewport.addEventListener("pointercancel", onPointerUp, true);
+
+    // ── OL click handler (append, split, delete, feature select) ───
 
     map.on("click", (evt) => {
       const curShape = liveShapeRef?.current ?? shapeRef.current;
@@ -314,29 +388,9 @@ export default function MapContainer({
         const [lon, lat] = toLonLat(coordinate);
         if (typeof lon !== "number" || typeof lat !== "number") return;
         const pixel = asPixel(map.getEventPixel(evt.originalEvent));
-        const hit = shapeHitTest(map, shapeCtx.layer, pixel, SHAPE_VERTEX_RADIUS + 12);
 
-        if (curMode === "delete") {
-          // Vertex hits are handled by the capture-phase listener;
-          // here we only care about edge clicks.
-          if (hit.kind === "edge" && hit.ringIndex >= 0) {
-            const nearest = findNearestEdge(curShape.rings, lon, lat);
-            if (nearest) {
-              onShapeActionRef.current?.({
-                type: "openEdge",
-                ringIndex: nearest.ringIndex,
-                after: nearest.insertAfter,
-              });
-            }
-            return;
-          }
-          return;
-        }
-
-        // Normal (add) mode — close gesture via proximity.
-        // Project vertex 0 of the current open ring to screen pixel
-        // and compare with the click pixel.  This works even after
-        // the map has been panned/zoomed.
+        // Close gesture: project vertex 0 of the current open ring to
+        // screen pixel and compare with the click pixel.
         {
           const openIdx = lastOpenRingIndex(curShape);
           if (openIdx >= 0) {
@@ -346,11 +400,9 @@ export default function MapContainer({
               const v0Proj = fromLonLat([v0Lon, v0Lat]);
               const v0Pixel = map.getPixelFromCoordinate(v0Proj);
               if (v0Pixel) {
-                const px = v0Pixel[0] ?? 0;
-                const py = v0Pixel[1] ?? 0;
-                const dx = pixel[0] - px;
-                const dy = pixel[1] - py;
-                if (dx * dx + dy * dy <= (SHAPE_VERTEX_RADIUS + 12) ** 2) {
+                const dx = pixel[0] - (v0Pixel[0] ?? 0);
+                const dy = pixel[1] - (v0Pixel[1] ?? 0);
+                if (dx * dx + dy * dy <= HIT_RADIUS * HIT_RADIUS) {
                   onShapeActionRef.current?.({ type: "closeRing" });
                   return;
                 }
@@ -359,24 +411,33 @@ export default function MapContainer({
           }
         }
 
-        // Vertex hits are handled by the capture-phase listener.
-        if (hit.kind === "vertex" && hit.ringIndex >= 0) {
-          return;
-        }
-        if (hit.kind === "edge" && hit.ringIndex >= 0) {
-          const nearest = findNearestEdge(curShape.rings, lon, lat);
-          if (nearest) {
+        // Vertex hits are handled by the capture-phase listeners.
+        if (hitVertex(curShape, pixel)) return;
+
+        // Edge hit → split (normal mode) or open (delete mode).
+        // Check pixel-space distance to the nearest edge segment.
+        const edgeInfo = nearestEdgePixel(curShape.rings, pixel);
+        if (edgeInfo && edgeInfo.distSq < HIT_RADIUS * HIT_RADIUS) {
+          if (curMode === "delete") {
+            onShapeActionRef.current?.({
+              type: "openEdge",
+              ringIndex: edgeInfo.ringIndex,
+              after: edgeInfo.insertAfter,
+            });
+          } else {
             onShapeActionRef.current?.({
               type: "splitEdge",
-              ringIndex: nearest.ringIndex,
-              after: nearest.insertAfter,
+              ringIndex: edgeInfo.ringIndex,
+              after: edgeInfo.insertAfter,
               lon,
               lat,
             });
           }
           return;
         }
-        // Empty map click in normal mode → append vertex.
+
+        // Empty map click → append vertex (or ignore in delete mode).
+        if (curMode === "delete") return;
         onShapeActionRef.current?.({ type: "appendVertex", lon, lat });
         return;
       }
