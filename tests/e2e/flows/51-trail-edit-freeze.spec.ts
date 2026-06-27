@@ -83,13 +83,15 @@ test.describe("Trail freeze / unfreeze (§21.6)", () => {
     });
     expect(reg.status).toBe(201);
     const { access_token } = reg.body as { access_token: string };
-    await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
+    const promote = await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
       method: "POST",
       token: access_token,
       body: { to: "elevated" },
     });
-    await page.waitForTimeout(500);
+    expect(promote.status).toBe(200);
+    await page.waitForTimeout(1000);
     await page.goto("/trail/buckeye-trail");
+    await page.waitForTimeout(1000);
     await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
     await page.getByTestId("trail-unfreeze").click();
     await page.waitForTimeout(1000);

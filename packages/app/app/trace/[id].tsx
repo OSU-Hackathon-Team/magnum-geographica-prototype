@@ -15,23 +15,23 @@ const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001"
 
 interface TraceData {
   id: string;
-  contributor_name: string;
+  contributorName: string;
   source: string;
   weight: number;
   upvotes: number;
   downvotes: number;
   status: string;
-  recorded_at: string | null;
-  created_at: string;
+  recordedAt: string | null;
+  createdAt: string;
 }
 
 interface TraceSegmentData {
   id: string;
-  trace_id: string;
-  cluster_id: number | null;
-  proposed_trail_id: string | null;
+  traceId: string;
+  clusterId: number | null;
+  proposedTrailId: string | null;
   coordinates: Array<[number, number]>;
-  created_at: string;
+  createdAt: string;
 }
 
 interface SegmentVoteData {
@@ -65,16 +65,16 @@ export default function TraceDetail() {
           const segItems: TraceSegmentData[] = (segs.items as Array<{
             id: string; trace_id: string; cluster_id: number | null;
             proposed_trail_id: string | null; geometry: { coordinates: Array<[number, number]> };
-            created_at: string;
-          }>).map((s) => ({
-            id: s.id,
-            trace_id: s.trace_id,
-            cluster_id: s.cluster_id,
-            proposed_trail_id: s.proposed_trail_id,
-            coordinates: s.geometry?.coordinates ?? [],
-            created_at: s.created_at,
-          }));
-          setSegments(segItems);
+        created_at: string;
+      }>).map((s) => ({
+        id: s.id,
+        traceId: s.trace_id ?? s.traceId,
+        clusterId: s.cluster_id ?? s.clusterId,
+        proposedTrailId: s.proposed_trail_id ?? s.proposedTrailId,
+        coordinates: s.geometry?.coordinates ?? [],
+        createdAt: s.created_at ?? s.createdAt ?? "",
+      }));
+      setSegments(segItems);
 
           // Fetch vote tallies for each segment.
           const votes: Record<string, SegmentVoteData[]> = {};
@@ -113,11 +113,11 @@ export default function TraceDetail() {
         created_at: string;
       }>).map((s) => ({
         id: s.id,
-        trace_id: s.trace_id,
-        cluster_id: s.cluster_id,
-        proposed_trail_id: s.proposed_trail_id,
+        traceId: s.trace_id ?? s.traceId,
+        clusterId: s.cluster_id ?? s.clusterId,
+        proposedTrailId: s.proposed_trail_id ?? s.proposedTrailId,
         coordinates: s.geometry?.coordinates ?? [],
-        created_at: s.created_at,
+        createdAt: s.created_at ?? s.createdAt ?? "",
       }));
       setSegments(segItems);
     } catch (e) {
@@ -151,15 +151,15 @@ export default function TraceDetail() {
     .map((s) => ({
       id: s.id,
       coordinates: s.coordinates,
-      proposed_trail_id: s.proposed_trail_id,
-      color: s.proposed_trail_id ? "#3b82f6" : "#22c55e",
+      proposed_trail_id: s.proposedTrailId,
+      color: s.proposedTrailId ? "#3b82f6" : "#22c55e",
     }));
 
   const fullCoords = segments.flatMap((s) => s.coordinates);
 
   return (
     <>
-      <Stack.Screen options={{ title: `Trace · ${trace.contributor_name}`, headerShown: true }} />
+      <Stack.Screen options={{ title: `Trace · ${trace.contributorName}`, headerShown: true }} />
       <ScrollView style={[styles.root, { backgroundColor: colors.bg }]}>
         <View style={styles.mapWrap}>
           <MapContainer
@@ -175,7 +175,7 @@ export default function TraceDetail() {
 
         <View style={styles.section}>
           <View style={styles.headerRow}>
-            <Text style={[textTokens.h2, { color: colors.text }]}>{trace.contributor_name}</Text>
+            <Text style={[textTokens.h2, { color: colors.text }]}>{trace.contributorName}</Text>
           </View>
           <View style={styles.metaRow}>
             <View style={[styles.badge, { backgroundColor: colors.surfaceMutedStrong }]}>
@@ -186,9 +186,9 @@ export default function TraceDetail() {
               />
               <Text style={[styles.badgeText, { color: colors.textMuted }]}>{trace.source}</Text>
             </View>
-            {trace.recorded_at ? (
+            {trace.recordedAt ? (
               <Text style={[styles.dateText, { color: colors.textMuted }]}>
-                {new Date(trace.recorded_at).toLocaleDateString()}
+                {new Date(trace.recordedAt).toLocaleDateString()}
               </Text>
             ) : null}
             <View style={[styles.badge, { backgroundColor: colors.surfaceMutedStrong }]}>
@@ -254,13 +254,13 @@ function SegmentCard({
         <Text style={[textTokens.bodyStrong, { color: colors.text }]}>
           Segment {seg.id.slice(0, 8)}…
         </Text>
-        {seg.proposed_trail_id ? (
+        {seg.proposedTrailId ? (
           <View style={[styles.badge, { backgroundColor: colors.surfaceMutedStrong }]}>
             <Text style={[styles.badgeText, { color: colors.primary }]}>Assigned</Text>
           </View>
         ) : null}
-        {seg.cluster_id != null ? (
-          <Text style={[styles.dateText, { color: colors.textMuted }]}>Cluster #{seg.cluster_id}</Text>
+        {seg.clusterId != null ? (
+          <Text style={[styles.dateText, { color: colors.textMuted }]}>Cluster #{seg.clusterId}</Text>
         ) : null}
       </View>
       <Text style={[styles.body, { color: colors.textSecondary }]}>
@@ -278,16 +278,16 @@ function SegmentCard({
       {showVote ? (
         <View style={[styles.votePanel, { borderTopColor: colors.border }]}>
           {/* Quick yes / no on current proposal */}
-          {seg.proposed_trail_id ? (
+          {seg.proposedTrailId ? (
             <View style={styles.voteRow}>
               <Text style={[textTokens.meta, { color: colors.textMuted }]}>
-                Proposed: {seg.proposed_trail_id.slice(0, 8)}…
+                Proposed: {seg.proposedTrailId.slice(0, 8)}…
               </Text>
               <View style={styles.voteBtns}>
-                <Button size="small" variant="ghost" onPress={() => onVoteSegment(seg.id, seg.proposed_trail_id!, 1)} disabled={voteBusy}>
+                <Button size="small" variant="ghost" onPress={() => onVoteSegment(seg.id, seg.proposedTrailId!, 1)} disabled={voteBusy}>
                   Agree (+1)
                 </Button>
-                <Button size="small" variant="ghost" onPress={() => onVoteSegment(seg.id, seg.proposed_trail_id!, -1)} disabled={voteBusy}>
+                <Button size="small" variant="ghost" onPress={() => onVoteSegment(seg.id, seg.proposedTrailId!, -1)} disabled={voteBusy}>
                   Disagree (-1)
                 </Button>
               </View>
