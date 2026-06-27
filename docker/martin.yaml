@@ -12,22 +12,40 @@ postgres:
     tables: false
     functions: false
   functions:
-    super_systems:
+    super_systems_0:
       schema: public
       function: super_systems
-    systems:
+    super_systems_1:
+      schema: public
+      function: super_systems
+    systems_0:
       schema: public
       function: systems
-    trails:
+    systems_1:
+      schema: public
+      function: systems
+    trails_0:
       schema: public
       function: trails
-    segments:
+    trails_1:
+      schema: public
+      function: trails
+    segments_0:
       schema: public
       function: segments
-    features:
+    segments_1:
+      schema: public
+      function: segments
+    features_0:
       schema: public
       function: features
-    traces_heatmap:
+    features_1:
+      schema: public
+      function: features
+    traces_heatmap_0:
+      schema: public
+      function: traces_heatmap
+    traces_heatmap_1:
       schema: public
       function: traces_heatmap
 

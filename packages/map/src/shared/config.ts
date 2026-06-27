@@ -79,32 +79,42 @@ export function resolveDefaultBaseLayerId(
   return layers.some((l) => l.id === requested) ? requested : layers[0]!.id;
 }
 
+/**
+ * Slot toggling — when data is edited, the client increments
+ * `tileVersion` and the map swaps the source slot (0 ↔ 1).  Martin
+ * sees a genuinely different source name and generates fresh tiles
+ * from PostGIS instead of returning stale ones from its LRU cache.
+ */
+export function tileUrlSlot(tileVersion: number): number {
+  return (tileVersion >>> 0) % 2;
+}
+
 export function trailsTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
-  return `${cfg.martinTilesUrl}/trails/{z}/{x}/{y}`;
+  return `${cfg.martinTilesUrl}/trails_0/{z}/{x}/{y}`;
 }
 
 export function segmentsTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
-  return `${cfg.martinTilesUrl}/segments/{z}/{x}/{y}`;
+  return `${cfg.martinTilesUrl}/segments_0/{z}/{x}/{y}`;
 }
 
 export function systemsTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
-  return `${cfg.martinTilesUrl}/systems/{z}/{x}/{y}`;
+  return `${cfg.martinTilesUrl}/systems_0/{z}/{x}/{y}`;
 }
 
 export function featuresTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
-  return `${cfg.martinTilesUrl}/features/{z}/{x}/{y}`;
+  return `${cfg.martinTilesUrl}/features_0/{z}/{x}/{y}`;
 }
 
 export function superSystemsTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
-  return `${cfg.martinTilesUrl}/super_systems/{z}/{x}/{y}`;
+  return `${cfg.martinTilesUrl}/super_systems_0/{z}/{x}/{y}`;
 }
 
 export function tracesHeatmapTileUrl(cfg: MapConfig): string | undefined {
   if (!cfg.martinTilesUrl) return undefined;
-  return `${cfg.martinTilesUrl}/traces_heatmap/{z}/{x}/{y}`;
+  return `${cfg.martinTilesUrl}/traces_heatmap_0/{z}/{x}/{y}`;
 }

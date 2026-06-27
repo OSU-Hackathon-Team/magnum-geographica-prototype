@@ -582,6 +582,7 @@ export default function MapContainer({
     if (!map || typeof tileVersion !== "number") return;
     if (prevTileVersionRef.current === tileVersion) return;
     prevTileVersionRef.current = tileVersion;
+    const slot = tileVersion % 2;
     const layers = map.getLayers().getArray();
     for (const layer of layers) {
       const src = (layer as unknown as { getSource?: () => unknown }).getSource?.();
@@ -589,8 +590,16 @@ export default function MapContainer({
         const s = src as unknown as { getUrls: () => string[]; setUrl: (url: string) => void };
         const urls = s.getUrls();
         if (urls && urls[0]) {
-          const baseUrl = urls[0].replace(/[?&]_v=\d+/, "");
-          s.setUrl(`${baseUrl}${baseUrl.includes("?") ? "&" : "?"}_v=${tileVersion}`);
+          let url = urls[0].replace(/[?&]_v=\d+/, "");
+          // Swap Martin source slot so the server sees a genuinely new
+          // source name and serves fresh PostGIS tiles.  The paired
+          // sources (systems_0 / systems_1 etc.) are defined in
+          // docker/martin.yaml and all point to the same SQL function.
+          url = url.replace(
+            /\/(super_systems|systems|trails|segments|features|traces_heatmap)_\d\//g,
+            (_: string, name: string) => `/${name}_${slot}/`,
+          );
+          s.setUrl(url);
         }
       }
     }
