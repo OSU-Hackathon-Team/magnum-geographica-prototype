@@ -1,5 +1,4 @@
-import { describe, expect, test } from "bun:test";
-import { mock } from "bun:test";
+import { describe, expect, test, mock } from "bun:test";
 import { createMockDb } from "./helpers/mockDb.js";
 
 const { db, state } = createMockDb();
@@ -8,6 +7,17 @@ mock.module("../src/db/index.js", () => ({
   db,
   pool: { end: () => Promise.resolve() },
   schema: {},
+}));
+
+// Mock auth middleware to pass through (the mock test doesn't test auth).
+mock.module("../src/middleware/auth.js", () => ({
+  authRequired: () => async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+    c.set("user", { id: "00000000-0000-4000-a000-000000000099", username: "tester", email: "test@test.com", role: "contributor", karma: 100, tier: "established" });
+    await next();
+  },
+  moderatorRequired: () => async (_c: unknown, next: () => Promise<void>) => {
+    await next();
+  },
 }));
 
 const { Hono } = await import("hono");
@@ -61,8 +71,10 @@ describe("POST /api/trails", () => {
       }),
     });
     expect(res.status).toBe(201);
-    expect(state.insertCalls.length).toBe(1);
-    const values = state.insertCalls[0]?.values as { name: string; difficulty: string };
+    expect(state.insertCalls.length).toBeGreaterThanOrEqual(1);
+    const trailInsert = state.insertCalls.find((c) => c.table === "trails");
+    expect(trailInsert).toBeDefined();
+    const values = trailInsert!.values as { name: string; difficulty: string };
     expect(values.name).toBe("Buckeye");
     expect(values.difficulty).toBe("moderate");
   });

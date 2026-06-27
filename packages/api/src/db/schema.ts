@@ -130,6 +130,11 @@ export const trails = pgTable(
     // §21.6 trail trust tier: premium (official import), elevated (frozen from
     // synthesized), or synthesized (built/maintained from GPS traces).
     tier: text("tier").notNull().default("synthesized"),
+    // §21.6 — provenance for premium/elevated trails (mirrors systems).
+    source: text("source"),
+    sourceDate: date("source_date"),
+    externalUrl: text("external_url"),
+    lastSynthesizedAt: timestamp("last_synthesized_at", { withTimezone: true }),
     // Trail creator — for karma attribution on upvotes.
     createdByUserId: uuid("created_by_user_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

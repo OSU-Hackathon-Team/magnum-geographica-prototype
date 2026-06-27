@@ -65,6 +65,34 @@ export interface MapContainerProps {
    */
   liveShapeRef?: React.RefObject<{ rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> } | null | undefined>;
   /**
+   * Line editor (open polyline paths, no closed rings). Reuses the
+   * same Shape rendering infrastructure but with path-specific
+   * gesture handling (no close gesture, startNewLine action).
+   */
+  line?: { rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> } | null;
+  lineMode?: "add" | "delete";
+  onLineAction?: (action: import("@magnum/shared").PathAction) => void;
+  liveLineRef?: React.RefObject<{ rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> } | null | undefined>;
+  /**
+   * Highlight a single trace on the map by rendering its geometry
+   * as a colored overlay. Set to null to clear.
+   */
+  highlightTrace?: {
+    id: string;
+    coordinates: Array<[number, number]>;
+    color?: string;
+  } | null;
+  /**
+   * Render trace segments as colored lines on the map, each with
+   * an id and optional trail assignment.
+   */
+  traceSegments?: Array<{
+    id: string;
+    coordinates: Array<[number, number]>;
+    proposed_trail_id?: string | null;
+    color?: string;
+  }> | null;
+  /**
    * GeoJSON geometry to fit the viewport to. When provided, the map
    * will automatically pan/zoom so the entire geometry is visible
    * with comfortable padding. Used by system/trail preview maps.

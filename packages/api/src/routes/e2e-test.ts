@@ -14,6 +14,7 @@ import { sql, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { signToken, signRefreshToken } from "../middleware/auth.js";
+import { tierFromKarma } from "../services/karma.js";
 import { APP_TABLES } from "../db/e2e.js";
 import { seedFixtures } from "../db/e2e-seed.js";
 import { FIXTURE_IDS } from "../../../../tests/e2e/fixtures/ids.js";
@@ -66,7 +67,10 @@ e2eTestRoute.post("/register", async (c) => {
   if (!user) {
     return c.json({ error: "internal", message: "failed to create user" }, 500);
   }
-  const tier = trustScore >= 500 ? "moderator" : trustScore >= 50 ? "established" : "new";
+  // Match production tierForUser: role-based moderator gate first,
+  // then karma-based tiers for everyone else.
+  const tier =
+    (role === "admin" || role === "moderator") ? "moderator" : tierFromKarma(trustScore);
   const accessToken = await signToken({
     id: user.id,
     username: user.username,

@@ -83,9 +83,14 @@ AS $$
         t.id,
         t.name,
         t.slug,
+        t.tier,
         t.difficulty,
         t.verified,
         t.length_meters::float8 AS length_m,
+        t.source,
+        t.source_date,
+        t.external_url,
+        t.last_synthesized_at,
         COALESCE(
           (SELECT ts.surface_type FROM trail_segments ts
            WHERE ts.trail_id = t.id ORDER BY ts.sort_order LIMIT 1),

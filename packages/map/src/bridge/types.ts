@@ -81,7 +81,34 @@ export type BridgeCommand =
       };
     }
   | { method: "refreshTiles"; args: { version: number } }
-  | { method: "setHeatmapVisible"; args: { visible: boolean } };
+  | { method: "setHeatmapVisible"; args: { visible: boolean } }
+  | {
+      method: "setLine";
+      args: {
+        rings: Array<{ vertices: Array<[number, number]>; closed: boolean }>;
+      };
+    }
+  | {
+      method: "setHighlightTrace";
+      args: {
+        id: string;
+        coordinates: Array<[number, number]>;
+        color?: string;
+      };
+    }
+  | { method: "clearHighlightTrace"; args: {} }
+  | {
+      method: "setTraceSegments";
+      args: {
+        segments: Array<{
+          id: string;
+          coordinates: Array<[number, number]>;
+          proposed_trail_id?: string | null;
+          color?: string;
+        }>;
+      };
+    }
+  | { method: "clearTraceSegments"; args: {} };
 
 export type BridgeEvent =
   | { type: "ready" }

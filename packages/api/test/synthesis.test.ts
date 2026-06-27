@@ -2,16 +2,18 @@
  * Synthesis service tests (§21.6 phase 2).
  *
  * Covers:
- *   - runSynthesis() inserts a synthesis_runs row, mirrors tally on
- *     trails, and returns a summary
- *   - promoteTrail() upgrades tier (synthesized → elevated)
- *   - importPremiumTrail() creates a premium trail, bypasses synthesis
+ *   - promoteTrail() transition validation + upgrade
+ *   - demoteTrail() downgrade + error cases
+ *   - importPremiumTrail() provenance + system linkage
  *   - listProposals() returns unassigned segments
- *   - approveProposal() creates a new synthesized trail + attaches the
- *     segment to it
+ *   - approveProposal() creates trail + attaches segment
  *   - rejectProposal() removes the segment
  *   - computeTraceWeight() Wilson-style math
  *   - trace floor: weight < 0.3 flips status to "ignored"
+ *
+ * Note: The full runSynthesis algorithm (DBSCAN clustering,
+ * spatial assignment, weighted centerline) requires real PostGIS
+ * and is tested in synthesis-algorithm.test.ts.
  */
 import { describe, expect, test, beforeEach, mock } from "bun:test";
 import { createMockDb } from "./helpers/mockDb.js";
@@ -44,6 +46,10 @@ function seedTrail(
     name: `Trail ${id}`,
     tier,
     geometry: null,
+    source: null,
+    sourceDate: null,
+    externalUrl: null,
+    lastSynthesizedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -89,26 +95,7 @@ beforeEach(() => {
   state.synthesisRuns.length = 0;
   state.votes.length = 0;
   state.entityStats.length = 0;
-});
-
-describe("synthesis: runSynthesis()", () => {
-  test("inserts a synthesis_runs row and returns the run", async () => {
-    seedSystem();
-    seedTrace(traceUUID(3));
-    const result = await synth.runSynthesis(traceUUID(1));
-    expect(result.run.id).toBeDefined();
-    expect(result.run.systemId).toBe(traceUUID(1));
-    expect(state.synthesisRuns.length).toBeGreaterThanOrEqual(1);
-  });
-
-  test("marks the run complete", async () => {
-    seedSystem();
-    seedTrace(traceUUID(3));
-    const result = await synth.runSynthesis(traceUUID(1));
-    const finished = state.synthesisRuns.find((r) => r.id === result.run.id);
-    expect(finished?.status).toBe("complete");
-    expect(finished?.finishedAt).toBeDefined();
-  });
+  state.trailSystems.length = 0;
 });
 
 describe("synthesis: promoteTrail()", () => {
@@ -120,22 +107,122 @@ describe("synthesis: promoteTrail()", () => {
     expect(stored?.tier).toBe("elevated");
   });
 
+  test("upgrades synthesized to premium", async () => {
+    seedTrail(traceUUID(8), "synthesized");
+    const promoted = await synth.promoteTrail(traceUUID(8), "premium");
+    expect(promoted?.tier).toBe("premium");
+  });
+
+  test("upgrades elevated to premium", async () => {
+    seedTrail(traceUUID(9), "elevated");
+    const promoted = await synth.promoteTrail(traceUUID(9), "premium");
+    expect(promoted?.tier).toBe("premium");
+  });
+
+  test("throws when promoting premium to elevated", async () => {
+    seedTrail(traceUUID(10), "premium");
+    await expect(synth.promoteTrail(traceUUID(10), "elevated")).rejects.toThrow(
+      "cannot promote from premium to elevated",
+    );
+  });
+
+  test("throws when promoting elevated to synthesized", async () => {
+    seedTrail(traceUUID(11), "elevated");
+    await expect(synth.promoteTrail(traceUUID(11), "elevated")).rejects.toThrow(
+      "cannot promote from elevated to elevated",
+    );
+  });
+
   test("returns null for unknown trail", async () => {
     const result = await synth.promoteTrail("missing", "elevated");
     expect(result).toBeNull();
   });
 });
 
+describe("synthesis: demoteTrail()", () => {
+  test("demotes elevated to synthesized", async () => {
+    seedTrail(traceUUID(12), "elevated");
+    const demoted = await synth.demoteTrail(traceUUID(12));
+    expect(demoted?.tier).toBe("synthesized");
+    const stored = state.trails.find((t) => t.id === traceUUID(12));
+    expect(stored?.tier).toBe("synthesized");
+  });
+
+  test("throws on synthesized trail", async () => {
+    seedTrail(traceUUID(13), "synthesized");
+    await expect(synth.demoteTrail(traceUUID(13))).rejects.toThrow(
+      "can only demote elevated trails",
+    );
+  });
+
+  test("throws on premium trail", async () => {
+    seedTrail(traceUUID(14), "premium");
+    await expect(synth.demoteTrail(traceUUID(14))).rejects.toThrow(
+      "can only demote elevated trails",
+    );
+  });
+
+  test("returns null for unknown trail", async () => {
+    const result = await synth.demoteTrail("missing");
+    expect(result).toBeNull();
+  });
+});
+
 describe("synthesis: importPremiumTrail()", () => {
-  test("inserts a premium trail", async () => {
+  test("inserts a premium trail with provenance", async () => {
     const trail = await synth.importPremiumTrail({
       name: "Bear Creek",
       slug: "bear-creek",
       systemId: traceUUID(1),
       geometry: { type: "LineString", coordinates: [[-120, 50], [-120.01, 50.01]] },
+      source: "NPS",
+      sourceDate: "2024-01-01",
+      externalUrl: "https://example.com",
     });
     expect(trail.tier).toBe("premium");
-    expect(state.trails.some((t) => t.slug === "bear-creek" && t.tier === "premium")).toBe(true);
+    const stored = state.trails.find((t) => t.slug === "bear-creek");
+    expect(stored?.tier).toBe("premium");
+    expect(stored?.source).toBe("NPS");
+    expect(stored?.sourceDate).toBe("2024-01-01");
+    expect(stored?.externalUrl).toBe("https://example.com");
+  });
+
+  test("creates a trail_systems row", async () => {
+    await synth.importPremiumTrail({
+      name: "Eagle Ridge",
+      slug: "eagle-ridge",
+      systemId: traceUUID(1),
+      geometry: { type: "LineString", coordinates: [[-120, 50], [-120.01, 50.01]] },
+    });
+    const link = state.trailSystems.find((ts: Record<string, unknown>) => {
+      const trailId = state.trails.find((t) => t.slug === "eagle-ridge")?.id;
+      return ts.trailId === trailId && ts.systemId === traceUUID(1);
+    });
+    expect(link).toBeDefined();
+  });
+
+  test("throws on invalid geometry", async () => {
+    await expect(
+      synth.importPremiumTrail({
+        name: "Bad Trail",
+        slug: "bad-trail",
+        systemId: traceUUID(1),
+        geometry: { type: "Point", coordinates: [0, 0] },
+      }),
+    ).rejects.toThrow("geometry must be a GeoJSON LineString or MultiLineString");
+  });
+
+  test("MultiLineString geometry works", async () => {
+    const trail = await synth.importPremiumTrail({
+      name: "Multi Trail",
+      slug: "multi-trail",
+      systemId: traceUUID(1),
+      geometry: {
+        type: "MultiLineString",
+        coordinates: [[[-120, 50], [-120.01, 50.01]], [[-119, 51], [-119.01, 51.01]]],
+      },
+    });
+    expect(trail.tier).toBe("premium");
   });
 });
 

@@ -77,6 +77,10 @@ export const FIXTURE_IDS = {
   // GPS traces (slot 200..219)
   trace1: id(200),
   trace2: id(201),
+  // GPS trace segments (slot 220..239)
+  traceSeg1: id(220),
+  traceSeg2: id(221),
+  traceSeg3: id(222),
 } as const;
 
 export const FIXTURE_SLUGS = {

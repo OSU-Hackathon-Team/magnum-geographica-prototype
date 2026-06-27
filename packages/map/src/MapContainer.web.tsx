@@ -25,6 +25,7 @@ import {
 import type { MapContainerProps } from "./types.js";
 import {
   type ShapeAction,
+  type PathAction,
   findNearestEdge,
   lastOpenRingIndex,
 } from "@magnum/shared";
@@ -95,6 +96,12 @@ export default function MapContainer({
   onShapeAction,
   liveShapeRef,
   onShapeChange: _onShapeChange,
+  line,
+  lineMode,
+  onLineAction,
+  liveLineRef,
+  highlightTrace,
+  traceSegments,
   fitGeometry,
   showHeatmap,
   systemTileVersion,
@@ -116,6 +123,9 @@ export default function MapContainer({
   const onShapeActionRef = useRef(onShapeAction);
   const shapeRef = useRef(shape);
   const shapeModeRef = useRef(shapeMode);
+  const onLineActionRef = useRef(onLineAction);
+  const lineRef = useRef(line);
+  const lineModeRef = useRef(lineMode);
   onReadyRef.current = onReady;
   onClickRef.current = onClick;
   onFeatureSelectRef.current = onFeatureSelect;
@@ -123,6 +133,9 @@ export default function MapContainer({
   onShapeActionRef.current = onShapeAction;
   shapeRef.current = shape;
   shapeModeRef.current = shapeMode;
+  onLineActionRef.current = onLineAction;
+  lineRef.current = line;
+  lineModeRef.current = lineMode;
 
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
   const baseLayerDefs = useMemo(() => resolveBaseLayers(merged), [merged]);
@@ -307,17 +320,45 @@ export default function MapContainer({
     // ── pointerdown ────────────────────────────────────────────────
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0 && e.pointerType === "mouse") return;
+      const curLine = liveLineRef?.current ?? lineRef.current;
+      const curLineMode = lineModeRef.current;
       const curShape = liveShapeRef?.current ?? shapeRef.current;
-      if (!curShape || !shapeCtx || !shapeModeRef.current) return;
+      const curShapeMode = shapeModeRef.current;
+      if (!shapeCtx) return;
+
+      if (curLine && curLineMode) {
+        const pixel = ptrPixel(e);
+        const hit = hitVertex(curLine, pixel);
+        if (!hit) return;
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (curLineMode === "delete") {
+          onLineActionRef.current?.({
+            type: "deleteVertex",
+            ringIndex: hit.ringIndex,
+            vertexIndex: hit.vertexIndex,
+          } as PathAction);
+          return;
+        }
+
+        dragRing = hit.ringIndex;
+        dragVtx = hit.vertexIndex;
+        dragDownPixel = pixel;
+        dragMoved = false;
+        return;
+      }
+
+      if (!curShape || !curShapeMode) return;
 
       const pixel = ptrPixel(e);
       const hit = hitVertex(curShape, pixel);
-      if (!hit) return; // empty map or edge — let OL handle the click
+      if (!hit) return;
 
       e.stopPropagation();
       e.preventDefault();
 
-      if (shapeModeRef.current === "delete") {
+      if (curShapeMode === "delete") {
         onShapeActionRef.current?.({
           type: "deleteVertex",
           ringIndex: hit.ringIndex,
@@ -326,7 +367,6 @@ export default function MapContainer({
         return;
       }
 
-      // Normal mode — start a potential drag.
       dragRing = hit.ringIndex;
       dragVtx = hit.vertexIndex;
       dragDownPixel = pixel;
@@ -338,38 +378,51 @@ export default function MapContainer({
       if (dragRing < 0) return;
       const pixel = ptrPixel(e);
       if (!dragMoved) {
-        // Check if movement exceeds slop threshold to start drag.
         const dx = pixel[0] - dragDownPixel[0];
         const dy = pixel[1] - dragDownPixel[1];
         if (dx * dx + dy * dy <= DRAG_SLOP_PX * DRAG_SLOP_PX) return;
         dragMoved = true;
         viewport.setPointerCapture?.(e.pointerId);
       }
-      // Drag is active — move the vertex.
       e.stopPropagation();
       e.preventDefault();
       const coord = map.getCoordinateFromPixel(pixel);
       if (!coord) return;
       const [lon, lat] = toLonLat(coord);
       if (typeof lon !== "number" || typeof lat !== "number") return;
-      onShapeActionRef.current?.({
-        type: "moveVertex",
-        ringIndex: dragRing,
-        vertexIndex: dragVtx,
-        lon,
-        lat,
-      });
+
+      const isLine = lineModeRef.current;
+      if (isLine) {
+        onLineActionRef.current?.({
+          type: "moveVertex" as const,
+          ringIndex: dragRing,
+          vertexIndex: dragVtx,
+          lon,
+          lat,
+        } as PathAction);
+      } else {
+        onShapeActionRef.current?.({
+          type: "moveVertex",
+          ringIndex: dragRing,
+          vertexIndex: dragVtx,
+          lon,
+          lat,
+        });
+      }
     };
 
     // ── pointerup ──────────────────────────────────────────────────
     const onPointerUp = (e: PointerEvent) => {
       if (dragRing < 0) return;
       if (!dragMoved) {
-        // Short click on a vertex (no drag happened).
-        const curShape = liveShapeRef?.current ?? shapeRef.current;
-        const ring = curShape?.rings[dragRing];
-        if (ring && !ring.closed && dragVtx === 0 && ring.vertices.length >= 3) {
-          onShapeActionRef.current?.({ type: "closeRing" });
+        // Short click on a vertex (no drag). Close-ring for shape
+        // mode only (line mode has no close gesture).
+        if (!lineModeRef.current) {
+          const curShape = liveShapeRef?.current ?? shapeRef.current;
+          const ring = curShape?.rings[dragRing];
+          if (ring && !ring.closed && dragVtx === 0 && ring.vertices.length >= 3) {
+            onShapeActionRef.current?.({ type: "closeRing" });
+          }
         }
       }
       dragRing = -1;
@@ -387,8 +440,48 @@ export default function MapContainer({
     map.on("click", (evt) => {
       const curShape = liveShapeRef?.current ?? shapeRef.current;
       const curMode = shapeModeRef.current;
+      const curLine = liveLineRef?.current ?? lineRef.current;
+      const curLineMode = lineModeRef.current;
 
-      // Shape editor hit-test takes priority when editor is active.
+      // ── Line editor hit-test ─────────────────────────────────────
+      if (curLine && shapeCtx && curLineMode) {
+        rebuildShapeSource(shapeCtx.source, { rings: curLine.rings });
+        const coordinate = evt.coordinate;
+        const [lon, lat] = toLonLat(coordinate);
+        if (typeof lon !== "number" || typeof lat !== "number") return;
+        const pixel = asPixel(map.getEventPixel(evt.originalEvent));
+
+        // Vertex hits are handled by capture-phase listeners (pointerdown).
+        if (hitVertex(curLine, pixel)) return;
+
+        // Edge hit → split (add mode), no-op (delete mode).
+        const edgeInfo = nearestEdgePixel(curLine.rings, pixel);
+        if (edgeInfo && edgeInfo.distSq < HIT_RADIUS * HIT_RADIUS) {
+          if (curLineMode === "delete") {
+            onLineActionRef.current?.({
+              type: "deleteVertex",
+              ringIndex: edgeInfo.ringIndex,
+              vertexIndex: edgeInfo.insertAfter + 1,
+            });
+          } else {
+            onLineActionRef.current?.({
+              type: "splitEdge",
+              ringIndex: edgeInfo.ringIndex,
+              after: edgeInfo.insertAfter,
+              lon,
+              lat,
+            });
+          }
+          return;
+        }
+
+        // Empty map click → append (add mode), no-op (delete mode).
+        if (curLineMode === "delete") return;
+        onLineActionRef.current?.({ type: "appendVertex", lon, lat });
+        return;
+      }
+
+      // ── Shape editor hit-test takes priority when editor is active. ──
       if (curShape && shapeCtx && curMode) {
         rebuildShapeSource(shapeCtx.source, { rings: curShape.rings });
         const coordinate = evt.coordinate;
@@ -535,10 +628,9 @@ export default function MapContainer({
   }, [baseLayerId]);
 
   // Re-render the shape source whenever the host's shape prop
-  // changes. We rely on the ShapeLayer being created in the mount
-  // effect above and stashed on the map instance.
+  // changes, or when the line prop changes (they share the same layer).
   // Also disable all map interactions (DragPan, zoom, etc.) when
-  // shape editing is active so clicks never shift the view.
+  // shape or line editing is active so clicks never shift the view.
   useEffect(() => {
     const map = mapRef.current as unknown as
       | (Map & {
@@ -549,7 +641,10 @@ export default function MapContainer({
     const shapeCtx = map?.__shapeCtx;
     const systemsLayer = map?.__systemsLayer;
     if (!shapeCtx) return;
-    if (!shape) {
+
+    const activeShape = line ?? shape;
+    const active = !!activeShape;
+    if (!active) {
       shapeCtx.source.clear();
       shapeCtx.layer.setVisible(false);
       if (systemsLayer) systemsLayer.setVisible(true);
@@ -561,12 +656,99 @@ export default function MapContainer({
     }
     shapeCtx.layer.setVisible(true);
     if (systemsLayer) systemsLayer.setVisible(false);
-    rebuildShapeSource(shapeCtx.source, shape);
+    rebuildShapeSource(shapeCtx.source, activeShape);
     const interactions = map?.getInteractions().getArray();
     if (interactions) {
       for (const ix of interactions) ix.setActive(false);
     }
-  }, [shape]);
+  }, [shape, line]);
+
+  // Trace highlight overlay effect.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const highlightLayer = (map as unknown as { __highlightTraceLayer?: VectorLayer }).__highlightTraceLayer;
+    if (!highlightLayer && !highlightTrace) return;
+
+    // Lazy-create the highlight layer.
+    let hl: VectorLayer;
+    if (!highlightTrace) {
+      hl = (map as unknown as { __highlightTraceLayer: VectorLayer }).__highlightTraceLayer!;
+      hl.getSource()?.clear();
+      hl.setVisible(false);
+      return;
+    }
+    if (!highlightLayer) {
+      const src = new VectorSource();
+      hl = new VectorLayer({
+        source: src,
+        style: new Style({
+          stroke: new Stroke({ color: "#f59e0b", width: 6, lineCap: "round" }),
+        }),
+        zIndex: 999,
+      });
+      (map as unknown as { __highlightTraceLayer: VectorLayer }).__highlightTraceLayer = hl;
+      map.addLayer(hl);
+    } else {
+      hl = highlightLayer;
+    }
+    hl.setVisible(true);
+    const src = hl.getSource()!;
+    src.clear();
+    if (highlightTrace.coordinates.length >= 2) {
+      const coords = highlightTrace.coordinates.map(([lon, lat]) => fromLonLat([lon, lat]));
+      hl.setStyle(new Style({
+        stroke: new Stroke({ color: highlightTrace.color ?? "#f59e0b", width: 6, lineCap: "round" }),
+      }));
+      src.addFeature(new Feature({ geometry: new LineString(coords) }));
+    }
+  }, [highlightTrace]);
+
+  // Trace segments overlay effect.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const segLayer = (map as unknown as { __traceSegmentsLayer?: VectorLayer }).__traceSegmentsLayer;
+    if (!segLayer && !traceSegments) return;
+
+    let sl: VectorLayer;
+    if (!traceSegments) {
+      sl = (map as unknown as { __traceSegmentsLayer: VectorLayer }).__traceSegmentsLayer!;
+      sl.getSource()?.clear();
+      sl.setVisible(false);
+      return;
+    }
+    if (!segLayer) {
+      const src = new VectorSource();
+      sl = new VectorLayer({
+        source: src,
+        style: (feature) => {
+          const hasProposal = !!feature.get("proposed_trail_id");
+          const color = (feature.get("color") as string) ?? (hasProposal ? "#3b82f6" : "#22c55e");
+          return new Style({
+            stroke: new Stroke({ color, width: 4, lineCap: "round", lineDash: hasProposal ? [8, 6] : undefined }),
+          });
+        },
+        zIndex: 998,
+      });
+      (map as unknown as { __traceSegmentsLayer: VectorLayer }).__traceSegmentsLayer = sl;
+      map.addLayer(sl);
+    } else {
+      sl = segLayer;
+    }
+    sl.setVisible(true);
+    const src = sl.getSource()!;
+    src.clear();
+    for (const seg of traceSegments) {
+      if (seg.coordinates.length < 2) continue;
+      const coords = seg.coordinates.map(([lon, lat]) => fromLonLat([lon, lat]));
+      const feat = new Feature({ geometry: new LineString(coords) });
+      feat.set("proposed_trail_id", seg.proposed_trail_id ?? null);
+      feat.set("color", seg.color ?? null);
+      feat.setId(seg.id);
+      src.addFeature(feat);
+    }
+  }, [traceSegments]);
 
   const lastFlyToRef = useRef<{ lon: number; lat: number; zoom?: number } | null>(null);
   useEffect(() => {

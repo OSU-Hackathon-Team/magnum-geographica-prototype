@@ -46,6 +46,7 @@ export interface MockState {
   subSystems: Array<Record<string, unknown>>;
   systemSuperSystems: Array<Record<string, unknown>>;
   trailSubSystems: Array<Record<string, unknown>>;
+  trailSystems: Array<Record<string, unknown>>;
   trails: Array<Record<string, unknown>>;
   features: Array<Record<string, unknown>>;
   wikiPages: Array<Record<string, unknown>>;
@@ -316,6 +317,8 @@ function pickTableArray(state: MockState, tableName: string): Array<Record<strin
       return state.systemSuperSystems;
     case "trail_sub_systems":
       return state.trailSubSystems;
+    case "trail_systems":
+      return state.trailSystems;
     case "trails":
       return state.trails;
     case "features":
@@ -474,6 +477,7 @@ export function createMockDb(): { db: Database; state: MockState } {
     subSystems: [],
     systemSuperSystems: [],
     trailSubSystems: [],
+    trailSystems: [],
     trails: [],
     features: [],
     wikiPages: [],

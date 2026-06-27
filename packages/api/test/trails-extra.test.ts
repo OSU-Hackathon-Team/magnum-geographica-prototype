@@ -9,12 +9,25 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { setupRealDb } from "./helpers/db.js";
 import { trailsRoute } from "../src/routes/trails.js";
-import { systems, trails, trailSystems, features } from "../src/db/schema.js";
+import { systems, trails, trailSystems, features, users } from "../src/db/schema.js";
+import { signToken } from "../src/middleware/auth.js";
 
 const { db, reset } = setupRealDb();
 
+const TEST_USER = {
+  id: "00000000-0000-4000-a000-000000000099",
+  username: "tester",
+  email: "test@test.com",
+  role: "contributor",
+  karma: 100,
+  tier: "established" as const,
+};
+
+let authToken: string;
+
 beforeEach(async () => {
   await reset();
+  authToken = await signToken(TEST_USER);
 });
 
 const buildApp = () => new Hono().route("/api/trails", trailsRoute);
@@ -173,7 +186,7 @@ describe("POST /api/trails", () => {
   test("rejects an invalid difficulty with 400 and does not insert", async () => {
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${authToken}` },
       body: JSON.stringify({
         name: "X",
         slug: "x",
@@ -188,7 +201,7 @@ describe("POST /api/trails", () => {
   test("accepts a valid trail and inserts it with all fields", async () => {
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${authToken}` },
       body: JSON.stringify({
         name: "Buckeye",
         slug: "buckeye",
@@ -211,7 +224,7 @@ describe("POST /api/trails", () => {
     await seedTrail();
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${authToken}` },
       body: JSON.stringify({ name: "Other", slug: "buckeye" }),
     });
     // The route does not catch the unique-constraint violation, so
@@ -231,7 +244,7 @@ describe("POST /api/trails", () => {
     const sys = await seedSystem();
     const res = await buildApp().request("/api/trails", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: `Bearer ${authToken}` },
       body: JSON.stringify({
         name: "Buckeye",
         slug: "buckeye",

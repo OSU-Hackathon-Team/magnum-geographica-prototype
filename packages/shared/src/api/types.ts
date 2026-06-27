@@ -3,6 +3,7 @@ import {
   createSystemInputSchema,
   updateSystemInputSchema,
   createTrailInputSchema,
+  updateTrailInputSchema,
   createFeatureInputSchema,
   createWikiPageInputSchema,
   updateWikiPageInputSchema,
@@ -24,6 +25,7 @@ import {
 export type CreateSystemInput = z.infer<typeof createSystemInputSchema>;
 export type UpdateSystemInput = z.infer<typeof updateSystemInputSchema>;
 export type CreateTrailInput = z.infer<typeof createTrailInputSchema>;
+export type UpdateTrailInput = z.infer<typeof updateTrailInputSchema>;
 export type CreateFeatureInput = z.infer<typeof createFeatureInputSchema>;
 export type UpdateFeatureInput = z.infer<typeof updateFeatureInputSchema>;
 export type CreateWikiPageInput = z.infer<typeof createWikiPageInputSchema>;

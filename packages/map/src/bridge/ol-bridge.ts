@@ -41,6 +41,16 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.refreshTiles(${json});`;
     case "setHeatmapVisible":
       return `window.olBridge.setHeatmapVisible(${json});`;
+    case "setLine":
+      return `window.olBridge.setLine(${json});`;
+    case "setHighlightTrace":
+      return `window.olBridge.setHighlightTrace(${json});`;
+    case "clearHighlightTrace":
+      return `window.olBridge.clearHighlightTrace();`;
+    case "setTraceSegments":
+      return `window.olBridge.setTraceSegments(${json});`;
+    case "clearTraceSegments":
+      return `window.olBridge.clearTraceSegments();`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -70,6 +80,11 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "fitBounds",
     "refreshTiles",
     "setHeatmapVisible",
+    "setLine",
+    "setHighlightTrace",
+    "clearHighlightTrace",
+    "setTraceSegments",
+    "clearTraceSegments",
   ].includes(method);
 }
 

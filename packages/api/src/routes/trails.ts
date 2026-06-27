@@ -2,19 +2,29 @@ import { Hono } from "hono";
 import { eq, and, ilike, sql, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { trails, trailSystems, trailSegments, features } from "../db/schema.js";
-import { createTrailInputSchema } from "@magnum/shared";
+import { createTrailInputSchema, updateTrailInputSchema } from "@magnum/shared";
+import { authRequired, type AuthUser } from "../middleware/auth.js";
+import { recordRevision } from "../services/revisions.js";
+import { resolveContributorName } from "../services/identity.js";
 
-export const trailsRoute = new Hono();
+type Variables = { user?: AuthUser };
+
+export const trailsRoute = new Hono<{ Variables: Variables }>();
 
 const baseTrailSelect = {
   id: trails.id,
   name: trails.name,
   slug: trails.slug,
+  tier: trails.tier,
   description: trails.description,
   difficulty: trails.difficulty,
   length_meters: trails.lengthMeters,
   elevation_gain_meters: trails.elevationGainMeters,
   verified: trails.verified,
+  source: trails.source,
+  source_date: trails.sourceDate,
+  external_url: trails.externalUrl,
+  last_synthesized_at: trails.lastSynthesizedAt,
   created_at: trails.createdAt,
   updated_at: trails.updatedAt,
 } as const;
@@ -170,7 +180,10 @@ trailsRoute.get("/:id/features", async (c) => {
   return c.json({ items, total: items.length });
 });
 
-trailsRoute.post("/", async (c) => {
+trailsRoute.post("/", authRequired(), async (c) => {
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+
   const body = await c.req.json().catch(() => null);
   const parsed = createTrailInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -189,8 +202,116 @@ trailsRoute.post("/", async (c) => {
       difficulty: parsed.data.difficulty ?? null,
       lengthMeters: parsed.data.length_meters ?? null,
       elevationGainMeters: parsed.data.elevation_gain_meters ?? null,
+      createdByUserId: authUser.id,
     })
     .returning();
 
-  return c.json(rows[0], 201);
+  const trail = rows[0];
+  if (!trail) return c.json({ error: "internal" }, 500);
+
+  await recordRevision({
+    targetType: "trail",
+    targetId: trail.id,
+    action: "create",
+    actorId: authUser.id,
+    contributorName: resolveContributorName(c),
+    editSummary: `Created trail "${trail.name}"`,
+    payloadAfter: { name: trail.name, slug: trail.slug, difficulty: trail.difficulty },
+  });
+
+  return c.json(trail, 201);
+});
+
+trailsRoute.put("/:id", authRequired(), async (c) => {
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+  const id = c.req.param("id");
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateTrailInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_input", message: "validation failed", details: parsed.error.flatten() },
+      400,
+    );
+  }
+
+  const [existing] = await db
+    .select({ id: trails.id, tier: trails.tier })
+    .from(trails)
+    .where(eq(trails.id, id))
+    .limit(1);
+  if (!existing) return c.json({ error: "not_found", message: `trail ${id} not found` }, 404);
+
+  const updates: Record<string, unknown> = {};
+  if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+  if (parsed.data.description !== undefined) updates.description = parsed.data.description;
+  if (parsed.data.difficulty !== undefined) updates.difficulty = parsed.data.difficulty;
+  if (parsed.data.length_meters !== undefined) updates.lengthMeters = parsed.data.length_meters;
+  if (parsed.data.elevation_gain_meters !== undefined)
+    updates.elevationGainMeters = parsed.data.elevation_gain_meters;
+  if (parsed.data.verified !== undefined) updates.verified = parsed.data.verified;
+  if (parsed.data.source !== undefined) updates.source = parsed.data.source;
+  if (parsed.data.source_date !== undefined) updates.sourceDate = parsed.data.source_date;
+  if (parsed.data.external_url !== undefined) updates.externalUrl = parsed.data.external_url;
+
+  if (Object.keys(updates).length === 0) {
+    return c.json({ error: "invalid_input", message: "no fields to update" }, 400);
+  }
+  updates.updatedAt = sql`now()`;
+
+  const updated = await db
+    .update(trails)
+    .set(updates as Partial<typeof trails.$inferInsert>)
+    .where(eq(trails.id, id))
+    .returning();
+
+  if (updated.length === 0)
+    return c.json({ error: "not_found", message: `trail ${id} not found` }, 404);
+
+  await recordRevision({
+    targetType: "trail",
+    targetId: id,
+    action: "update",
+    actorId: authUser.id,
+    contributorName: resolveContributorName(c),
+    editSummary: `Updated trail metadata`,
+    payloadAfter: updates,
+  });
+
+  const rows = await db
+    .select(baseTrailSelectWithCenter)
+    .from(trails)
+    .where(eq(trails.id, id))
+    .limit(1);
+  return c.json(withCenter(rows[0]!));
+});
+
+trailsRoute.delete("/:id", authRequired(), async (c) => {
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+  const id = c.req.param("id");
+
+  const [trail] = await db
+    .select({ id: trails.id, name: trails.name, tier: trails.tier })
+    .from(trails)
+    .where(eq(trails.id, id))
+    .limit(1);
+  if (!trail) return c.json({ error: "not_found", message: `trail ${id} not found` }, 404);
+
+  // Premium trails can only be deleted by moderators+.
+  if (trail.tier === "premium" && authUser.tier !== "moderator") {
+    return c.json({ error: "forbidden", message: "premium trails require moderator permission to delete" }, 403);
+  }
+
+  await db.delete(trails).where(eq(trails.id, id));
+  await recordRevision({
+    targetType: "trail",
+    targetId: id,
+    action: "delete",
+    actorId: authUser.id,
+    contributorName: resolveContributorName(c),
+    editSummary: `Deleted trail "${trail.name}"`,
+  });
+  return c.json({ ok: true });
 });

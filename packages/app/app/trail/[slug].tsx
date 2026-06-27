@@ -1,6 +1,6 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
 import {
@@ -63,6 +63,8 @@ export default function TrailDetail() {
   const [wikiPage, setWikiPage] = useState<WikiPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [freezing, setFreezing] = useState(false);
+  const [unfreezing, setUnfreezing] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [splittingId, setSplittingId] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export default function TrailDetail() {
   const isOnline = useOfflineStore((s) => s.isOnline);
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
+  const token = useAuthStore((s) => s.token);
 
   const refreshSegments = useCallback(
     async (trailId: string) => {
@@ -224,6 +227,36 @@ export default function TrailDetail() {
         .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"));
     }, [slug, isOnline]),
   );
+
+  const handleFreeze = async (trailId: string) => {
+    setFreezing(true);
+    try {
+      const client = createMagnumClient(API_URL, {
+        getAuthToken: () => token ?? undefined,
+      });
+      await client.promoteTrail(trailId, "elevated");
+      if (trail) setTrail({ ...trail, tier: "elevated" });
+    } catch (e) {
+      Alert.alert("Freeze failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setFreezing(false);
+    }
+  };
+
+  const handleUnfreeze = async (trailId: string) => {
+    setUnfreezing(true);
+    try {
+      const client = createMagnumClient(API_URL, {
+        getAuthToken: () => token ?? undefined,
+      });
+      await client.demoteTrail(trailId);
+      if (trail) setTrail({ ...trail, tier: "synthesized" });
+    } catch (e) {
+      Alert.alert("Unfreeze failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setUnfreezing(false);
+    }
+  };
 
   const handleSegmentUpdate = async (id: string, body: UpdateSegmentInput) => {
     if (!trail) return;
@@ -507,6 +540,38 @@ export default function TrailDetail() {
             {trail.difficulty ? <DifficultyBadge difficulty={trail.difficulty} /> : null}
             {trail.tier ? <TrailTierBadge tier={trail.tier} /> : null}
           </View>
+          {/* Actions bar: Edit Details, Freeze/Demote */}
+          <View style={styles.actionsRow} testID="trail-actions">
+            <Button
+              variant="ghost"
+              size="small"
+              onPress={() => router.push(`/trail/${trail.slug}/edit` as never)}
+              testID="trail-edit-details"
+            >
+              Edit Details
+            </Button>
+            {trail.tier === "synthesized" ? (
+              <Button
+                variant="ghost"
+                size="small"
+                onPress={() => handleFreeze(trail.id)}
+                disabled={freezing}
+                testID="trail-freeze"
+              >
+                {freezing ? "Freezing…" : "Freeze"}
+              </Button>
+            ) : trail.tier === "elevated" ? (
+              <Button
+                variant="ghost"
+                size="small"
+                onPress={() => handleUnfreeze(trail.id)}
+                disabled={unfreezing}
+                testID="trail-unfreeze"
+              >
+                {unfreezing ? "Unfreezing…" : "Unfreeze"}
+              </Button>
+            ) : null}
+          </View>
           <View style={styles.statsRow} testID="trail-stats">
             {trail.length_meters ? (
               <Text style={[styles.stat, { color: colors.textMuted }]} testID="trail-length">
@@ -660,6 +725,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 14, lineHeight: 20 },
   meta: { fontSize: 12 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  actionsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   statsRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 4 },
   stat: { fontSize: 12 },
   cardTitle: { fontSize: 15, fontWeight: "600" },

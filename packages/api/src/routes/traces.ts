@@ -302,8 +302,8 @@ tracesRoute.delete("/:id/vote", authRequired(), async (c) => {
 
 /**
  * Wiki-style segment → trail marking (§21.6).
- * - `trail_id: null` + `vote: -1` = "propose new trail" (downvote + null)
- * - `trail_id: <uuid>` + `vote: +1` = "this segment is part of <trail>"
+ * - `trail_id: null` + `vote: +1` = "propose new trail"
+ * - `trail_id: <uuid>` + `vote: +1` = "this segment IS part of <trail>"
  * - `trail_id: <uuid>` + `vote: -1` = "this segment is NOT part of <trail>"
  */
 export const traceSegmentsRoute = new Hono<{ Variables: Variables }>();
@@ -320,12 +320,8 @@ traceSegmentsRoute.post("/:id/vote", authRequired(), async (c) => {
       400,
     );
   }
-  // The plan also asks for a `vote` value; we let trail_id=null mean
-  // "propose new" (implicit -1) and trail_id set mean "agrees" (+1).
-  // The route stores the vote as +1/-1 in trace_segment_votes.
-  const vote = parsed.data.trail_id ? 1 : -1;
-  // Attribute the segment vote to the authenticated user; never trust
-  // the body.
+  // Default vote to +1 (agree or propose-new); explicit -1 means "disagree".
+  const vote = parsed.data.vote ?? 1;
   await db
     .execute(
       sql`INSERT INTO trace_segment_votes (segment_id, user_id, trail_id, vote, contributor_name)
@@ -339,4 +335,23 @@ traceSegmentsRoute.post("/:id/vote", authRequired(), async (c) => {
       );
     });
   return c.json({ ok: true, segment_id: segmentId, trail_id: parsed.data.trail_id, vote });
+});
+
+traceSegmentsRoute.get("/:id/votes", async (c) => {
+  const segmentId = c.req.param("id");
+  const rows = await db.execute<{
+    trail_id: string | null;
+    vote: number;
+    count: number;
+  }>(
+    sql`SELECT trail_id, vote, COUNT(*)::int AS count
+        FROM trace_segment_votes
+        WHERE segment_id = ${segmentId}
+        GROUP BY trail_id, vote`,
+  );
+  return c.json({
+    segment_id: segmentId,
+    votes: rows.rows,
+    total: (rows.rows as Array<{ count: number }>).reduce((s, r) => s + r.count, 0),
+  });
 });

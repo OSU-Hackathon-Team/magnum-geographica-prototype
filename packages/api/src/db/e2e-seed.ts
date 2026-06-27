@@ -179,6 +179,7 @@ export async function seedFixtures(
       lengthMeters: 2324200,
       elevationGainMeters: 8500,
       verified: true,
+      tier: "synthesized",
       geometry: sql.raw(`ST_Multi(ST_GeomFromText('LINESTRING(-82.54 39.43, -82.55 39.45, -82.56 39.47)', 4326))`),
       createdByUserId: ids.user100,
     },
@@ -191,6 +192,7 @@ export async function seedFixtures(
       lengthMeters: 154500,
       elevationGainMeters: 200,
       verified: true,
+      tier: "elevated",
       geometry: sql.raw(`ST_Multi(ST_GeomFromText('LINESTRING(-81.56 41.28, -81.57 41.27, -81.58 41.26)', 4326))`),
       createdByUserId: ids.user100,
     },
@@ -203,6 +205,9 @@ export async function seedFixtures(
       lengthMeters: 6400,
       elevationGainMeters: 180,
       verified: false,
+      tier: "premium",
+      source: "NPS",
+      sourceDate: "2024-01-01",
       geometry: sql.raw(`ST_Multi(ST_GeomFromText('LINESTRING(-82.54 39.43, -82.55 39.44, -82.56 39.45)', 4326))`),
       createdByUserId: ids.user100,
     },
@@ -363,4 +368,35 @@ export async function seedFixtures(
       { traceId: ids.trace1, systemId: ids.sys1 },
       { traceId: ids.trace2, systemId: ids.sys1 },
     ]);
+
+  // --- Trace segments (server-cut for trace1) ---------------------
+  await db.insert(schema.gpsTraceSegments).values([
+    {
+      id: ids.traceSeg1,
+      traceId: ids.trace1,
+      geometry: sql.raw(
+        `ST_Multi(ST_GeomFromText('LINESTRING(-82.5412 39.4342, -82.5408 39.4348)', 4326))`,
+      ),
+      clusterId: 1,
+      proposedTrailId: ids.trail1,
+    },
+    {
+      id: ids.traceSeg2,
+      traceId: ids.trace1,
+      geometry: sql.raw(
+        `ST_Multi(ST_GeomFromText('LINESTRING(-82.5408 39.4348, -82.5405 39.4355)', 4326))`,
+      ),
+      clusterId: 1,
+      proposedTrailId: ids.trail1,
+    },
+    {
+      id: ids.traceSeg3,
+      traceId: ids.trace1,
+      geometry: sql.raw(
+        `ST_Multi(ST_GeomFromText('LINESTRING(-82.5405 39.4355, -82.5398 39.4368)', 4326))`,
+      ),
+      clusterId: 2,
+      proposedTrailId: null,
+    },
+  ]);
 }

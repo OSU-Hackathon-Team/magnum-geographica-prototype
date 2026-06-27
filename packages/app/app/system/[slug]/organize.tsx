@@ -207,11 +207,16 @@ export default function SystemOrganize() {
             style={({ pressed }) => [styles.row, { borderBottomColor: colors.divider }, pressed && { backgroundColor: colors.surfaceMutedStrong }]}
             testID={`proposal-${p.id}`}
           >
-            <View style={styles.rowMain}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Cluster #{p.cluster_id ?? "?"}</Text>
-              <Text style={[styles.rowSub, { color: colors.textMuted }]}>Trace {p.trace_id.slice(0, 8)}…</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <View style={styles.rowMain}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Cluster #{p.cluster_id ?? "?"}</Text>
+                <Text style={[styles.rowSub, { color: colors.textMuted }]}>Trace {p.trace_id.slice(0, 8)}…</Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                <Button variant="ghost" size="small" onPress={() => router.push(`/trace/${p.trace_id}` as never)}>
+                  View
+                </Button>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </View>
           </Pressable>
         ))}
       </ScrollView>

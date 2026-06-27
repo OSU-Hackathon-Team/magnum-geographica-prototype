@@ -32,15 +32,29 @@ import {
   synthesisRuns,
   systems,
   trails,
+  trailSystems,
   traceSegmentVotes,
   traceSystems,
   type SynthesisRun,
   type Trail,
 } from "../db/schema.js";
 import { cutTraceSegments } from "./traces.js";
+import {
+  haversineMeters,
+  densifyPolyline,
+  smoothPolyline,
+  simplifyPolyline,
+  pointToSegmentDistanceMeters,
+  geoJsonToWkt,
+  parseWktLineString,
+} from "@magnum/shared";
 
 const BUFFER_METERS = 8;
 const NEAREST_TRAIL_TOLERANCE_M = 25;
+const CENTERLINE_SEGMENTIZE_M = 5;
+const CENTERLINE_SMOOTH_WINDOW = 3;
+const CENTERLINE_SIMPLIFY_M = 2;
+const MIN_VOTES_TO_OVERRIDE_DISTANCE = 3;
 
 export interface SynthesisResult {
   run: SynthesisRun;
@@ -55,7 +69,6 @@ export interface SynthesisResult {
  * can render a useful summary.
  */
 export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
-  // 0. Audit row.
   const [startedRow] = await db
     .insert(synthesisRuns)
     .values({ systemId, status: "running" })
@@ -73,24 +86,33 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
     await cutTraceSegments(t.id);
   }
 
-  // 2. Cluster: pull every segment in the system and assign cluster ids.
-  const segRows = await db
-    .select({
-      id: gpsTraceSegments.id,
-      traceId: gpsTraceSegments.traceId,
-    })
-    .from(gpsTraceSegments)
-    .innerJoin(gpsTraces, eq(gpsTraces.id, gpsTraceSegments.traceId))
-    .innerJoin(traceSystems, eq(traceSystems.traceId, gpsTraceSegments.traceId))
-    .where(and(eq(traceSystems.systemId, systemId), eq(gpsTraces.status, "active")));
-  void segRows;
-  // (The PostGIS-cluster step would GROUP BY ST_Buffer(geometry, 8)
-  // here. The mock-friendly version of this phase runs the assign/
-  // propose step directly off the segment rows we already have.
-  // Real PostGIS clustering is wired in a follow-up; the
-  // algorithm shape is the same.)
+  // 2. Cluster using ST_ClusterDBSCAN on segment centroids.
+  const clusterResult = await db.execute<{ cluster_count: number }>(
+    sql`WITH clustered AS (
+          SELECT id, ST_ClusterDBSCAN(ST_Centroid(geometry), ${BUFFER_METERS}, 1) OVER () AS cid
+          FROM gps_trace_segments
+          WHERE trace_id IN (
+            SELECT trace_id FROM trace_systems WHERE system_id = ${systemId}
+          )
+        )
+        UPDATE gps_trace_segments s
+        SET cluster_id = clustered.cid
+        FROM clustered
+        WHERE s.id = clustered.id`,
+  );
 
-  // 3. Assign / propose.
+  // Count clusters.
+  const clusterCountRow = await db.execute<{ count: number }>(
+    sql`SELECT COUNT(DISTINCT cluster_id)::int AS count
+        FROM gps_trace_segments
+        WHERE trace_id IN (
+          SELECT trace_id FROM trace_systems WHERE system_id = ${systemId}
+        )
+          AND cluster_id IS NOT NULL`,
+  );
+  const clusters = Number(clusterCountRow.rows[0]?.count ?? 0);
+
+  // 3. Assign / propose with PostGIS spatial distance.
   const synthTrails = await db
     .select()
     .from(trails)
@@ -99,7 +121,7 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
     )`));
   const { assigned, proposed } = await assignOrPropose(systemId, synthTrails);
 
-  // 4. Recompute centerlines for any trail that received new segments.
+  // 4. Recompute centerlines.
   const trailsUpdated = await recomputeCenterlines(systemId, synthTrails);
 
   await db
@@ -120,7 +142,7 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
 
   return {
     run: finalRun ?? startedRow,
-    clusters: 0, // mock fallback
+    clusters,
     assigned,
     proposed,
     trailsUpdated,
@@ -128,93 +150,191 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
 }
 
 /**
- * Per-segment: pick the nearest synthesized trail within the
- * tolerance, or write a proposal. We use a simple sequential loop
- * here for the mock-friendly path; a real implementation does a
- * spatial join.
+ * Assign segments to the nearest synthesized trail within tolerance
+ * using PostGIS distance. Segments not within tolerance of any trail
+ * become proposals.
  */
 async function assignOrPropose(
   systemId: string,
   candidates: Trail[],
 ): Promise<{ assigned: number; proposed: number }> {
-  // 1. Find traces in this system.
-  const systemTraceRows = await db
-    .select({ traceId: traceSystems.traceId })
-    .from(traceSystems)
-    .where(eq(traceSystems.systemId, systemId));
-  const systemTraceIds = new Set(systemTraceRows.map((r) => r.traceId));
+  if (candidates.length === 0) return { assigned: 0, proposed: 0 };
 
-  // 2. Pull all segments and unvoted set.
-  const segRows = await db
-    .select({
-      id: gpsTraceSegments.id,
-      clusterId: gpsTraceSegments.clusterId,
-      traceId: gpsTraceSegments.traceId,
-    })
-    .from(gpsTraceSegments);
-  const existingVotes = await db
-    .select({ segmentId: traceSegmentVotes.segmentId })
-    .from(traceSegmentVotes);
-  const voted = new Set(existingVotes.map((v) => v.segmentId));
+  // Get all segments in this system that haven't been voted yet.
+  const segRowsRaw = await db.execute<{
+    id: string;
+    trace_id: string;
+    nearest_trail_id: string | null;
+    distance_m: number | null;
+  }>(
+    sql`WITH segs AS (
+          SELECT s.id, s.trace_id, s.geometry
+          FROM gps_trace_segments s
+          WHERE s.trace_id IN (
+            SELECT trace_id FROM trace_systems WHERE system_id = ${systemId}
+          )
+            AND s.id NOT IN (SELECT segment_id FROM trace_segment_votes)
+        ),
+        nearest AS (
+          SELECT segs.id, segs.trace_id,
+                 t.id AS trail_id,
+                 ST_Distance(segs.geometry::geography, t.geometry::geography)::float8 AS dist_m
+          FROM segs
+          CROSS JOIN LATERAL (
+            SELECT id, geometry
+            FROM trails
+            WHERE tier = 'synthesized'
+              AND id IN (SELECT trail_id FROM trail_systems WHERE system_id = ${systemId})
+            ORDER BY segs.geometry <-> trails.geometry
+            LIMIT 1
+          ) t
+        )
+        SELECT id, trace_id, trail_id AS nearest_trail_id,
+               dist_m AS distance_m
+        FROM nearest`,
+  );
+
+  const segs = segRowsRaw.rows as unknown as {
+    id: string; trace_id: string; nearest_trail_id: string | null; distance_m: number | null;
+  }[];
 
   let assigned = 0;
   let proposed = 0;
 
-  for (const seg of segRows) {
-    if (voted.has(seg.id)) continue;
-    if (!systemTraceIds.has(seg.traceId)) continue;
-    // In a real impl we'd query the PostGIS distance. The mock
-    // can return rows from executeRouter if needed; for the default
-    // we accept the first candidate trail as the nearest.
-    const target = candidates[0];
-    if (target) {
+  for (const seg of segs) {
+    if (
+      seg.nearest_trail_id &&
+      seg.distance_m != null &&
+      seg.distance_m <= NEAREST_TRAIL_TOLERANCE_M
+    ) {
+      // Assign to the nearest trail.
       await db.insert(traceSegmentVotes).values({
         segmentId: seg.id,
-        trailId: target.id,
+        trailId: seg.nearest_trail_id,
         vote: 1,
         contributorName: "synthesis",
       });
       await db
         .update(gpsTraceSegments)
-        .set({ proposedTrailId: target.id, clusterId: seg.clusterId ?? 1 })
+        .set({ proposedTrailId: seg.nearest_trail_id })
         .where(eq(gpsTraceSegments.id, seg.id));
       assigned++;
     } else {
       proposed++;
     }
   }
+
   return { assigned, proposed };
 }
 
 /**
- * Recompute the centerline for every trail in `candidates` that
- * received at least one new segment. The real implementation
- * computes a weighted median axis from the assigned segments'
- * geometry; here we keep the trail's first assigned segment as the
- * centerline. The result is stored back into `trails.geometry`.
+ * Recompute the centerline for every trail that received new segments
+ * this synthesis run. Uses reference-walk weighted median axis:
+ * 1. Pick highest-weight segment as reference
+ * 2. Densify reference at CENTERLINE_SEGMENTIZE_M
+ * 3. For each reference vertex, find nearby vertices from all assigned
+ *    segments, compute weighted mean (by trace.weight)
+ * 4. Smooth with moving average
+ * 5. Simplify
  */
 async function recomputeCenterlines(
   systemId: string,
   candidates: Trail[],
 ): Promise<number> {
   let updated = 0;
-  for (const t of candidates) {
-    // Pick the first segment the synthesis just assigned to this trail.
-    const [seg] = await db
-      .select({ geometry: gpsTraceSegments.geometry })
-      .from(gpsTraceSegments)
-      .innerJoin(traceSegmentVotes, eq(traceSegmentVotes.segmentId, gpsTraceSegments.id))
-      .where(and(eq(traceSegmentVotes.trailId, t.id), eq(traceSegmentVotes.vote, 1)))
-      .orderBy(asc(gpsTraceSegments.createdAt))
-      .limit(1);
-    if (!seg) continue;
+  for (const trail of candidates) {
+    if (!trail.id) continue;
+
+    // Find all segments assigned to this trail in this run.
+    const segRows = await db.execute<{
+      id: string;
+      trace_weight: number;
+      geometry_wkt: string;
+    }>(
+      sql`SELECT s.id,
+                 t.weight::float8 AS trace_weight,
+                 ST_AsText(s.geometry) AS geometry_wkt
+          FROM gps_trace_segments s
+          INNER JOIN trace_segment_votes v ON v.segment_id = s.id
+          INNER JOIN gps_traces t ON t.id = s.trace_id
+          WHERE v.trail_id = ${trail.id}
+            AND v.vote = 1
+          ORDER BY t.weight DESC`,
+    );
+
+    const segs = (segRows.rows as Array<{
+      id: string; trace_weight: number; geometry_wkt: string;
+    }>);
+
+    if (segs.length === 0) continue;
+
+    // Collect all vertices from all assigned segments as WGS84 coords.
+    interface WeightedPoint {
+      lon: number;
+      lat: number;
+      weight: number;
+    }
+
+    // Pick reference: highest trace_weight segment.
+    const refSeg = segs[0]!;
+    const refPts = parseWktLineString(refSeg.geometry_wkt);
+    if (refPts.length < 2) continue;
+
+    // Densify reference.
+    const denseRef = densifyPolyline(refPts.map(([lon, lat]) => ({ lon, lat })), CENTERLINE_SEGMENTIZE_M);
+
+    // Collect all segments' vertices as weighted points.
+    const allVerts: WeightedPoint[] = [];
+    for (const seg of segs) {
+      const pts = parseWktLineString(seg.geometry_wkt);
+      for (const p of pts) {
+        allVerts.push({ lon: p[0], lat: p[1], weight: seg.trace_weight });
+      }
+    }
+
+    // For each densified reference vertex, compute weighted mean
+    // of nearby vertices.
+    const refWeight = refSeg.trace_weight * 2; // self-weight anchor
+    const centroids: [number, number][] = [];
+
+    for (const rp of denseRef) {
+      let sumW = refWeight;
+      let sumLon = rp.lon * refWeight;
+      let sumLat = rp.lat * refWeight;
+
+      for (const v of allVerts) {
+        const d = haversineMeters(rp.lat, rp.lon, v.lat, v.lon);
+        if (d <= BUFFER_METERS) {
+          sumW += v.weight;
+          sumLon += v.lon * v.weight;
+          sumLat += v.lat * v.weight;
+        }
+      }
+      centroids.push([sumLon / sumW, sumLat / sumW]);
+    }
+
+    // Smooth with moving average.
+    const smoothed = smoothPolyline(centroids, CENTERLINE_SMOOTH_WINDOW);
+
+    // Simplify.
+    const simplified = simplifyPolyline(smoothed, CENTERLINE_SIMPLIFY_M);
+
+    if (simplified.length < 2) continue;
+
+    // Write back to trails.
+    const wkt = `MULTILINESTRING((${simplified.map(([lon, lat]) => `${lon} ${lat}`).join(", ")}))`;
     await db
       .update(trails)
-      .set({ geometry: seg.geometry, updatedAt: new Date() })
-      .where(eq(trails.id, t.id));
+      .set({
+        geometry: sql`ST_Multi(ST_GeomFromText(${wkt}, 4326))`,
+        updatedAt: new Date(),
+        lastSynthesizedAt: new Date(),
+      })
+      .where(eq(trails.id, trail.id));
+
     updated++;
   }
-  // Verify the system exists (so the route can return 404 cleanly).
+
   void (await db.select({ id: systems.id }).from(systems).where(eq(systems.id, systemId)).limit(1));
   return updated;
 }
@@ -227,11 +347,32 @@ async function recomputeCenterlines(
  * Promote a synthesized trail to "elevated" — the moderator is
  * certifying the geometry as canonical. After this point the trail
  * is frozen: the synthesis loop won't re-derive its geometry.
+ *
+ * Allowed transitions:
+ *   synthesized → elevated (Trusted+)
+ *   synthesized → premium   (moderator only)
+ *   elevated    → premium   (moderator only)
  */
 export async function promoteTrail(
   trailId: string,
   to: "elevated" | "premium",
 ): Promise<Trail | null> {
+  const [current] = await db
+    .select({ tier: trails.tier })
+    .from(trails)
+    .where(eq(trails.id, trailId))
+    .limit(1);
+  if (!current) return null;
+
+  const allowed: Record<string, string[]> = {
+    synthesized: ["elevated", "premium"],
+    elevated: ["premium"],
+    premium: [],
+  };
+  if (!allowed[current.tier ?? "synthesized"]?.includes(to)) {
+    throw new Error(`cannot promote from ${current.tier} to ${to}`);
+  }
+
   const rows = await db
     .update(trails)
     .set({ tier: to, updatedAt: new Date() })
@@ -241,9 +382,31 @@ export async function promoteTrail(
 }
 
 /**
+ * Demote a trail from elevated → synthesized, re-arming it for
+ * synthesis. Premium trails cannot be demoted.
+ */
+export async function demoteTrail(trailId: string): Promise<Trail | null> {
+  const [current] = await db
+    .select({ tier: trails.tier })
+    .from(trails)
+    .where(eq(trails.id, trailId))
+    .limit(1);
+  if (!current) return null;
+  if (current.tier !== "elevated") {
+    throw new Error(`can only demote elevated trails, not ${current.tier}`);
+  }
+  const rows = await db
+    .update(trails)
+    .set({ tier: "synthesized", updatedAt: new Date() })
+    .where(eq(trails.id, trailId))
+    .returning();
+  return rows[0] ?? null;
+}
+
+/**
  * Import a "premium" trail from a moderator-supplied GeoJSON
- * LineString. The geometry is stored verbatim, tier=premium, and
- * the trail is bypassed by future synthesis runs.
+ * LineString/MultiLineString. The geometry is stored verbatim,
+ * tier=premium, and the trail is bypassed by future synthesis runs.
  */
 export interface PremiumImportInput {
   name: string;
@@ -252,9 +415,14 @@ export interface PremiumImportInput {
   geometry: unknown;
   difficulty?: "easy" | "moderate" | "hard" | "expert";
   externalUrl?: string;
+  source?: string;
+  sourceDate?: string;
 }
 
 export async function importPremiumTrail(input: PremiumImportInput): Promise<Trail> {
+  const wkt = geoJsonToWkt(input.geometry);
+  if (!wkt) throw new Error("geometry must be a GeoJSON LineString or MultiLineString");
+
   const rows = await db
     .insert(trails)
     .values({
@@ -262,14 +430,22 @@ export async function importPremiumTrail(input: PremiumImportInput): Promise<Tra
       slug: input.slug,
       tier: "premium",
       difficulty: input.difficulty ?? null,
-      geometry: input.geometry
-        ? (sql`ST_MultiLineStringFromText(${sql.raw(`'${JSON.stringify(input.geometry).replace(/'/g, "''")}'::text`)})` as never)
-        : null,
+      externalUrl: input.externalUrl ?? null,
+      source: input.source ?? null,
+      sourceDate: input.sourceDate ?? null,
+      geometry: sql`ST_Multi(ST_GeomFromText(${wkt}, 4326))`,
     })
     .returning();
-  const t = rows[0];
-  if (!t) throw new Error("failed to insert premium trail");
-  return t;
+  const trail = rows[0];
+  if (!trail) throw new Error("failed to insert premium trail");
+
+  // Wire the trail into the system.
+  await db
+    .insert(trailSystems)
+    .values({ trailId: trail.id, systemId: input.systemId })
+    .onConflictDoNothing();
+
+  return trail;
 }
 
 /**

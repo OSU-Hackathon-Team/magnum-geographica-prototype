@@ -15,6 +15,7 @@ import type {
 import type {
   CreateSystemInput,
   CreateTrailInput,
+  UpdateTrailInput,
   CreateFeatureInput,
   UpdateFeatureInput,
   CreateWikiPageInput,
@@ -81,6 +82,9 @@ export function createMagnumClient(
     listTrailFeatures: (id: string) =>
       client.get<{ items: Feature[]; total: number }>(`/api/trails/${id}/features`),
     createTrail: (body: CreateTrailInput) => client.post<Trail>("/api/trails", body),
+    updateTrail: (id: string, body: UpdateTrailInput) =>
+      client.put<Trail>(`/api/trails/${id}`, body),
+    deleteTrail: (id: string) => client.delete<{ ok: boolean }>(`/api/trails/${id}`),
 
     search: (q: SearchQuery) =>
       client.get<{
@@ -386,8 +390,10 @@ export function createMagnumClient(
       }>(`/api/traces/${id}/vote`),
     voteOnTraceSegment: (
       segmentId: string,
-      body: { trail_id?: string | null; contributor_name?: string },
+      body: { trail_id?: string | null; vote?: 1 | -1; contributor_name?: string },
     ) => client.post<{ ok: boolean }>(`/api/trace-segments/${segmentId}/vote`, body),
+    listTraceSegmentVotes: (segmentId: string) =>
+      client.get<{ segment_id: string; votes: Array<{ trail_id: string | null; vote: number; count: number }>; total: number }>(`/api/trace-segments/${segmentId}/votes`),
     // §21.6 phase 2 — synthesis
     synthesize: (systemId: string) =>
       client.post<{
@@ -416,12 +422,16 @@ export function createMagnumClient(
       client.post<{ ok: boolean }>(`/api/admin/synthesis-proposals/${segmentId}/reject`, body),
     promoteTrail: (trailId: string, to: "elevated" | "premium") =>
       client.post<{ id: string; tier: string }>(`/api/admin/trails/${trailId}/promote`, { to }),
+    demoteTrail: (trailId: string) =>
+      client.post<{ id: string; tier: string }>(`/api/admin/trails/${trailId}/demote`),
     importPremiumTrail: (body: {
       name: string;
       slug: string;
       system_id: string;
       difficulty?: "easy" | "moderate" | "hard" | "expert";
       external_url?: string;
+      source?: string;
+      source_date?: string;
       geometry: unknown;
     }) =>
       client.post<{ id: string; name: string; tier: string; slug: string }>(

@@ -163,11 +163,13 @@ export const trailSchema = z.object({
   length_meters: z.number().nonnegative().nullable().optional(),
   elevation_gain_meters: z.number().nonnegative().nullable().optional(),
   verified: z.boolean().optional(),
-  // §21.6 — trail tier (premium / elevated / synthesized). Older
-  // clients may not send this; default to "synthesized".
+  // §21.6 — trail tier (premium / elevated / synthesized).
   tier: trailTierSchema.optional(),
-  // §21.6 — metadata about the last synthesis: how many segments
-  // and traces contributed, when it ran.
+  // §21.6 — provenance for premium/elevated trails (mirrors systems).
+  source: z.string().max(500).nullable().optional(),
+  source_date: z.string().min(1).max(30).nullable().optional(),
+  external_url: z.string().url().nullable().optional(),
+  // §21.6 — metadata about the last synthesis.
   derived_from_segments: z.number().int().nonnegative().nullable().optional(),
   derived_from_traces: z.number().int().nonnegative().nullable().optional(),
   last_synthesized_at: isoDateSchema.nullable().optional(),
@@ -312,6 +314,23 @@ export const createTrailInputSchema = trailSchema
     difficulty: true,
     length_meters: true,
     elevation_gain_meters: true,
+  });
+
+export const updateTrailInputSchema = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    description: z.string().max(10_000).nullable().optional(),
+    difficulty: z.enum(DIFFICULTIES).nullable().optional(),
+    length_meters: z.number().nonnegative().nullable().optional(),
+    elevation_gain_meters: z.number().nonnegative().nullable().optional(),
+    verified: z.boolean().optional(),
+    source: z.string().max(500).nullable().optional(),
+    source_date: z.string().min(1).max(30).nullable().optional(),
+    external_url: z.string().url().nullable().optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "at least one field must be provided",
   });
 
 export const createFeatureInputSchema = z.object({
@@ -993,6 +1012,7 @@ export const traceSegmentSchema = z.object({
 export const traceSegmentVoteInputSchema = z
   .object({
     trail_id: uuidSchema.nullable(), // null = "propose new trail"
+    vote: z.union([z.literal(-1), z.literal(1)]).optional(), // defaults to +1
     contributor_name: z.string().min(1).max(120).optional(),
   })
   .strict();
