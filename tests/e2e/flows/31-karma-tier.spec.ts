@@ -38,7 +38,8 @@ test.describe("Trust tier thresholds (§21.7)", () => {
     expect(body.tier).toBe("trusted");
     expect(body.karma).toBe(999);
 
-    const missing = await apiFetch(page, "/api/votes/users/does-not-exist/karma");
+    // Use a valid UUID that doesn't correspond to any user
+    const missing = await apiFetch(page, "/api/votes/users/00000000-0000-0000-0000-000000000000/karma");
     expect(missing.status).toBe(404);
   });
 
@@ -64,8 +65,9 @@ test.describe("Trust tier thresholds (§21.7)", () => {
   });
 
   test("Established tier (karma 50) → move_to_super succeeds", async ({ page }) => {
-    // Register a high-trust user via the API directly, then move.
-    const reg = await apiFetch(page, "/api/auth/register", {
+    // Register a high-trust user via the e2e test endpoint, which supports
+    // elevated trust_score. The production /api/auth/register strips unknown fields.
+    const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
         username: "high_trust_user",
