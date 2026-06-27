@@ -13,6 +13,7 @@ import {
   listTracePoints,
 } from "../../services/offlineDataService";
 import { useTheme } from "../../providers/ThemeProvider";
+import { hexToRgba } from "../../theme/hexToRgba";
 import { spacing, text as textTokens } from "../../theme/tokens";
 
 /**
@@ -138,7 +139,7 @@ export function TraceRecoveryModal() {
       }}
       testID="trace-recovery-modal"
     >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { backgroundColor: hexToRgba(colors.shadow, 0.55) }]}>
         <View
           style={[
             styles.dialog,
@@ -234,7 +235,6 @@ function formatDuration(s: number): string {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.xl,

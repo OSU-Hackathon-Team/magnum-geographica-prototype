@@ -558,7 +558,7 @@ function ActiveView({
             onPress={handleRecenter}
             style={({ pressed }) => [
               styles.recenterBtn,
-              { backgroundColor: colors.bg },
+              { backgroundColor: colors.bg, shadowColor: colors.shadow },
               pressed && styles.recenterBtnPressed,
             ]}
             testID="record-recenter"
@@ -840,7 +840,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },

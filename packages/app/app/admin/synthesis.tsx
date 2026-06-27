@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { createMagnumClient } from "@magnum/shared/api/endpoints";
 import { useAuthStore } from "../../src/stores/authStore";
 import { useTheme } from "../../src/providers/ThemeProvider";
+import { hexToRgba } from "../../src/theme/hexToRgba";
 import { Card } from "../../src/components/ui/Card";
 import { Button } from "../../src/components/ui/Button";
 
@@ -173,7 +174,7 @@ export default function AdminSynthesisScreen() {
         transparent
         onRequestClose={() => setSelected(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { backgroundColor: hexToRgba(colors.shadow, 0.4) }]}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Approve as new trail</Text>
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1 },
   rowTitle: { fontWeight: "600" },
   rowSub: { fontSize: 12 },
-  modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  modalBackdrop: { flex: 1, justifyContent: "flex-end" },
   modalCard: {
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,

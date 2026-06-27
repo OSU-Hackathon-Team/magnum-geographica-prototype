@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { Revision } from "@magnum/shared";
 import { Button } from "../ui/Button";
 import { useTheme } from "../../providers/ThemeProvider";
+import { hexToRgba } from "../../theme/hexToRgba";
 import { spacing } from "../../theme/tokens";
 
 function formatDate(iso: string): string {
@@ -96,7 +97,7 @@ export function RevisionHistory({ revisions, onRevert }: RevisionHistoryProps) {
         onRequestClose={() => setPendingRevertId(null)}
         testID="revert-confirm-modal"
       >
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, { backgroundColor: hexToRgba(colors.shadow, 0.4) }]}>
           <View style={[styles.dialog, { backgroundColor: colors.surface }]} testID="revert-confirm-dialog">
             <Text style={[styles.title, { color: colors.text }]}>Revert to this revision?</Text>
             {pending ? (
@@ -148,7 +149,6 @@ const styles = StyleSheet.create({
   revertBtn: { padding: 6 },
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
     alignItems: "center",
     justifyContent: "center",
     padding: 24,

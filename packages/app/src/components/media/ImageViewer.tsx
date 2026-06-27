@@ -1,6 +1,7 @@
 import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../providers/ThemeProvider";
+import { hexToRgba } from "../../theme/hexToRgba";
 
 export interface ImageViewerProps {
   visible: boolean;
@@ -13,7 +14,10 @@ export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps
   const { colors } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" testID="image-viewer-modal">
-      <View style={styles.overlay} testID="image-viewer-overlay">
+      <View
+        style={[styles.overlay, { backgroundColor: hexToRgba(colors.shadow, 0.92) }]}
+        testID="image-viewer-overlay"
+      >
         <Pressable style={styles.closeBtn} onPress={onClose} testID="image-viewer-close">
           <Ionicons name="close" size={24} color={colors.textInverse} />
         </Pressable>
@@ -32,7 +36,13 @@ export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps
         )}
 
         {caption ? (
-          <View style={styles.captionBar} testID="image-viewer-caption-bar">
+          <View
+            style={[
+              styles.captionBar,
+              { backgroundColor: hexToRgba(colors.shadow, 0.6) },
+            ]}
+            testID="image-viewer-caption-bar"
+          >
             <Text style={[styles.caption, { color: colors.textInverse }]} testID="image-viewer-caption">
               {caption}
             </Text>
@@ -46,7 +56,6 @@ export function ImageViewer({ visible, uri, caption, onClose }: ImageViewerProps
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.92)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -64,7 +73,6 @@ const styles = StyleSheet.create({
     bottom: 48,
     left: 16,
     right: 16,
-    backgroundColor: "rgba(0,0,0,0.6)",
     padding: 12,
     borderRadius: 8,
   },
