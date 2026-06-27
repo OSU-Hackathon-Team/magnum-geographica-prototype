@@ -156,7 +156,7 @@ export default function BoundaryScreen() {
       });
       const s2 = await client.getSystemBySlug(slug);
       await client.updateSystem(s2.id, { boundary });
-      useMapStore.getState().incrementTileVersion();
+      useMapStore.getState().incrementSystemTileVersion();
       dirtyRef.current = false;
       router.replace(`/system/${slug}` as never);
     } catch (e) {

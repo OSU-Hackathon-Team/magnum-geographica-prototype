@@ -64,7 +64,12 @@ export default function ExploreScreen() {
   const params = useLocalSearchParams<{ lat?: string; lon?: string; zoom?: string }>();
   const mapCenter = useMapStore((s) => s.center);
   const mapZoom = useMapStore((s) => s.zoom);
-  const tileVersion = useMapStore((s) => s.tileVersion);
+  const systemTileVersion = useMapStore((s) => s.systemTileVersion);
+  const trailTileVersion = useMapStore((s) => s.trailTileVersion);
+  const segmentTileVersion = useMapStore((s) => s.segmentTileVersion);
+  const featureTileVersion = useMapStore((s) => s.featureTileVersion);
+  const heatmapTileVersion = useMapStore((s) => s.heatmapTileVersion);
+  const superSystemTileVersion = useMapStore((s) => s.superSystemTileVersion);
   const showHeatmap = useMapStore((s) => s.showHeatmap);
   const toggleHeatmap = useMapStore((s) => s.toggleHeatmap);
   const setViewport = useMapStore((s) => s.setViewport);
@@ -355,7 +360,7 @@ export default function ExploreScreen() {
         }
         const client = createMagnumClient(API_URL);
         await client.createFeature(payload as Parameters<typeof client.createFeature>[0]);
-        useMapStore.getState().incrementTileVersion();
+        useMapStore.getState().incrementFeatureTileVersion();
         setAddFeatureAt(null);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Failed to create feature";
@@ -479,7 +484,12 @@ export default function ExploreScreen() {
           offlineBaseLayer={offlineBaseLayer}
           drawMode={isDrawing}
           onDrawEnd={handleDrawEnd}
-          tileVersion={tileVersion}
+          systemTileVersion={systemTileVersion}
+          trailTileVersion={trailTileVersion}
+          segmentTileVersion={segmentTileVersion}
+          featureTileVersion={featureTileVersion}
+          heatmapTileVersion={heatmapTileVersion}
+          superSystemTileVersion={superSystemTileVersion}
           showHeatmap={showHeatmap}
         />
         <BaseLayerSwitcher layers={baseLayerDefs} testID="explore-base-layer-switcher" />

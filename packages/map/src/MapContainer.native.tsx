@@ -852,8 +852,13 @@ export default function MapContainer({
   shapeMode,
   onShapeAction,
   fitGeometry,
-  tileVersion,
   showHeatmap,
+  systemTileVersion,
+  trailTileVersion,
+  segmentTileVersion,
+  featureTileVersion,
+  heatmapTileVersion,
+  superSystemTileVersion,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
@@ -1196,10 +1201,24 @@ export default function MapContainer({
   }, [fitGeometry, send]);
 
   useEffect(() => {
-    tileVersionRef.current = tileVersion;
-    if (typeof tileVersion !== "number" || !initSentRef.current) return;
-    send({ method: "refreshTiles", args: { version: tileVersion } });
-  }, [tileVersion, send]);
+    // Compute a combined version (max of all per-layer versions) so
+    // the WebView can refresh all layers at once via the WebView bridge.
+    const combined = Math.max(
+      systemTileVersion ?? 0,
+      trailTileVersion ?? 0,
+      segmentTileVersion ?? 0,
+      featureTileVersion ?? 0,
+      heatmapTileVersion ?? 0,
+      superSystemTileVersion ?? 0,
+    );
+    tileVersionRef.current = combined;
+    if (!initSentRef.current || combined === 0) return;
+    send({ method: "refreshTiles", args: { version: combined } });
+  }, [
+    systemTileVersion, trailTileVersion, segmentTileVersion,
+    featureTileVersion, heatmapTileVersion, superSystemTileVersion,
+    send,
+  ]);
 
   if (Platform.OS === "web") {
     return null;

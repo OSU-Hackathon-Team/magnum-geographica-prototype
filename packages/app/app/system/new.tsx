@@ -138,7 +138,7 @@ export default function NewSystemScreen() {
         "/api/systems",
         { body: payload },
       );
-      useMapStore.getState().incrementTileVersion();
+      useMapStore.getState().incrementSystemTileVersion();
       router.replace(`/system/${finalSlug}` as never);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create system");

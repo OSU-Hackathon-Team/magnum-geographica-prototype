@@ -96,8 +96,13 @@ export default function MapContainer({
   liveShapeRef,
   onShapeChange: _onShapeChange,
   fitGeometry,
-  tileVersion,
   showHeatmap,
+  systemTileVersion,
+  trailTileVersion,
+  segmentTileVersion,
+  featureTileVersion,
+  heatmapTileVersion,
+  superSystemTileVersion,
   liveRoute,
 }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -576,34 +581,50 @@ export default function MapContainer({
     });
   }, [fitGeometry]);
 
-  const prevTileVersionRef = useRef<number | undefined>(undefined);
+  const prevSlotVersions = useRef<
+    Record<string, number | undefined>
+  >({});
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || typeof tileVersion !== "number") return;
-    if (prevTileVersionRef.current === tileVersion) return;
-    prevTileVersionRef.current = tileVersion;
-    const slot = tileVersion % 2;
+    if (!map) return;
+
     const layers = map.getLayers().getArray();
+    // Map Martin source names to the tile version that last flipped them.
+    const swaps: Record<string, { slot: number; regex: RegExp }> = {
+      systemTileVersion:   { slot: (systemTileVersion   ?? 0) % 2, regex: /\/systems_\d\//g },
+      trailTileVersion:    { slot: (trailTileVersion    ?? 0) % 2, regex: /\/trails_\d\//g },
+      segmentTileVersion:  { slot: (segmentTileVersion  ?? 0) % 2, regex: /\/segments_\d\//g },
+      featureTileVersion:  { slot: (featureTileVersion  ?? 0) % 2, regex: /\/features_\d\//g },
+      heatmapTileVersion:  { slot: (heatmapTileVersion  ?? 0) % 2, regex: /\/traces_heatmap_\d\//g },
+      superSystemTileVersion: { slot: (superSystemTileVersion ?? 0) % 2, regex: /\/super_systems_\d\//g },
+    };
+
     for (const layer of layers) {
       const src = (layer as unknown as { getSource?: () => unknown }).getSource?.();
-      if (src && typeof (src as { getUrls?: () => string[] }).getUrls === "function") {
-        const s = src as unknown as { getUrls: () => string[]; setUrl: (url: string) => void };
-        const urls = s.getUrls();
-        if (urls && urls[0]) {
-          let url = urls[0].replace(/[?&]_v=\d+/, "");
-          // Swap Martin source slot so the server sees a genuinely new
-          // source name and serves fresh PostGIS tiles.  The paired
-          // sources (systems_0 / systems_1 etc.) are defined in
-          // docker/martin.yaml and all point to the same SQL function.
-          url = url.replace(
-            /\/(super_systems|systems|trails|segments|features|traces_heatmap)_\d\//g,
-            (_: string, name: string) => `/${name}_${slot}/`,
-          );
-          s.setUrl(url);
-        }
+      if (!src || typeof (src as { getUrls?: () => string[] }).getUrls !== "function") continue;
+      const s = src as unknown as { getUrls: () => string[]; setUrl: (url: string) => void };
+      const urls = s.getUrls();
+      if (!urls?.[0]) continue;
+
+      const prev = prevSlotVersions.current;
+      let url = urls[0];
+      for (const [key, { slot, regex }] of Object.entries(swaps)) {
+        if (!regex.test(url)) continue;
+        const lastSlot = prev[key];
+        if (lastSlot !== undefined && lastSlot === slot) continue; // no change
+        prev[key] = slot;
+        url = url.replace(regex, (m) => {
+          const name = m.replace(/_\d\//, "");
+          return `${name}_${slot}/`;
+        });
+        s.setUrl(url);
+        break; // each source belongs to at most one layer
       }
     }
-  }, [tileVersion]);
+  }, [
+    systemTileVersion, trailTileVersion, segmentTileVersion,
+    featureTileVersion, heatmapTileVersion, superSystemTileVersion,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;

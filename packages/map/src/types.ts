@@ -77,9 +77,15 @@ export interface MapContainerProps {
    */
   showHeatmap?: boolean;
   /**
-   * Incremented after server-side mutations to invalidate the
-   * client-side vector tile cache. The map appends `?_v=$tileVersion`
-   * to tile URLs, forcing re-fetches. Default 0.
+   * Per-layer tile version counters.  Each increments independently
+   * when data in its layer changes on the server.  The map swaps the
+   * Martin source slot (0 ↔ 1) only for the affected layer, so
+   * editing a system refreshes system tiles without touching trails.
    */
-  tileVersion?: number;
+  systemTileVersion?: number;
+  trailTileVersion?: number;
+  segmentTileVersion?: number;
+  featureTileVersion?: number;
+  heatmapTileVersion?: number;
+  superSystemTileVersion?: number;
 }
