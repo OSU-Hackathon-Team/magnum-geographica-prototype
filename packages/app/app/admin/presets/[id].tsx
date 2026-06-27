@@ -101,7 +101,7 @@ export default function AdminPresetEditorScreen() {
         setIconColor(p.icon_color);
         setCategory(p.category as PresetCategory);
         setUpstreamable(p.upstreamable);
-        setSortOrder(p.sort_order);
+        setSortOrder(p.sortOrder);
         setQuestions(
           p.questions.map((q) => ({
             key: q.key,

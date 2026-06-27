@@ -359,7 +359,9 @@ export default function ExploreScreen() {
           Alert.alert("Queued", "Feature saved offline — will sync when online.");
           return;
         }
-        const client = createMagnumClient(API_URL);
+        const client = createMagnumClient(API_URL, {
+          getAuthToken: () => useAuthStore.getState().token ?? undefined,
+        });
         await client.createFeature(payload as Parameters<typeof client.createFeature>[0]);
         useMapStore.getState().incrementFeatureTileVersion();
         setAddFeatureAt(null);

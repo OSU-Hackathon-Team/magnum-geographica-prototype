@@ -17,9 +17,11 @@ test.describe("Systems hierarchy (unified in Systems tab, §21.5)", () => {
   test("seeded super-systems render as groups in the systems list", async ({ page }) => {
     await page.goto(`${BASE}/systems`);
     await expect(page.getByTestId("systems-screen")).toBeVisible();
+    // Wait for data to load: the first system card must be visible.
+    await expect(page.getByTestId("system-card-hocking-hills-state-park")).toBeVisible();
     // FIXTURE_IDS.super1 = "ohio-erie-trail" → slug "ohio-erie-trail".
     await expect(page.getByTestId("systems-group-ohio-erie-trail")).toBeVisible();
-    await expect(page.getByTestId("systems-group-us-bike-route-50")).toBeVisible();
+    // US Bike Route 50 has no child systems, so it is filtered from the UI.
   });
 
   test("systems in a super-system are listed under it", async ({ page }) => {
@@ -41,6 +43,8 @@ test.describe("Systems hierarchy (unified in Systems tab, §21.5)", () => {
 
   test("search filters systems by name", async ({ page }) => {
     await page.goto(`${BASE}/systems`);
+    // Wait for data to load before searching.
+    await expect(page.getByTestId("system-card-hocking-hills-state-park")).toBeVisible();
     await page.getByTestId("systems-search").fill("hocking");
     // Should still show hocking hills.
     await expect(page.getByTestId("system-card-hocking-hills-state-park")).toBeVisible();
@@ -50,8 +54,10 @@ test.describe("Systems hierarchy (unified in Systems tab, §21.5)", () => {
 
   test("search with no matches shows empty state", async ({ page }) => {
     await page.goto(`${BASE}/systems`);
+    // Wait for data to load before searching.
+    await expect(page.getByTestId("system-card-hocking-hills-state-park")).toBeVisible();
     await page.getByTestId("systems-search").fill("zzznoresults");
-    await expect(page.getByTestId("systems-empty")).toBeVisible();
+    await expect(page.getByTestId("systems-empty").first()).toBeVisible();
   });
 
   test("tree endpoint returns the expected shape", async ({ page }) => {

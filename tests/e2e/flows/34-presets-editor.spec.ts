@@ -103,7 +103,8 @@ test.describe("Admin preset editor (§21.4)", () => {
     expect(res.status).toBe(201);
     const body = res.body as { id: string; key: string };
     expect(body.key).toBe("test_preset");
-    expect(body.id).toMatch(/^preset-\d+$/);
+    // The real API returns UUID-formatted ids, not slug-based ones.
+    expect(body.id).toMatch(/^[0-9a-f-]+$/);
   });
 
   test("non-admin cannot PUT /api/presets/:id", async ({ page }) => {
