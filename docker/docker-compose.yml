@@ -62,7 +62,8 @@ services:
       - "${API_HOST_PORT:-3000}:3000"
     volumes:
       - ../packages/api/src:/app/src:ro
-      - ../packages/shared:/app/shared:ro
+      # Live-reload shared source; keep image-baked node_modules (incl. zod).
+      - ../packages/shared/src:/app/node_modules/@magnum/shared/src:ro
     command: ["bun", "run", "--watch", "src/index.ts"]
     restart: unless-stopped
 
