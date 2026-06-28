@@ -37,6 +37,7 @@ export default function WikiEditScreen() {
   // pending entry shows the right name locally — the server will
   // override it on sync.
   const storedContributor = useAuthStore((s) => s.contributorName);
+  const token = useAuthStore((s) => s.token);
 
   const load = useCallback(async () => {
     if (!targetType || !targetId || typeof targetType !== "string" || typeof targetId !== "string")
@@ -82,7 +83,9 @@ export default function WikiEditScreen() {
   useEffect(() => {
     if (!isOnline || !targetType || !targetId) return;
     if (typeof targetType !== "string" || typeof targetId !== "string") return;
-    const client = createMagnumClient(API_URL);
+    const client = createMagnumClient(API_URL, {
+      getAuthToken: () => token ?? undefined,
+    });
     client
       .getWikiPage(targetType, targetId)
       .then(async (page) => {
@@ -118,7 +121,9 @@ export default function WikiEditScreen() {
     // We no longer send `contributor_name` — the server derives it
     // from the auth context. The local offline queue still keeps it
     // for display purposes.
-    const client = createMagnumClient(API_URL);
+    const client = createMagnumClient(API_URL, {
+      getAuthToken: () => token ?? undefined,
+    });
     try {
       if (!isOnline) {
         await addPendingContribution(
@@ -196,7 +201,9 @@ export default function WikiEditScreen() {
     if (!wikiPage) return;
     setSaving(true);
     setError(null);
-    const client = createMagnumClient(API_URL);
+    const client = createMagnumClient(API_URL, {
+      getAuthToken: () => token ?? undefined,
+    });
     try {
       const updated = await client.revertWikiPage(wikiPage.id, {
         revision_id: revisionId,
@@ -216,7 +223,9 @@ export default function WikiEditScreen() {
       setError("Citations require an online connection");
       return;
     }
-    const client = createMagnumClient(API_URL);
+    const client = createMagnumClient(API_URL, {
+      getAuthToken: () => token ?? undefined,
+    });
     try {
       const created = await client.createCitation({
         wiki_page_id: wikiPage.id,
@@ -235,7 +244,9 @@ export default function WikiEditScreen() {
       setError("Citation changes require an online connection");
       return;
     }
-    const client = createMagnumClient(API_URL);
+    const client = createMagnumClient(API_URL, {
+      getAuthToken: () => token ?? undefined,
+    });
     try {
       await client.deleteCitation(citationId);
       setCitations((prev) => prev.filter((c) => c.id !== citationId));

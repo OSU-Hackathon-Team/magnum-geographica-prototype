@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { installApi, resetApi } from "../helpers/api.js";
 import { FIXTURE_IDS } from "../fixtures/ids.js";
 
@@ -15,16 +15,29 @@ import { FIXTURE_IDS } from "../fixtures/ids.js";
  *   5. Reorder two segments.
  *   6. Exit edit mode and verify the trail detail is restored.
  */
+
+const BASE = "http://localhost:4173";
+
 test.beforeEach(async ({ page }) => {
-  resetApi();
+  await resetApi();
   await installApi(page);
 });
 
+async function loginAsHiker(page: Page) {
+  await page.goto(`${BASE}/auth/login`);
+  await page.getByTestId("login-email").fill("hiker1@example.com");
+  await page.getByTestId("login-password").fill("password123");
+  await page.getByTestId("login-submit").click();
+  await expect(page).toHaveURL(/\/explore$/);
+  await page.waitForTimeout(2000);
+}
+
 test("user can edit a segment name, surface, and hazards from the editor", async ({ page }) => {
+  await loginAsHiker(page);
+
   await page.goto("/trail/buckeye-trail");
   await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
 
-  // The mock fixture has FIXTURE_IDS.seg1 ("North loop") and FIXTURE_IDS.seg2 ("Road connector").
   // Scroll to the Edit Segments button and tap it.
   await page.getByTestId("trail-segments").scrollIntoViewIfNeeded();
   await page.getByTestId("trail-segments-edit").click();
@@ -35,14 +48,16 @@ test("user can edit a segment name, surface, and hazards from the editor", async
   await expect(seg1Editor).toBeVisible();
   await expect(page.getByTestId(`segment-editor-name-${FIXTURE_IDS.seg1}`)).toHaveValue("North loop");
 
-  // 2. Change the name and save. The save navigates away from the editor.
-  await page.getByTestId(`segment-editor-name-${FIXTURE_IDS.seg1}`).fill("Northern ridge");
+  // 2. Change the name and save. The editor stays in edit mode.
+  await page.getByTestId(`segment-editor-name-${FIXTURE_IDS.seg1}`).pressSequentially("Northern ridge");
   await page.getByTestId(`segment-editor-save-${FIXTURE_IDS.seg1}`).click();
   await page.waitForTimeout(1000);
-  await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
+  await expect(page.getByTestId("trail-segment-edit-list")).toBeVisible();
 });
 
 test("user can reorder segments with the up and down buttons", async ({ page }) => {
+  await loginAsHiker(page);
+
   await page.goto("/trail/buckeye-trail");
   await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
   await page.getByTestId("trail-segments").scrollIntoViewIfNeeded();
@@ -72,6 +87,8 @@ test("user can reorder segments with the up and down buttons", async ({ page }) 
 });
 
 test("user can delete a segment from the editor", async ({ page }) => {
+  await loginAsHiker(page);
+
   await page.goto("/trail/buckeye-trail");
   await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
   await page.getByTestId("trail-segments").scrollIntoViewIfNeeded();
@@ -82,10 +99,13 @@ test("user can delete a segment from the editor", async ({ page }) => {
   await page.getByTestId(`segment-editor-delete-${FIXTURE_IDS.seg1}`).click();
   await page.waitForTimeout(1000);
 
-  await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
+  // After deletion, the editor stays in edit mode.
+  await expect(page.getByTestId("trail-segment-edit-list")).toBeVisible();
 });
 
 test("segment surface and road connector toggles can be changed", async ({ page }) => {
+  await loginAsHiker(page);
+
   await page.goto("/trail/buckeye-trail");
   await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
   await page.getByTestId("trail-segments").scrollIntoViewIfNeeded();
@@ -106,5 +126,6 @@ test("segment surface and road connector toggles can be changed", async ({ page 
   await page.getByTestId(`segment-editor-save-${FIXTURE_IDS.seg1}`).click();
   await page.waitForTimeout(1000);
 
-  await expect(page.getByTestId("trail-detail-screen")).toBeVisible();
+  // Editor stays in edit mode after save.
+  await expect(page.getByTestId("trail-segment-edit-list")).toBeVisible();
 });
