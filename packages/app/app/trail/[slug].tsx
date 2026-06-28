@@ -264,7 +264,9 @@ export default function TrailDetail() {
     setPendingId(id);
     try {
       if (isOnline) {
-        const client = createMagnumClient(API_URL);
+        const client = createMagnumClient(API_URL, {
+          getAuthToken: () => token ?? undefined,
+        });
         await client.updateSegment(id, body);
         await refreshSegments(trail.id);
       } else {
@@ -329,7 +331,9 @@ export default function TrailDetail() {
     setDeletingId(id);
     try {
       if (isOnline) {
-        const client = createMagnumClient(API_URL);
+        const client = createMagnumClient(API_URL, {
+          getAuthToken: () => token ?? undefined,
+        });
         await client.deleteSegment(id);
         await refreshSegments(trail.id);
       } else {
@@ -382,7 +386,9 @@ export default function TrailDetail() {
     setSplittingId(id);
     try {
       if (isOnline) {
-        const client = createMagnumClient(API_URL);
+        const client = createMagnumClient(API_URL, {
+          getAuthToken: () => token ?? undefined,
+        });
         const res = await client.splitSegment(trail.id, {
           segment_id: id,
           split_at: splitAt,
@@ -414,7 +420,9 @@ export default function TrailDetail() {
     setMerging(true);
     try {
       if (isOnline) {
-        const client = createMagnumClient(API_URL);
+        const client = createMagnumClient(API_URL, {
+          getAuthToken: () => token ?? undefined,
+        });
         await client.mergeSegments(trail.id, {
           segment_id_a: idA,
           segment_id_b: idB,
@@ -444,7 +452,9 @@ export default function TrailDetail() {
     setReordering(true);
     try {
       if (isOnline) {
-        const client = createMagnumClient(API_URL);
+        const client = createMagnumClient(API_URL, {
+          getAuthToken: () => token ?? undefined,
+        });
         const res = await client.reorderSegments(trail.id, { ordered_ids: orderedIds });
         setSegments(res.items);
       } else {
