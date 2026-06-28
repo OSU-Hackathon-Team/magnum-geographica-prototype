@@ -71,9 +71,10 @@ test("wiki revision history grows each time the page is saved", async ({ page })
   await page.waitForTimeout(2000);
 
   await page.goto(`/wiki/trail/${FIXTURE_IDS.trail2}`);
-  await page.waitForTimeout(2000);
   await expect(page.getByTestId("wiki-page-screen")).toBeVisible({ timeout: 20000 });
-  await page.waitForTimeout(1000);
+  await expect(page.getByTestId("wiki-view-history")).toContainText("1 revision");
+  await page.getByTestId("wiki-view-history").click();
+  await page.getByTestId("wiki-editor").waitFor({ state: "visible", timeout: 15000 });
   await page.getByTestId("wiki-tab-revisions").click();
   await expect(page.getByTestId("revision-history")).toBeVisible();
 });

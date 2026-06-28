@@ -14,6 +14,10 @@ const WINDOW_MS = 60_000;
 // usually a polling loop or a runaway script.
 const MAX_REQUESTS = 30;
 
+function e2eBypass(): MiddlewareHandler {
+  return async (_c, next) => next();
+}
+
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of store) {
@@ -26,6 +30,8 @@ export function rateLimit(opts?: {
   windowMs?: number;
   keyFn?: (c: Context) => string;
 }): MiddlewareHandler {
+  if (process.env.MAGNUM_E2E === "1") return e2eBypass();
+
   const max = opts?.max ?? MAX_REQUESTS;
   const windowMs = opts?.windowMs ?? WINDOW_MS;
   const keyFn =
@@ -68,5 +74,6 @@ export function rateLimit(opts?: {
 }
 
 export function strictRateLimit(): MiddlewareHandler {
+  if (process.env.MAGNUM_E2E === "1") return e2eBypass();
   return rateLimit({ max: 10, windowMs: 60_000 });
 }
