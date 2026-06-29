@@ -12,6 +12,7 @@ import {
   gpsTraces,
   traceSystems,
   gpsTraceSegments,
+  traceAnnotations,
 } from "../db/schema.js";
 
 const SUPER_SYSTEM_BOUNDARY =
@@ -176,6 +177,7 @@ export interface SeedResult {
   wiki_pages: number;
   traces: number;
   trace_segments: number;
+  annotations: number;
 }
 
 export async function seedOhioData(database: Database): Promise<SeedResult> {
@@ -188,6 +190,7 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
     wiki_pages: 0,
     traces: 0,
     trace_segments: 0,
+    annotations: 0,
   };
 
   const [ohioErie] = await database
@@ -318,76 +321,149 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
     contributor: string;
     systemIdIdx: number;
     recordedAt: string;
+    annotations: Array<{
+      type: string;
+      value?: string | null;
+      index: number;
+      lon: number;
+      lat: number;
+      capturedAt: string;
+    }>;
   }> = [
     {
       geometry: "MULTILINESTRING((-82.538 39.438, -82.520 39.455, -82.492 39.468, -82.462 39.478, -82.432 39.470, -82.402 39.452))",
       source: "recorded", weight: 1.0, upvotes: 3, downvotes: 0, status: "active",
       contributor: "trail_blazer", systemIdIdx: 0, recordedAt: "2026-05-15",
+      annotations: [
+        { type: "surface_change", value: "gravel", index: 1, lon: -82.520, lat: 39.455, capturedAt: "2026-05-15T10:05:00Z" },
+        { type: "surface_change", value: "natural", index: 3, lon: -82.462, lat: 39.478, capturedAt: "2026-05-15T10:25:00Z" },
+        { type: "road_crossing", index: 5, lon: -82.402, lat: 39.452, capturedAt: "2026-05-15T10:40:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-82.542 39.441, -82.518 39.462, -82.488 39.469, -82.458 39.479, -82.428 39.468, -82.398 39.449))",
       source: "recorded", weight: 0.9, upvotes: 2, downvotes: 0, status: "active",
       contributor: "hiker_jane", systemIdIdx: 0, recordedAt: "2026-06-01",
+      annotations: [
+        { type: "surface_change", value: "paved", index: 0, lon: -82.542, lat: 39.441, capturedAt: "2026-06-01T08:00:00Z" },
+        { type: "pseudo_trail_start", index: 2, lon: -82.488, lat: 39.469, capturedAt: "2026-06-01T08:20:00Z" },
+        { type: "pseudo_trail_end", index: 4, lon: -82.428, lat: 39.468, capturedAt: "2026-06-01T08:35:00Z" },
+        { type: "surface_change", value: "natural", index: 5, lon: -82.398, lat: 39.449, capturedAt: "2026-06-01T08:45:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-82.536 39.439, -82.524 39.457, -82.494 39.466, -82.460 39.481, -82.434 39.472))",
       source: "import", weight: 0.7, upvotes: 1, downvotes: 0, status: "active",
       contributor: "gps_uploads", systemIdIdx: 0, recordedAt: "2026-04-20",
+      annotations: [
+        { type: "surface_change", value: "gravel", index: 1, lon: -82.524, lat: 39.457, capturedAt: "2026-04-20T12:00:00Z" },
+        { type: "surface_change", value: "boardwalk", index: 3, lon: -82.460, lat: 39.481, capturedAt: "2026-04-20T12:30:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-81.582 41.218, -81.558 41.238, -81.538 41.248, -81.518 41.262, -81.502 41.252, -81.482 41.232))",
       source: "recorded", weight: 1.0, upvotes: 5, downvotes: 0, status: "active",
       contributor: "cleveland_hiker", systemIdIdx: 1, recordedAt: "2026-05-10",
+      annotations: [
+        { type: "surface_change", value: "paved", index: 0, lon: -81.582, lat: 41.218, capturedAt: "2026-05-10T09:00:00Z" },
+        { type: "surface_change", value: "gravel", index: 3, lon: -81.518, lat: 41.262, capturedAt: "2026-05-10T09:30:00Z" },
+        { type: "road_crossing", index: 4, lon: -81.502, lat: 41.252, capturedAt: "2026-05-10T09:40:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-81.578 41.222, -81.562 41.243, -81.542 41.251, -81.522 41.258, -81.498 41.248))",
       source: "recorded", weight: 0.85, upvotes: 2, downvotes: 1, status: "active",
       contributor: "akron_walker", systemIdIdx: 1, recordedAt: "2026-06-10",
+      annotations: [
+        { type: "surface_change", value: "natural", index: 0, lon: -81.578, lat: 41.222, capturedAt: "2026-06-10T14:00:00Z" },
+        { type: "surface_change", value: "boardwalk", index: 2, lon: -81.542, lat: 41.251, capturedAt: "2026-06-10T14:20:00Z" },
+        { type: "surface_change", value: "natural", index: 4, lon: -81.498, lat: 41.248, capturedAt: "2026-06-10T14:40:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-82.468 39.448, -82.438 39.458, -82.412 39.470, -82.382 39.482, -82.352 39.488))",
       source: "import", weight: 0.6, upvotes: 1, downvotes: 0, status: "active",
       contributor: "trail_data", systemIdIdx: 2, recordedAt: "2026-03-15",
+      annotations: [
+        { type: "road_crossing", index: 2, lon: -82.412, lat: 39.470, capturedAt: "2026-03-15T10:00:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-82.472 39.452, -82.442 39.462, -82.408 39.468, -82.378 39.478))",
       source: "recorded", weight: 1.0, upvotes: 4, downvotes: 0, status: "active",
       contributor: "bike_scout", systemIdIdx: 2, recordedAt: "2026-06-15",
+      annotations: [
+        { type: "surface_change", value: "paved", index: 0, lon: -82.472, lat: 39.452, capturedAt: "2026-06-15T07:00:00Z" },
+        { type: "pseudo_trail_start", index: 1, lon: -82.442, lat: 39.462, capturedAt: "2026-06-15T07:15:00Z" },
+        { type: "pseudo_trail_end", index: 2, lon: -82.408, lat: 39.468, capturedAt: "2026-06-15T07:25:00Z" },
+        { type: "surface_change", value: "natural", index: 3, lon: -82.378, lat: 39.478, capturedAt: "2026-06-15T07:35:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-82.538 39.432, -82.522 39.448, -82.498 39.472, -82.482 39.488, -82.504 39.472, -82.522 39.450, -82.537 39.431))",
       source: "recorded", weight: 1.0, upvotes: 7, downvotes: 0, status: "active",
       contributor: "gorge_explorer", systemIdIdx: 0, recordedAt: "2026-05-20",
+      annotations: [
+        { type: "surface_change", value: "gravel", index: 0, lon: -82.538, lat: 39.432, capturedAt: "2026-05-20T06:00:00Z" },
+        { type: "road_crossing", index: 2, lon: -82.498, lat: 39.472, capturedAt: "2026-05-20T06:20:00Z" },
+        { type: "surface_change", value: "natural", index: 3, lon: -82.482, lat: 39.488, capturedAt: "2026-05-20T06:30:00Z" },
+        { type: "pseudo_trail_start", index: 4, lon: -82.504, lat: 39.472, capturedAt: "2026-05-20T06:45:00Z" },
+        { type: "pseudo_trail_end", index: 5, lon: -82.522, lat: 39.450, capturedAt: "2026-05-20T06:55:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-82.547 39.429, -82.525 39.447, -82.505 39.468, -82.485 39.491, -82.498 39.473, -82.519 39.448, -82.542 39.429))",
       source: "recorded", weight: 0.95, upvotes: 2, downvotes: 0, status: "active",
       contributor: "weekend_hiker", systemIdIdx: 0, recordedAt: "2026-06-05",
+      annotations: [
+        { type: "surface_change", value: "natural", index: 0, lon: -82.547, lat: 39.429, capturedAt: "2026-06-05T11:00:00Z" },
+        { type: "surface_change", value: "paved", index: 3, lon: -82.485, lat: 39.491, capturedAt: "2026-06-05T11:25:00Z" },
+        { type: "surface_change", value: "natural", index: 5, lon: -82.519, lat: 39.448, capturedAt: "2026-06-05T11:45:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-81.598 41.202, -81.578 41.218, -81.558 41.235, -81.538 41.258, -81.518 41.282, -81.492 41.288))",
       source: "import", weight: 0.4, upvotes: 0, downvotes: 3, status: "active",
       contributor: "old_data", systemIdIdx: 1, recordedAt: "2026-01-01",
+      annotations: [],
     },
     {
       geometry: "MULTILINESTRING((-81.605 41.198, -81.583 41.224, -81.560 41.242, -81.542 41.262, -81.524 41.278, -81.495 41.290))",
       source: "recorded", weight: 1.0, upvotes: 8, downvotes: 0, status: "active",
       contributor: "towpath_runner", systemIdIdx: 1, recordedAt: "2026-06-20",
+      annotations: [
+        { type: "surface_change", value: "gravel", index: 0, lon: -81.605, lat: 41.198, capturedAt: "2026-06-20T06:00:00Z" },
+        { type: "road_crossing", index: 2, lon: -81.560, lat: 41.242, capturedAt: "2026-06-20T06:15:00Z" },
+        { type: "surface_change", value: "paved", index: 3, lon: -81.542, lat: 41.262, capturedAt: "2026-06-20T06:25:00Z" },
+        { type: "road_crossing", index: 5, lon: -81.495, lat: 41.290, capturedAt: "2026-06-20T06:40:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-81.592 41.210, -81.572 41.228, -81.552 41.248, -81.532 41.265, -81.512 41.276))",
       source: "recorded", weight: 0.75, upvotes: 1, downvotes: 0, status: "active",
       contributor: "canal_rider", systemIdIdx: 1, recordedAt: "2026-04-10",
+      annotations: [
+        { type: "surface_change", value: "paved", index: 0, lon: -81.592, lat: 41.210, capturedAt: "2026-04-10T15:00:00Z" },
+        { type: "pseudo_trail_start", index: 2, lon: -81.552, lat: 41.248, capturedAt: "2026-04-10T15:20:00Z" },
+        { type: "pseudo_trail_end", index: 3, lon: -81.532, lat: 41.265, capturedAt: "2026-04-10T15:30:00Z" },
+      ],
     },
     {
       geometry: "MULTILINESTRING((-82.538 39.438, -82.520 39.455, -82.492 39.468, -82.462 39.478))",
       source: "recorded", weight: 0.25, upvotes: 0, downvotes: 6, status: "ignored",
       contributor: "unknown_walker", systemIdIdx: 0, recordedAt: "2026-02-01",
+      annotations: [],
     },
     {
       geometry: "MULTILINESTRING((-82.470 39.446, -82.440 39.456, -82.414 39.469, -82.384 39.480, -82.354 39.492))",
       source: "recorded", weight: 1.0, upvotes: 6, downvotes: 0, status: "active",
       contributor: "wayne_ranger", systemIdIdx: 2, recordedAt: "2026-05-25",
+      annotations: [
+        { type: "surface_change", value: "natural", index: 0, lon: -82.470, lat: 39.446, capturedAt: "2026-05-25T08:00:00Z" },
+        { type: "surface_change", value: "gravel", index: 2, lon: -82.414, lat: 39.469, capturedAt: "2026-05-25T08:20:00Z" },
+        { type: "pseudo_trail_start", index: 3, lon: -82.384, lat: 39.480, capturedAt: "2026-05-25T08:30:00Z" },
+        { type: "pseudo_trail_end", index: 4, lon: -82.354, lat: 39.492, capturedAt: "2026-05-25T08:35:00Z" },
+      ],
     },
   ];
 
@@ -418,6 +494,26 @@ export async function seedOhioData(database: Database): Promise<SeedResult> {
       .insert(traceSystems)
       .values({ traceId: trace.id, systemId: sys.id })
       .onConflictDoNothing();
+
+    // Insert trace annotations
+    if (t.annotations.length > 0) {
+      await database
+        .insert(traceAnnotations)
+        .values(
+          t.annotations.map((a) => ({
+            traceId: trace.id,
+            type: a.type,
+            value: a.value ?? null,
+            point: sql.raw(
+              `ST_SetSRID(ST_MakePoint(${a.lon}, ${a.lat}), 4326)::geometry(Point,4326)`,
+            ) as unknown as string,
+            traceIndex: a.index,
+            capturedAt: new Date(a.capturedAt),
+            contributorName: t.contributor,
+          })),
+        );
+      result.annotations += t.annotations.length;
+    }
   }
 
   const firstTrace = await database.select({ id: gpsTraces.id }).from(gpsTraces).limit(1);
