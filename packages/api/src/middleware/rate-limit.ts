@@ -47,6 +47,14 @@ export function rateLimit(opts?: {
     });
 
   return async (c: Context, next) => {
+    // Only rate-limit mutations. Read-only GET/HEAD requests are exempt
+    // because typical page loads fire many requests in a burst (systems,
+    // trails, segments, features, tiles, etc.) and the limit exists to
+    // prevent spam/vandalism, not to block normal browsing.
+    if (c.req.method === "GET" || c.req.method === "HEAD") {
+      return next();
+    }
+
     const key = keyFn(c);
     const now = Date.now();
     let entry = store.get(key);
