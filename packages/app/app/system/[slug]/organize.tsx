@@ -22,15 +22,12 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
 /**
- * §21.6 phase 2 — Organize view.
+ * §21.6 / Phase 10 — Organize view.
  *
- * A full-screen segment map for moderators to:
- *   - assign a cut segment to the nearest synthesized trail, or
- *   - propose a new trail (queues into the moderator proposal queue)
- *   - downvote / agree on a segment vote
- *
- * v1 uses simple flat lists; the "tap a segment on the map" UX is
- * the next iteration. The bottom sheet is the primary interaction.
+ * A full-screen segment map and proposal list. Synthesis runs
+ * automatically in the background (no manual trigger needed).
+ * Proposals are visible to any logged-in user; the approve /
+ * reject actions are moderator-only.
  */
 export default function SystemOrganize() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -51,13 +48,7 @@ export default function SystemOrganize() {
       reason: string;
     }>
   >([]);
-  const [synthLoading, setSynthLoading] = useState(false);
-  const [synthError, setSynthError] = useState<string | null>(null);
-  const [synthResult, setSynthResult] = useState<{
-    assigned: number;
-    proposed: number;
-    trails_updated: number;
-  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<(typeof proposals)[number] | null>(null);
   const [newTrailName, setNewTrailName] = useState("");
   const [approving, setApproving] = useState(false);
@@ -79,7 +70,7 @@ export default function SystemOrganize() {
         .catch(() => ({ items: [] as Trail[] }));
       setTrails(tr.items.filter((t) => t.tier === "synthesized"));
     } catch (err) {
-      setSynthError((err as Error).message);
+      setError((err as Error).message);
     }
   }, [slug, client]);
 
@@ -93,33 +84,13 @@ export default function SystemOrganize() {
       const r = await client.listSynthesisProposals(system.id);
       setProposals(r.proposals);
     } catch (err) {
-      setSynthError((err as Error).message);
+      setError((err as Error).message);
     }
   }, [client, system]);
 
   useEffect(() => {
     if (system) loadProposals();
   }, [system, loadProposals]);
-
-  async function runSynthesis() {
-    if (!system) return;
-    setSynthLoading(true);
-    setSynthError(null);
-    setSynthResult(null);
-    try {
-      const r = await client.synthesize(system.id);
-      setSynthResult({
-        assigned: r.assigned,
-        proposed: r.proposed,
-        trails_updated: r.trails_updated,
-      });
-      await loadProposals();
-    } catch (err) {
-      setSynthError((err as Error).message);
-    } finally {
-      setSynthLoading(false);
-    }
-  }
 
   async function approveProposal(segmentId: string, name: string) {
     if (!system) return;
@@ -130,7 +101,7 @@ export default function SystemOrganize() {
       setNewTrailName("");
       await loadProposals();
     } catch (err) {
-      setSynthError((err as Error).message);
+      setError((err as Error).message);
     } finally {
       setApproving(false);
     }
@@ -143,7 +114,7 @@ export default function SystemOrganize() {
       setSelectedSegment(null);
       await loadProposals();
     } catch (err) {
-      setSynthError((err as Error).message);
+      setError((err as Error).message);
     }
   }
 
@@ -152,24 +123,6 @@ export default function SystemOrganize() {
       <Stack.Screen
         options={{
           title: system?.name ? `Organize · ${system.name}` : "Organize",
-          headerRight: () =>
-            isModerator ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={runSynthesis}
-                disabled={synthLoading}
-                testID="organize-run-synthesis"
-                style={({ pressed }) => [
-                  styles.headerBtn,
-                  pressed && { opacity: 0.6 },
-                ]}
-              >
-                <Ionicons name="refresh" size={18} color={colors.primary} />
-                <Text style={[styles.headerBtnText, { color: colors.primary }]}>
-                  {synthLoading ? "Running…" : "Run synthesis"}
-                </Text>
-              </Pressable>
-            ) : null,
         }}
       />
 
@@ -183,22 +136,17 @@ export default function SystemOrganize() {
         />
       </View>
 
-      <View style={styles.summary} testID="organize-summary">
-        {synthResult ? (
-          <Text style={[styles.summaryText, { color: colors.textOnTint }]}>
-            ✓ Assigned {synthResult.assigned} · Proposed {synthResult.proposed} · Updated{" "}
-            {synthResult.trails_updated}
-          </Text>
-        ) : null}
-        {synthError ? <Text style={[styles.errorText, { color: colors.danger }]}>{synthError}</Text> : null}
-      </View>
+      {error ? (
+        <View style={styles.summary} testID="organize-summary">
+          <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+        </View>
+      ) : null}
 
       <ScrollView style={styles.list} testID="organize-proposals">
         <Text style={[styles.h2, { color: colors.text }]}>Proposals ({proposals.length})</Text>
         {proposals.length === 0 ? (
           <Text style={[styles.muted, { color: colors.textMuted }]}>
-            No outstanding segments. Tap “Run synthesis” to cut the latest traces and queue
-            proposals.
+            No outstanding proposals. Synthesis runs automatically when new traces are submitted.
           </Text>
         ) : null}
         {proposals.map((p) => (
@@ -294,15 +242,6 @@ export default function SystemOrganize() {
           </View>
         </View>
       </Modal>
-
-      {synthLoading ? (
-        <View
-          style={[styles.overlay, { backgroundColor: hexToRgba(colors.shadow, 0.5) }]}
-          testID="organize-loading"
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : null}
 
       <Text style={[styles.foot, { color: colors.textMuted }]} testID="organize-foot">
         contributor: {contributorName} · {isModerator ? "moderator" : "viewer"}

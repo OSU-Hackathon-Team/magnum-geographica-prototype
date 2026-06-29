@@ -399,14 +399,8 @@ export function createMagnumClient(
     listTraceSegmentVotes: (segmentId: string) =>
       client.get<{ segment_id: string; votes: Array<{ trail_id: string | null; vote: number; count: number }>; total: number }>(`/api/trace-segments/${segmentId}/votes`),
     // §21.6 phase 2 — synthesis
-    synthesize: (systemId: string) =>
-      client.post<{
-        run: { id: string; status: string; trails_updated: number; trails_proposed: number };
-        clusters: number;
-        assigned: number;
-        proposed: number;
-        trails_updated: number;
-      }>(`/api/systems/${systemId}/synthesize`),
+    // The POST /api/systems/:id/synthesize route was removed in Phase 10;
+    // synthesis runs automatically via the background worker.
     listSynthesisProposals: (systemId: string) =>
       client.get<{
         proposals: Array<{

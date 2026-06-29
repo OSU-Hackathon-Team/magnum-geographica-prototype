@@ -26,7 +26,7 @@ type Variables = { user?: AuthUser };
 
 export const synthesisRoute = new Hono<{ Variables: Variables }>();
 
-synthesisRoute.get("/admin/synthesis-proposals", moderatorRequired(), async (c) => {
+synthesisRoute.get("/admin/synthesis-proposals", authRequired(), async (c) => {
   const systemId = c.req.query("system_id");
   if (!systemId) return c.json({ error: "system_id is required" }, 400);
   const proposals = await listProposals(systemId);
