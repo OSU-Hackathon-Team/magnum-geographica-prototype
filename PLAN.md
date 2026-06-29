@@ -781,7 +781,7 @@ Four quick single-tap annotation buttons visible while recording is active:
 | **Surface change** | "The surface became gravel / paved / natural / boardwalk / road_connector from this point" | Long-press opens a 6-tile radial for material; single tap = gravel (most common), re-tap to change. A second tap updates the surface. |
 | **Road crossing** | A point where the trail crosses a road | Single tap — logs a GPS fix + `road_crossing` event. No menu. |
 | **Pseudo-trail start/end** | A section that's no longer really a trail (bike ride on road, abandoned, seasonal) | Toggle: tap once → start pseudo-trail mode (visual: red banner + haptic). Tap again → end it. While active, every GPS point between start and end is inside the pseudo-trail span. |
-| **Low-consensus marker** | A marker left at the final reading if the mode hasn't been stopped | Auto-generated if a user forgets to disable pseudo-trail; shown in the editor so it can be corrected. |
+| **Trail transition** | A marker for when the user transitions to a new trail | Single tap drops a `trail_transition` marker. Inline prompt for trail name (optional). Becomes a snap point in the trail editor (§23). |
 
 No typing required — every annotation is a 3-tap-max action against the recorder UI.
 
@@ -798,7 +798,8 @@ Annotations are attached to the trace submit payload as an array:
     { "type": "surface_change", "value": "gravel", "index": 412, "lat": 41.3, "lon": -81.6, "captured_at": "..." },
     { "type": "road_crossing",                              "index": 580, "lat": ...,   "lon": ...,    "captured_at": "..." },
     { "type": "pseudo_trail_start",                          "index": 720, "lat": ...,   "lon": ...,    "captured_at": "..." },
-    { "type": "pseudo_trail_end",                            "index": 905, "lat": ...,   "lon": ...,    "captured_at": "..." }
+    { "type": "pseudo_trail_end",                            "index": 905, "lat": ...,   "lon": ...,    "captured_at": "..." },
+    { "type": "trail_transition", "value": "Sycamore Ridge",  "index": 1100, "lat": ...,  "lon": ...,    "captured_at": "..." }
   ]
 }
 ```
@@ -2126,7 +2127,7 @@ magnum/
 ---
 
 _Last updated: 2026-06-29_
-_Phase 10 begins: synthesis redesign, canonical trail segments, inline trace annotations._
+_Phase 10b: unified map-based trail editor, replacing form-based segment editing and organize screen._
 
 ---
 
@@ -2879,7 +2880,7 @@ A redesign of the contributor recording flow to make capturing a GPS trace a **f
 | Surface | What it does |
 | --- | --- |
 | **Record tab (idle)** | Big "Start recording" CTA, "Import a file" link, recent traces list. |
-| **Record tab (active)** | Status pill (Recording/Paused/Submitting), live map with growing polyline + tail dot, three stats (Duration, Distance, Points), three quick-tap annotation buttons (Surface / Road Crossing / Pseudo-trail toggle), Pause/Resume + Submit buttons, Discard link. |
+| **Record tab (active)** | Status pill (Recording/Paused/Submitting), live map with growing polyline + tail dot, three stats (Duration, Distance, Points), four quick-tap annotation buttons (Surface / Road Crossing / Pseudo-trail toggle / Trail transition), Pause/Resume + Submit buttons, Discard link. |
 | **Persistent banner** | Red (recording) or amber (paused) bar across the top of every screen, shows duration and tap-target to return to the Record tab. |
 | **Recovery modal** | On app launch with an unfinished session, modal offers Continue / End & Save / Discard. |
 | **Explore FAB** | Continues to expose "Upload Trace" (file import) — the Record tab is the home for recording, the FAB is the home for file imports. |
@@ -2977,6 +2978,7 @@ While the recorder is active, a persistent three-button dock renders below the m
 | **Surface** | Long-press opens a 6-tile radial (natural / gravel / paved / boardwalk / road_connector / pseudo_trail). Single tap (after first open) logs the current surface as a `surface_change` event at the current GPS fix. | 1–2 |
 | **Road crossing** | Single tap. No menu. Logs a `road_crossing` GPS-fix event. | 1 |
 | **Pseudo-trail toggle** | Two-state. Off → tap to start (logs `pseudo_trail_start`, shows red banner + haptic). On → tap to end (logs `pseudo_trail_end`). | 1 |
+| **Trail transition** | Single tap drops a `trail_transition` marker at current GPS fix. Inline prompt: "Trail name (optional)" — type or skip. Marker visible on live map as blue diamond. These become snap points in the trail editor (§23). | 1–2 |
 
 Every annotation writes a row immediately to the local `trace_annotations` mirror (new SQLite table, v5 migration) with `(session_id, seq, type, value, lon, lat, captured_at)`. On trace submit, annotations are bundled into the server payload. The annotation dock is always visible during recording; when paused, buttons are disabled.
 
@@ -2987,7 +2989,7 @@ CREATE TABLE trace_annotations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   session_id TEXT NOT NULL,
   seq INTEGER NOT NULL,              -- monotonic ordinal, ties to trace_points.seq
-  type TEXT NOT NULL,                 -- surface_change | road_crossing | pseudo_trail_start | pseudo_trail_end
+  type TEXT NOT NULL,                 -- surface_change | road_crossing | pseudo_trail_start | pseudo_trail_end | trail_transition
   value TEXT,                          -- surface type when type=surface_change; NULL otherwise
   lon REAL NOT NULL,
   lat REAL NOT NULL,
@@ -3054,3 +3056,279 @@ The user-never-loses-data promise is the recovery modal: even on a hard kill, th
 - **Voice prompts.** "Half a mile to the next trail intersection" — driven by proximity queries against the live route + nearby trails.
 - **Photo attachments.** Long-press on the map during a recording to drop a geo-tagged photo into the trace as a feature.
 - **Multi-day recordings.** The schema supports indefinite session length (50k point cap is the only hard limit). Multi-day traces would split into segments by day.
+
+---
+
+## 23. Unified Trail Editor — Map-Based Editing (Phase 10b)
+
+A full-screen, map-based trail editor that replaces both the old form-based segment editor and the list-based "Organize Traces" screen. All trail editing — segment attributes, boundary adjustments, trail assignment from traces — happens visually on the map.
+
+### 23.1 Design Principles
+
+- **Visual, not forms.** Trails are rendered as styled lines on the map. Surface colors, pseudo-trail dotted patterns, and annotation pins communicate state at a glance. Editing happens through map gestures (tap, drag, draw-to-select), not text inputs and toggles.
+- **Two related modes, one screen.** Segment editing (the "what" — surface, pseudo, hazards) and trail editing (the "which trail" — assigning trace sections to named trails) are closely related tasks toggled with a single button.
+- **Never lose progress.** All changes are batched in a draft that autosaves to local storage every 5 seconds. If the app crashes, the network drops, or the user navigates away, the draft is preserved and offered for recovery. This extends the existing offline `pending_contributions` pattern.
+- **All trails in the system, always visible.** The editor shows the full trail network for spatial context. No filtering or hiding — just visual focus through opacity.
+- **Mobile-first, draw-to-select.** The primary selection gesture is drawing across the map. In segment mode it selects trail spans. In trail mode it selects trace spans. Both modes support snapping to annotation transition points.
+
+### 23.2 Architecture: Tile Mode vs Overlay Mode
+
+The map has two rendering modes for trails:
+
+| Mode | Where used | How trails render | Interactive? |
+| --- | --- | --- | --- |
+| **Tile mode** (existing) | Explore map, browse | Martin MVT → `VectorTileSource` → canvas. Geometry never crosses the bridge. | No (tap → feature select only) |
+| **Overlay mode** (new) | Trail editor, trail detail mini-map | Host pushes GeoJSON segments + annotations → `ol.layer.Vector` with per-feature styles. | Yes — drag, tap, draw-to-select |
+
+Overlay mode is the foundation of the editor. The host (React Native) fetches trail/segment/annotation data from the API and pushes it to the map as vector features. The map renders them with rich per-segment styling and handles all interaction (tap, drag, draw-to-select) inside OpenLayers, reporting events back over the bridge.
+
+### 23.3 Screen Layout
+
+```
+┌─────────────────────────────────────────┐
+│ ←  Trail Editor — {System Name}    [✔]  │  Header: back + save indicator
+│                                         │
+│  [Segments] [Trails]     📌 Snap  👁 traces│  Toolbar: mode toggle + snap + trace visibility
+├─────────────────────────────────────────┤
+│                                         │
+│                                         │
+│            FULL-SCREEN MAP              │
+│                                         │
+│    All trails rendered with segment     │
+│    styling (surface colors, dotted      │
+│    pseudo, etc.)                        │
+│                                         │
+│    In Segments mode: boundary handles   │
+│    In Trails mode: trace overlays +     │
+│    transition markers                   │
+│                                         │
+│                                         │
+├─────────────────────────────────────────┤
+│  [Bottom sheet appears on tap/draw]     │
+└─────────────────────────────────────────┘
+```
+
+### 23.4 Mode Toggle: Segments vs Trails
+
+#### Segments mode
+
+**Purpose:** Edit the attributes of trail segments (surface, pseudo, hazards).
+
+- **Boundary handles** visible on all trails (draggable circles at each segment transition).
+- **Draw-to-select** a span of any trail → highlights segment(s) → bottom sheet appears.
+- **Tap** a segment → same bottom sheet.
+- **Drag** a boundary handle → adjusts where one segment ends and the next begins (snaps to trail geometry).
+- **Long-press** a boundary → merge adjacent segments.
+- **Tap** on a trail between handles → split at that point.
+- **Traces toggle**: optional — show raw GPS traces underneath for context (faded, with annotation pins).
+
+Bottom sheet (segment attributes):
+
+```
+┌─────────────────────────────────┐
+│  Segment 3 · 142m               │
+│                                 │
+│  Surface                        │
+│  [Natural] [Gravel] [Paved]     │
+│  [Boardwalk] [Road]             │
+│                                 │
+│  ☐ Pseudo-trail                 │
+│  ☐ Road connector               │
+│  ☐ Steep grade                  │
+│                                 │
+│  Hazards                        │
+│  [Rocky] [Muddy] [Exposed]...   │
+│                                 │
+│  [Clear low-consensus]  (trusted+)│
+│  [Delete segment]               │
+└─────────────────────────────────┘
+```
+
+#### Trails mode
+
+**Purpose:** Mark what trail is what — assign trace sections to named trails.
+
+- **All raw traces** overlaid on the map (intentionally overlapping, each a different color).
+- **Transition markers** visible on traces (from annotations: surface changes, pseudo starts/ends, trail-transition markers from the recorder).
+- **All existing trails** visible underneath (faded, for context).
+- **Draw-to-select** a span of a trace → highlights it → bottom sheet appears.
+- **Snap toggle** (magnet icon): when enabled, selection endpoints snap to nearby transition markers.
+
+Bottom sheet (trail assignment):
+
+```
+┌─────────────────────────────────┐
+│  Assign to trail                │
+│                                 │
+│  340m of Trace A selected       │
+│                                 │
+│  Existing trails:               │
+│  ● Sycamore Ridge Trail         │
+│  ● Old Loggers Path             │
+│  ● Buckeye Loop                 │
+│                                 │
+│  + Create new trail...          │
+│  ✕ Not a trail (pseudo)         │
+└─────────────────────────────────┘
+```
+
+After assignment, the selected span takes on the trail's color. Multiple traces assigned to the same trail merge visually.
+
+**Merge two trails:** draw-select across the boundary between two differently-assigned sections → "Merge into [Trail A]?"
+
+**Split a trail:** tap a transition point within an assigned section → "Split here?"
+
+#### "Toggle marked trails" button
+
+In Trails mode, a button toggles between:
+- **All traces visible** (default) — shows every raw trace with transition markers, for marking.
+- **Only marked/assigned** — shows only the canonical trail lines (what's been assigned), hides raw traces.
+
+This lets the user see the "clean" result of their work vs the raw data they're marking from.
+
+### 23.5 Visual Style Guide
+
+#### Line rendering per segment
+
+| Attribute | Visual |
+| --- | --- |
+| Surface colors | Existing palette: brown/tan/grey/sienna, 5px solid |
+| Road connector | Grey dashed `[10, 6]` |
+| Pseudo-trail | Thick dotted overlay (`[2, 8]` dot pattern, 8px width) on top of surface color |
+| Low consensus (<0.4) | Line at 40% opacity (pale, faded — subtle, not attention-grabbing) |
+| Source: editor | No special marker (looks authoritative) |
+| Source: synthesis | Very thin dashed border on the line edge (subtle distinction) |
+
+#### Annotation pins (28px, big and visible)
+
+| Type | Icon | Color |
+| --- | --- | --- |
+| Surface change | Filled circle matching new surface color, white border | Surface palette |
+| Road crossing | X-shape (`RegularShape` cross) | Amber (`#eab308`) |
+| Pseudo-trail start | Right-pointing flag | Red (`#ef4444`) |
+| Pseudo-trail end | Left-pointing flag | Grey (`#6b7280`) |
+| Trail transition | Diamond | Blue (`#3b82f6`) |
+
+#### Boundary handles
+
+White-filled circles, 18px, colored border matching the following segment's surface color. Highlight on touch.
+
+### 23.6 Entry Points
+
+| Where | Button | Action |
+| --- | --- | --- |
+| System detail | "Edit Trails" (replaces "Organize Traces") | Opens trail editor for the system |
+| Trail detail | "Edit" | Opens trail editor, auto-focused on that trail (zoomed to its geometry) |
+
+The old `organize.tsx` screen is deleted.
+
+### 23.7 Save Flow — Never Lose Progress
+
+#### Draft autosave
+
+1. **In-memory draft** in a Zustand store (`trailEditStore`): tracks all pending changes (segment attribute updates, boundary moves, splits, merges, trail assignments, new trail creations).
+2. **Autosave to local storage** every 5 seconds (if dirty) using AsyncStorage (`@react-native-async-storage/async-storage`) — platform-agnostic, works on web + native.
+3. **Draft key**: `magnum.trail-edit-draft.{systemId}` — JSON blob with `{ changes: [...], timestamp, mode }`.
+4. **On crash/recovery**: detect unsaved draft on editor mount → "Restore unsaved changes?" dialog.
+
+#### Sync to server
+
+1. Changes are **batched** — not sent per-interaction.
+2. **On back button**: if dirty, "Save changes?" dialog → save → sync.
+3. **When online**: batch-send all changes via existing segment API endpoints (PUT/POST/DELETE segments, split, merge) + trail assignment endpoints.
+4. **When offline**: queue each operation in `pending_contributions` (existing SQLite offline pattern) — clear draft only after successful queue.
+5. **If save fails**: keep the local draft, show "⚠ Unsaved changes" indicator in header.
+6. **Never discard**: the draft persists in local storage until explicitly saved or discarded by the user.
+
+### 23.8 Trail Detail Mini-Map
+
+The trail detail mini-map (240pt box) switches to overlay rendering for the focused trail. Instead of relying on Martin tiles (which don't show segment styling), the mini-map pushes the trail's segments as a vector overlay. This shows surface colors, pseudo dotted lines, and annotation pins — a small scope change with a big visual win.
+
+### 23.9 Recorder "Trail" Button
+
+New button in the annotation dock during recording (see §22.6):
+
+- Flag icon, labeled "Trail".
+- Tap → drops a `trail_transition` annotation at the current GPS fix.
+- Inline prompt: "Trail name (optional)" text input above the dock — type or skip.
+- Marker visible on live recording map as blue diamond.
+- These become snap points in Trails editing mode.
+
+New annotation type: `trail_transition` added to `TRACE_ANNOTATION_TYPES`.
+
+### 23.10 Bridge Expansion
+
+#### New commands (host → WebView)
+
+| Command | Purpose |
+| --- | --- |
+| `setTrailOverlay` | Push system-scoped vector data: trails (with segments + boundaries), features, annotations |
+| `clearTrailOverlay` | Remove overlay |
+| `setEditorMode` | `{ mode: 'segments' \| 'trails' }` — toggle interaction handlers |
+| `setSnapEnabled` | `{ enabled: bool }` — toggle draw-select snapping at runtime |
+| `setTracesVisible` | `{ visible: bool }` — toggle raw trace visibility |
+
+#### New events (WebView → host)
+
+| Event | Payload | Purpose |
+| --- | --- | --- |
+| `segmentTap` | `{ trail_id, segment_id, lon, lat }` | Open segment bottom sheet |
+| `boundaryDrag` | `{ boundary_id, lon, lat }` | Boundary moved — update geometry |
+| `boundaryLongPress` | `{ boundary_id }` | Merge dialog |
+| `trailSplit` | `{ trail_id, lon, lat }` | Insert new boundary |
+| `drawSelect` | `{ trace_id?, trail_id?, start: {lon,lat}, end: {lon,lat}, snapped: bool }` | Draw-to-select completed |
+
+All interactions happen inside the WebView's OpenLayers instance. The host only receives final results on gesture end — no per-frame round-trips. This keeps the interaction smooth.
+
+### 23.11 File-by-File Change List
+
+#### Map package
+
+| File | Change |
+| --- | --- |
+| `src/layers/SegmentsLayer.ts` **(new)** | Web layer factory: per-surface style function, pseudo-trail dotted overlay, low-consensus opacity |
+| `src/layers/AnnotationLayer.ts` **(new)** | Web layer factory: annotation pins as Icon/RegularShape features |
+| `src/layers/BoundaryHandleLayer.ts` **(new)** | Web layer factory: draggable boundary circles |
+| `src/MapContainer.web.tsx` | Add `trailOverlay`, `editorMode`, `snapEnabled`, `tracesVisible` props; wire overlay layers + draw-select interaction + boundary Modify |
+| `src/MapContainer.native.tsx` | Add new bridge command handlers in `buildMapHtml` + `onHostMessage`; implement per-segment styling, annotation pins, boundary handles, draw-to-select in WebView HTML |
+| `src/bridge/types.ts` | New command types + new event types |
+| `src/bridge/ol-bridge.ts` | Command → script mappings for new commands |
+| `src/types.ts` | New props: `trailOverlay`, `editorMode`, `snapEnabled`, `tracesVisible`, `onSegmentTap`, `onBoundaryDrag`, `onDrawSelect` |
+| `src/shared/styles.ts` | Pseudo-trail dotted style, annotation icon styles, boundary handle style, low-consensus opacity helper |
+
+#### App package
+
+| File | Change |
+| --- | --- |
+| `app/system/[slug]/edit.tsx` **(new)** | Unified trail editor screen — full-screen map + mode toggle + bottom sheets |
+| `app/system/[slug]/organize.tsx` | **Deleted** |
+| `app/trail/[slug].tsx` | "Edit" button → navigates to system edit screen focused on this trail; TrailMapPreview uses overlay rendering |
+| `src/components/trail/SegmentMapEditor.tsx` **(new)** | Map-based segment editing component (bottom sheet + boundary interactions) |
+| `src/components/trail/TrailAssignmentSheet.tsx` **(new)** | Trail assignment bottom sheet (existing trail picker, create new, pseudo) |
+| `src/components/trail/SegmentEditor.tsx` | **Deprecated** — form-based editor replaced by SegmentMapEditor |
+| `src/components/trace/AnnotationDock.tsx` | Add "Trail" button (trail_transition marker + optional name prompt) |
+| `src/components/trace/TrailTracesTab.tsx` | "Organize" → "Edit Trails" → routes to edit.tsx |
+| `src/stores/trailEditStore.ts` **(new)** | Zustand store: draft state, change queue, autosave logic, sync-to-server |
+
+#### Shared package
+
+| File | Change |
+| --- | --- |
+| `src/constants.ts` | Add `trail_transition` to `TRACE_ANNOTATION_TYPES` |
+| `src/schemas/index.ts` | Add `trail_transition` to annotation schema |
+
+#### API package
+
+| File | Change |
+| --- | --- |
+| `src/services/synthesis.ts` | Treat `trail_transition` as a trail-span boundary in `emitCanonicalSegments` |
+
+### 23.12 Implementation Order
+
+1. **Map bridge expansion** — new commands, events, per-segment styling, annotation pins (both web + native)
+2. **Trail detail mini-map overlay** — quick win, validates the overlay rendering pipeline
+3. **Segment mode** — boundary handles, draw-to-select, segment bottom sheet, splits/merges
+4. **Trail mode** — trace overlays, transition markers, draw-to-select with snapping, trail assignment bottom sheet
+5. **Draft autosave + offline sync** — Zustand store, AsyncStorage, pending_contributions integration
+6. **Recorder "Trail" button** — trail_transition annotation capture
+7. **Delete organize.tsx**, wire up new entry points
