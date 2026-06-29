@@ -38,7 +38,35 @@ import {
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const MARTIN_URL = process.env.EXPO_PUBLIC_MARTIN_URL ?? "http://localhost:3001";
 
-function TrailMapPreview({ center, geometry, backgroundColor }: { center?: { lon: number; lat: number } | null; geometry?: unknown; backgroundColor?: string }) {
+function TrailMapPreview({ center, geometry, backgroundColor, segments }: {
+  center?: { lon: number; lat: number } | null;
+  geometry?: unknown;
+  backgroundColor?: string;
+  segments?: TrailSegment[];
+}) {
+  const trailOverlay = segments && segments.length > 0 ? {
+    trails: [{
+      id: "", name: "Trail",
+      segments: segments.map((s, i) => ({
+        coordinates: (() => {
+          const geom = s.geometry as { coordinates?: unknown; type?: string } | undefined;
+          if (geom?.type === "LineString" && Array.isArray(geom.coordinates)) return geom.coordinates as Array<[number, number]>;
+          if (geom?.type === "MultiLineString" && Array.isArray(geom.coordinates)) return (geom.coordinates as Array<Array<[number, number]>>).flat();
+          return [];
+        })(),
+        surface_type: s.surface_type ?? null,
+        is_pseudo_trail: s.is_pseudo_trail ?? false,
+        is_road_connector: s.is_road_connector ?? false,
+        source: s.source ?? null,
+        consensus: s.consensus ?? null,
+        sort_order: s.sort_order ?? i,
+      })),
+      boundaries: [],
+    }],
+    features: [],
+    annotations: [],
+  } : null;
+
   return (
     <View style={[styles.mapPreview, backgroundColor ? { backgroundColor } : undefined]}>
       <MapContainer
@@ -48,6 +76,7 @@ function TrailMapPreview({ center, geometry, backgroundColor }: { center?: { lon
           initialZoom: 12,
         }}
         fitGeometry={geometry ?? null}
+        trailOverlay={trailOverlay}
       />
     </View>
   );
@@ -557,7 +586,7 @@ export default function TrailDetail() {
     <>
       <Stack.Screen options={{ title: trail.name, headerShown: true }} />
       <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} testID="trail-detail-screen">
-        <TrailMapPreview center={trail.center} geometry={trail.geometry} backgroundColor={colors.border} />
+        <TrailMapPreview center={trail.center} geometry={trail.geometry} backgroundColor={colors.border} segments={segments} />
 
         <View style={styles.section} testID="trail-meta">
           <View style={styles.row}>

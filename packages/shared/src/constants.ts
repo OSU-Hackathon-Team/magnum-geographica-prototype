@@ -284,8 +284,17 @@ export const TRACE_ANNOTATION_TYPES = [
   "road_crossing",
   "pseudo_trail_start",
   "pseudo_trail_end",
+  "trail_transition",
 ] as const;
 export type TraceAnnotationType = (typeof TRACE_ANNOTATION_TYPES)[number];
+
+export const ANNOTATION_PIN_COLORS: Record<TraceAnnotationType, string> = {
+  surface_change: "#22c55e",
+  road_crossing: "#eab308",
+  pseudo_trail_start: "#ef4444",
+  pseudo_trail_end: "#6b7280",
+  trail_transition: "#3b82f6",
+};
 
 // ========== Synthesis (§21.6 / Phase 10) ==========
 
@@ -297,6 +306,14 @@ export type SynthesisJobStatus = (typeof SYNTHESIS_JOB_STATUSES)[number];
 
 export const SYNTHESIS_DEBOUNCE_MS = 60_000;
 export const SYNTHESIS_LOW_CONSENSUS_THRESHOLD = 0.4;
+
+// §22.6 — Pseudo-trail visual style
+export const PSEUDO_TRAIL_LINE_WIDTH = 8;
+export const PSEUDO_TRAIL_DASH = [2, 8];
+export const LOW_CONSENSUS_OPACITY = 0.4;
+export const BOUNDARY_HANDLE_RADIUS = 9;
+export const BOUNDARY_HANDLE_STROKE = 2;
+export const ANNOTATION_PIN_SIZE = 28;
 
 // ========== Hierarchy actions (§21.5) ==========
 

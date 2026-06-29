@@ -92,10 +92,10 @@ export function TrailTracesTab({ systemId, testID }: TrailTracesTabProps) {
           <Button
             variant="ghost"
             size="small"
-            onPress={() => router.push(`/system/${systemId}/organize` as never)}
-            testID="traces-organize"
+            onPress={() => router.push(`/system/${systemId}/edit` as never)}
+            testID="traces-edit-trails"
           >
-            <Ionicons name="git-merge" size={14} color={colors.text} /> Organize
+            <Ionicons name="git-branch-outline" size={14} color={colors.text} /> Edit Trails
           </Button>
           <Button
             variant="primary"

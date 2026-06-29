@@ -51,6 +51,16 @@ export function commandToScript(command: BridgeCommand): string {
       return `window.olBridge.setTraceSegments(${json});`;
     case "clearTraceSegments":
       return `window.olBridge.clearTraceSegments();`;
+    case "setTrailOverlay":
+      return `window.olBridge.setTrailOverlay(${json});`;
+    case "clearTrailOverlay":
+      return `window.olBridge.clearTrailOverlay();`;
+    case "setEditorMode":
+      return `window.olBridge.setEditorMode(${json});`;
+    case "setSnapEnabled":
+      return `window.olBridge.setSnapEnabled(${json});`;
+    case "setTracesVisible":
+      return `window.olBridge.setTracesVisible(${json});`;
     default: {
       const _exhaustive: never = command;
       void _exhaustive;
@@ -83,9 +93,14 @@ export function isBridgeMethod(method: string): method is BridgeMethod {
     "setLine",
     "setHighlightTrace",
     "clearHighlightTrace",
-    "setTraceSegments",
-    "clearTraceSegments",
-  ].includes(method);
+      "setTraceSegments",
+      "clearTraceSegments",
+      "setTrailOverlay",
+      "clearTrailOverlay",
+      "setEditorMode",
+      "setSnapEnabled",
+      "setTracesVisible",
+    ].includes(method);
 }
 
 export function isBridgeEvent(value: unknown): value is BridgeEvent {
@@ -103,6 +118,11 @@ export function isBridgeEvent(value: unknown): value is BridgeEvent {
       "drawEnd",
       "shapeHit",
       "shapeDrag",
+      "segmentTap",
+      "boundaryDrag",
+      "boundaryLongPress",
+      "trailSplit",
+      "drawSelect",
     ].includes(t)
   );
 }

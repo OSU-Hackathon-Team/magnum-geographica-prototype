@@ -79,14 +79,160 @@ function buildMapHtml(
           shapeSource=null,
           shapeLayer=null,
           dragVertex=null,
-          dragFired=false;
+          dragFired=false,
+          // Trail editor overlay globals
+          trailOverlaySegSrc=null,
+          trailOverlaySegLayer=null,
+          trailOverlayAnnSrc=null,
+          trailOverlayAnnLayer=null,
+          trailOverlayBndSrc=null,
+          trailOverlayBndLayer=null,
+          trailOverlayTrcSrc=null,
+          trailOverlayTrcLayer=null,
+          editorMode='segments',
+          snapEnabled=true,
+          tracesVisible=true;
 
       function postToRN(e){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(e))}}
 
       function baseStyle(){return new ol.style.Style({stroke:new ol.style.Stroke({color:'#8B4513',width:3})})}
       function highlightStyle(){return new ol.style.Style({stroke:new ol.style.Stroke({color:'#22c55e',width:5})})}
 
-      function applyHighlight(){
+      // Trail overlay: per-segment styled rendering for the editor
+      var SURFACE_COLORS={natural:'#8B4513',gravel:'#C2B280',paved:'#4A4A4A',boardwalk:'#A0522D',road_connector:'#888888'};
+      function segmentStyle(data){
+        var surface=data.surface_type||'natural';
+        var color=SURFACE_COLORS[surface]||SURFACE_COLORS.natural;
+        var isLow=typeof data.consensus==='number'&&data.consensus<0.4;
+        var opacity=isLow?0.4:1;
+        function rgba(hex,o){var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return 'rgba('+r+','+g+','+b+','+o+')'}
+        var styles=[];
+        if(data.is_road_connector){
+          styles.push(new ol.style.Style({stroke:new ol.style.Stroke({color:'#888888',width:5,lineDash:[10,6]})}));
+        }else{
+          styles.push(new ol.style.Style({stroke:new ol.style.Stroke({color:rgba(color,opacity),width:5})}));
+        }
+        if(data.is_pseudo_trail){
+          styles.push(new ol.style.Style({stroke:new ol.style.Stroke({color:'#ef4444',width:8,lineDash:[2,8]})}));
+        }
+        return styles;
+      }
+      var ANNOTATION_COLORS={surface_change:'#22c55e',road_crossing:'#eab308',pseudo_trail_start:'#ef4444',pseudo_trail_end:'#6b7280',trail_transition:'#3b82f6'};
+      function buildTrailOverlay(data){
+        if(!map)return;
+        // Segments
+        if(!trailOverlaySegSrc){trailOverlaySegSrc=new ol.source.Vector();trailOverlaySegLayer=new ol.layer.Vector({source:trailOverlaySegSrc,zIndex:1000});map.addLayer(trailOverlaySegLayer)}
+        trailOverlaySegSrc.clear();
+        if(!trailOverlayAnnSrc){trailOverlayAnnSrc=new ol.source.Vector();trailOverlayAnnLayer=new ol.layer.Vector({source:trailOverlayAnnSrc,zIndex:1001});map.addLayer(trailOverlayAnnLayer)}
+        trailOverlayAnnSrc.clear();
+        if(!trailOverlayBndSrc){trailOverlayBndSrc=new ol.source.Vector();trailOverlayBndLayer=new ol.layer.Vector({source:trailOverlayBndSrc,zIndex:1002});map.addLayer(trailOverlayBndLayer);
+          // Boundary drag via Translate interaction
+          var bndTranslate=new ol.interaction.Translate({layers:[trailOverlayBndLayer],hitTolerance:10});
+          bndTranslate.on('translateend',function(evt){
+            for(var fi=0;fi<evt.features.getLength();fi++){
+              var f=evt.features.item(fi);
+              var bd=f.get('boundaryData');
+              var g=f.getGeometry();
+              if(bd&&g){var c=ol.proj.toLonLat(g.getCoordinates());postToRN({type:'boundaryDrag',trail_id:bd.trail_id||'',boundary_sort_order:bd.sort_order||0,lon:c[0],lat:c[1]})}
+            }
+          });
+          map.addInteraction(bndTranslate);
+        }
+        trailOverlayBndSrc.clear();
+        if(!data||!data.trails)return;
+        // Segments
+        for(var ti=0;ti<data.trails.length;ti++){
+          var tr=data.trails[ti];
+          if(!tr.segments)continue;
+          for(var si=0;si<tr.segments.length;si++){
+            var s=tr.segments[si];
+            if(!s.coordinates||s.coordinates.length<2)continue;
+            var coords=s.coordinates.map(function(c){return ol.proj.fromLonLat(c)});
+            var feat=new ol.Feature({geometry:new ol.geom.LineString(coords)});
+            feat.set('segmentData',s);
+            feat.setStyle(segmentStyle(s));
+            trailOverlaySegSrc.addFeature(feat);
+          }
+          // Boundaries
+          if(tr.boundaries){
+            for(var bi=0;bi<tr.boundaries.length;bi++){
+              var b=tr.boundaries[bi];
+              var bpt=new ol.Feature({geometry:new ol.geom.Point(ol.proj.fromLonLat([b.lon,b.lat]))});
+              bpt.set('boundaryData',Object.assign({},b,{trail_id:tr.id}));
+              bpt.setStyle(new ol.style.Style({image:new ol.style.Circle({radius:9,fill:new ol.style.Fill({color:'#fff'}),stroke:new ol.style.Stroke({color:'#3b82f6',width:2})})}));
+              trailOverlayBndSrc.addFeature(bpt);
+            }
+          }
+        }
+        // Annotation pins
+        if(data.annotations){
+          for(var ai=0;ai<data.annotations.length;ai++){
+            var ann=data.annotations[ai];
+            var acolor=ANNOTATION_COLORS[ann.type]||'#9ca3af';
+            var apt=new ol.Feature({geometry:new ol.geom.Point(ol.proj.fromLonLat([ann.lon,ann.lat]))});
+            apt.set('annotationData',ann);
+            apt.setStyle(new ol.style.Style({image:new ol.style.Circle({radius:14,fill:new ol.style.Fill({color:acolor}),stroke:new ol.style.Stroke({color:'#fff',width:2})})}));
+            trailOverlayAnnSrc.addFeature(apt);
+          }
+        }
+        // Trace lines (for trails mode)
+        if(data.traces){
+          if(!trailOverlayTrcSrc){trailOverlayTrcSrc=new ol.source.Vector();trailOverlayTrcLayer=new ol.layer.Vector({source:trailOverlayTrcSrc,zIndex:1003});map.addLayer(trailOverlayTrcLayer)}
+          trailOverlayTrcSrc.clear();
+          for(var ti=0;ti<data.traces.length;ti++){
+            var trc=data.traces[ti];
+            if(!trc.coordinates||trc.coordinates.length<2)continue;
+            var tcoords=trc.coordinates.map(function(c){return ol.proj.fromLonLat(c)});
+            var tfeat=new ol.Feature({geometry:new ol.geom.LineString(tcoords)});
+            tfeat.set('traceId',trc.id);
+            tfeat.set('color',trc.color||'#3b82f6');
+            tfeat.set('transitions',trc.transitions||[]);
+            tfeat.setStyle(new ol.style.Style({stroke:new ol.style.Stroke({color:trc.color||'#3b82f6',width:3,lineCap:'round'})}));
+            trailOverlayTrcSrc.addFeature(tfeat);
+            // Transition markers
+            if(trc.transitions){
+              for(var tri=0;tri<trc.transitions.length;tri++){
+                var trp=trc.transitions[tri];
+                var tpt=new ol.Feature({geometry:new ol.geom.Point(ol.proj.fromLonLat([trp.lon,trp.lat]))});
+                tpt.setStyle(new ol.style.Style({image:new ol.style.Circle({radius:6,fill:new ol.style.Fill({color:'#f59e0b'}),stroke:new ol.style.Stroke({color:'#fff',width:1})})}));
+                trailOverlayTrcSrc.addFeature(tpt);
+              }
+            }
+          }
+        }
+        // Click handler for segment tap
+        map.un('click',onSegmentClick);
+        map.on('click',onSegmentClick);
+      }
+      function onSegmentClick(evt){
+        if(!trailOverlaySegLayer)return;
+        var feat=map.forEachFeatureAtPixel(map.getEventPixel(evt.originalEvent),function(f,l){return l===trailOverlaySegLayer?f:null});
+        if(feat){
+          var sdata=feat.get('segmentData');
+          if(sdata){
+            var coord=ol.proj.toLonLat(evt.coordinate);
+            postToRN({type:'segmentTap',trail_id:'',segment_sort_order:sdata.sort_order||0,lon:coord[0],lat:coord[1]});
+            return;
+          }
+        }
+        // Check boundary handles
+        if(trailOverlayBndLayer){
+          var bfeat=map.forEachFeatureAtPixel(map.getEventPixel(evt.originalEvent),function(f,l){return l===trailOverlayBndLayer?f:null});
+          if(bfeat){
+            var bdata=bfeat.get('boundaryData');
+            if(bdata){
+              postToRN({type:'boundaryLongPress',trail_id:bdata.trail_id||'',boundary_sort_order:bdata.sort_order||0});
+              return;
+            }
+          }
+        }
+        // Trail split: tap on trail line between segments
+        var nearTrail=map.forEachFeatureAtPixel(map.getEventPixel(evt.originalEvent),function(f,l){return l===trailOverlaySegLayer?f:null},{hitTolerance:12});
+        if(nearTrail){
+          var coord=ol.proj.toLonLat(evt.coordinate);
+          postToRN({type:'trailSplit',trail_id:'',lon:coord[0],lat:coord[1]});
+        }
+      }
         if(!vectorSources.trails)return;
         var src = vectorSources.trails;
         if(typeof src.forEachFeature === 'function'){
@@ -383,8 +529,21 @@ function buildMapHtml(
                     if(ek==='ring-outline'){
                       hit={kind:'edge',ringIndex:features[ej].get('ringIndex')||0,vertexIndex:-1};
                       break;
-                    }
-                  }
+            }
+          }else if(m === 'setTrailOverlay' && a){
+            buildTrailOverlay(a);
+          }else if(m === 'clearTrailOverlay'){
+            if(trailOverlaySegSrc) trailOverlaySegSrc.clear();
+            if(trailOverlayAnnSrc) trailOverlayAnnSrc.clear();
+            if(trailOverlayBndSrc) trailOverlayBndSrc.clear();
+            if(trailOverlayTrcSrc) trailOverlayTrcSrc.clear();
+          }else if(m === 'setEditorMode' && a){
+            editorMode = a.mode || 'segments';
+          }else if(m === 'setSnapEnabled' && a){
+            snapEnabled = !!a.enabled;
+          }else if(m === 'setTracesVisible' && a){
+            tracesVisible = !!a.visible;
+          }
                 }
               }
             }catch(_){}
@@ -839,7 +998,17 @@ function buildMapHtml(
               }
             }
           }
-        }
+        },
+        setTrailOverlay:function(a){buildTrailOverlay(a)},
+        clearTrailOverlay:function(){
+          if(trailOverlaySegSrc) trailOverlaySegSrc.clear();
+          if(trailOverlayAnnSrc) trailOverlayAnnSrc.clear();
+          if(trailOverlayBndSrc) trailOverlayBndSrc.clear();
+          if(trailOverlayTrcSrc) trailOverlayTrcSrc.clear();
+        },
+        setEditorMode:function(a){if(a&&a.mode) editorMode = a.mode},
+        setSnapEnabled:function(a){snapEnabled = !!(a&&a.enabled)},
+        setTracesVisible:function(a){tracesVisible = !!(a&&a.visible)}
       };
       window.addEventListener('error',function(e){postToRN({type:'error',message:e.message})});
       // Replay any commands the host sent before the bridge was installed.
@@ -874,6 +1043,15 @@ export default function MapContainer({
   segmentTileVersion,
   featureTileVersion,
   superSystemTileVersion,
+  trailOverlay,
+  editorMode,
+  snapEnabled,
+  tracesVisible,
+  onSegmentTap,
+  onBoundaryDrag,
+  onBoundaryLongPress,
+  onTrailSplit,
+  onDrawSelect,
 }: MapContainerProps) {
   const webViewRef = useRef<WebView | null>(null);
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
@@ -1001,6 +1179,17 @@ export default function MapContainer({
   shapeModeForHandler.current = shapeMode;
   onShapeActionForHandler.current = onShapeAction;
 
+  const onSegmentTapRef = useRef(onSegmentTap);
+  const onBoundaryDragRef = useRef(onBoundaryDrag);
+  const onBoundaryLongPressRef = useRef(onBoundaryLongPress);
+  const onTrailSplitRef = useRef(onTrailSplit);
+  const onDrawSelectRef = useRef(onDrawSelect);
+  onSegmentTapRef.current = onSegmentTap;
+  onBoundaryDragRef.current = onBoundaryDrag;
+  onBoundaryLongPressRef.current = onBoundaryLongPress;
+  onTrailSplitRef.current = onTrailSplit;
+  onDrawSelectRef.current = onDrawSelect;
+
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
       let parsed: unknown;
@@ -1019,6 +1208,11 @@ export default function MapContainer({
         shape: shapeForHandler.current,
         shapeMode: shapeModeForHandler.current,
         onShapeAction: onShapeActionForHandler.current,
+        onSegmentTap: onSegmentTapRef.current,
+        onBoundaryDrag: onBoundaryDragRef.current,
+        onBoundaryLongPress: onBoundaryLongPressRef.current,
+        onTrailSplit: onTrailSplitRef.current,
+        onDrawSelect: onDrawSelectRef.current,
       });
     },
     [onReady, onClick, onFeatureSelect, onMoveEnd, onDrawEnd],
@@ -1192,6 +1386,32 @@ export default function MapContainer({
     }
   }, [shape, send]);
 
+  // Sync trail overlay to WebView (segments, annotations, boundaries).
+  useEffect(() => {
+    if (!initSentRef.current) return;
+    if (!trailOverlay) {
+      send({ method: "clearTrailOverlay", args: {} });
+    } else {
+      send({ method: "setTrailOverlay", args: trailOverlay });
+    }
+  }, [trailOverlay, send]);
+
+  // Sync editor mode, snap, traces visibility to WebView.
+  useEffect(() => {
+    if (!initSentRef.current) return;
+    send({ method: "setEditorMode", args: { mode: editorMode ?? "segments" } });
+  }, [editorMode, send]);
+
+  useEffect(() => {
+    if (!initSentRef.current) return;
+    send({ method: "setSnapEnabled", args: { enabled: !!snapEnabled } });
+  }, [snapEnabled, send]);
+
+  useEffect(() => {
+    if (!initSentRef.current) return;
+    send({ method: "setTracesVisible", args: { visible: !!tracesVisible } });
+  }, [tracesVisible, send]);
+
   // Track the last flyTo values so we only re-send when the target actually
   // changes (not when the parent passes a new object ref with same values).
   const lastFlyToRef = useRef<{ lon: number; lat: number; zoom?: number } | null>(null);
@@ -1289,6 +1509,11 @@ function handleBridgeEvent(
     onShapeAction?: (action: ShapeAction) => void;
     shape?: { rings: Array<{ vertices: Array<[number, number]>; closed: boolean }> } | null;
     shapeMode?: "normal" | "delete";
+    onSegmentTap?: (s: { trail_id: string; segment_sort_order: number; lon: number; lat: number }) => void;
+    onBoundaryDrag?: (b: { trail_id: string; boundary_sort_order: number; lon: number; lat: number }) => void;
+    onBoundaryLongPress?: (b: { trail_id: string; boundary_sort_order: number }) => void;
+    onTrailSplit?: (s: { trail_id: string; lon: number; lat: number }) => void;
+    onDrawSelect?: (s: { trace_id?: string | null; trail_id?: string | null; start_lon: number; start_lat: number; end_lon: number; end_lat: number; snapped: boolean }) => void;
   },
 ) {
   switch (event.type) {
@@ -1375,6 +1600,21 @@ function handleBridgeEvent(
     }
     case "mapLongPress":
     case "error":
+      return;
+    case "segmentTap":
+      handlers.onSegmentTap?.({ trail_id: event.trail_id, segment_sort_order: event.segment_sort_order, lon: event.lon, lat: event.lat });
+      return;
+    case "boundaryDrag":
+      handlers.onBoundaryDrag?.({ trail_id: event.trail_id, boundary_sort_order: event.boundary_sort_order, lon: event.lon, lat: event.lat });
+      return;
+    case "boundaryLongPress":
+      handlers.onBoundaryLongPress?.({ trail_id: event.trail_id, boundary_sort_order: event.boundary_sort_order });
+      return;
+    case "trailSplit":
+      handlers.onTrailSplit?.({ trail_id: event.trail_id, lon: event.lon, lat: event.lat });
+      return;
+    case "drawSelect":
+      handlers.onDrawSelect?.({ trace_id: event.trace_id, trail_id: event.trail_id, start_lon: event.start_lon, start_lat: event.start_lat, end_lon: event.end_lon, end_lat: event.end_lat, snapped: event.snapped });
       return;
     default: {
       const _exhaustive: never = event;

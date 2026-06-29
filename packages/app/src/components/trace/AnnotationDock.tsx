@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTraceStore } from "../../stores/traceStore";
 import { persistTraceAnnotation } from "../../services/backgroundGeolocationService";
@@ -25,6 +25,8 @@ export function AnnotationDock() {
   const setPseudoActive = useTraceStore((s) => s.setPseudoActive);
 
   const [showSurfacePicker, setShowSurfacePicker] = useState(false);
+  const [showTrailNameInput, setShowTrailNameInput] = useState(false);
+  const [trailName, setTrailName] = useState("");
 
   const recordAnnotation = useCallback(
     (type: string, value: string | null = null) => {
@@ -60,6 +62,16 @@ export function AnnotationDock() {
     }
   }, [isPseudoActive, recordAnnotation, setPseudoActive]);
 
+  const handleTrailTransition = useCallback(() => {
+    recordAnnotation("trail_transition", trailName.trim() || null);
+    setShowTrailNameInput(false);
+    setTrailName("");
+  }, [recordAnnotation, trailName]);
+
+  const handleTrailPress = useCallback(() => {
+    setShowTrailNameInput((v) => !v);
+  }, []);
+
   return (
     <View style={styles.container} testID="annotation-dock">
       {isPseudoActive ? (
@@ -94,6 +106,18 @@ export function AnnotationDock() {
             </Pressable>
           ))}
         </View>
+      ) : null}
+
+      {showTrailNameInput ? (
+        <TextInput
+          style={[styles.nameInput, { color: colors.text, backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+          placeholder="Trail name (optional)"
+          placeholderTextColor={colors.textMuted}
+          value={trailName}
+          onChangeText={setTrailName}
+          autoFocus
+          testID="annotation-trail-name-input"
+        />
       ) : null}
 
       <View style={[styles.row, { backgroundColor: colors.surfaceMutedStrong }]}>
@@ -155,6 +179,21 @@ export function AnnotationDock() {
             {isPseudoActive ? "End pseudo" : "Pseudo"}
           </Text>
         </Pressable>
+
+        <Pressable
+          onPress={showTrailNameInput ? handleTrailTransition : handleTrailPress}
+          style={({ pressed }) => [
+            styles.btn,
+            { backgroundColor: showTrailNameInput ? colors.primaryMuted : colors.surfaceMuted },
+            pressed && styles.btnPressed,
+          ]}
+          testID="annotation-trail-transition"
+        >
+          <Ionicons name="flag-outline" size={18} color={showTrailNameInput ? colors.primary : "#3b82f6"} />
+          <Text style={[styles.btnLabel, { color: showTrailNameInput ? colors.primary : colors.textSecondary }]}>
+            {showTrailNameInput ? "Save" : "Trail"}
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -201,4 +240,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   surfaceLabel: { fontSize: 12, fontWeight: "600" },
+  nameInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+  },
 });

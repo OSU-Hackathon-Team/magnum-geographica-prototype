@@ -108,7 +108,58 @@ export type BridgeCommand =
         }>;
       };
     }
-  | { method: "clearTraceSegments"; args: {} };
+  | { method: "clearTraceSegments"; args: {} }
+  | {
+      method: "setTrailOverlay";
+      args: {
+        trails: Array<{
+          id: string;
+          name: string;
+          color?: string;
+          segments: Array<{
+            coordinates: Array<[number, number]>;
+            surface_type?: string | null;
+            is_pseudo_trail?: boolean;
+            is_road_connector?: boolean;
+            source?: string | null;
+            consensus?: number | null;
+            sort_order: number;
+          }>;
+          boundaries: Array<{
+            lon: number;
+            lat: number;
+            sort_order: number;
+          }>;
+        }>;
+        features: Array<{
+          id: string;
+          name: string;
+          lon: number;
+          lat: number;
+          icon?: string;
+        }>;
+        annotations: Array<{
+          type: string;
+          value?: string | null;
+          lon: number;
+          lat: number;
+        }>;
+        traces?: Array<{
+          id: string;
+          coordinates: Array<[number, number]>;
+          color?: string;
+          transitions: Array<{
+            type: string;
+            lon: number;
+            lat: number;
+          }>;
+        }>;
+      };
+    }
+  | { method: "clearTrailOverlay"; args: {} }
+  | { method: "setEditorMode"; args: { mode: "segments" | "trails" } }
+  | { method: "setSnapEnabled"; args: { enabled: boolean } }
+  | { method: "setTracesVisible"; args: { visible: boolean } };
 
 export type BridgeEvent =
   | { type: "ready" }
@@ -132,6 +183,26 @@ export type BridgeEvent =
       lat: number;
     }
   | { type: "shapeDrag"; ringIndex: number; vertexIndex: number; lon: number; lat: number }
+  | { type: "segmentTap"; trail_id: string; segment_sort_order: number; lon: number; lat: number }
+  | {
+      type: "boundaryDrag";
+      trail_id: string;
+      boundary_sort_order: number;
+      lon: number;
+      lat: number;
+    }
+  | { type: "boundaryLongPress"; trail_id: string; boundary_sort_order: number }
+  | { type: "trailSplit"; trail_id: string; lon: number; lat: number }
+  | {
+      type: "drawSelect";
+      trace_id?: string | null;
+      trail_id?: string | null;
+      start_lon: number;
+      start_lat: number;
+      end_lon: number;
+      end_lat: number;
+      snapped: boolean;
+    }
   | { type: "error"; message: string };
 
 export type BridgeMethod = BridgeCommand["method"];

@@ -116,4 +116,70 @@ export interface MapContainerProps {
   segmentTileVersion?: number;
   featureTileVersion?: number;
   superSystemTileVersion?: number;
+  /**
+   * §Phase 10 — Trail editor overlay. When set, renders all trails
+   * in the system with per-segment styling (surface colors, pseudo
+   * dotted lines, annotation pins, boundary handles). Clear to
+   * remove the overlay and return to tile-only rendering.
+   */
+  trailOverlay?: {
+    trails: Array<{
+      id: string;
+      name: string;
+      color?: string;
+      segments: Array<{
+        coordinates: Array<[number, number]>;
+        surface_type?: string | null;
+        is_pseudo_trail?: boolean;
+        is_road_connector?: boolean;
+        source?: string | null;
+        consensus?: number | null;
+        sort_order: number;
+      }>;
+      boundaries: Array<{
+        lon: number;
+        lat: number;
+        sort_order: number;
+      }>;
+    }>;
+    features: Array<{
+      id: string;
+      name: string;
+      lon: number;
+      lat: number;
+      icon?: string;
+    }>;
+    annotations: Array<{
+      type: string;
+      value?: string | null;
+      lon: number;
+      lat: number;
+    }>;
+    traces?: Array<{
+      id: string;
+      coordinates: Array<[number, number]>;
+      color?: string;
+      transitions: Array<{
+        type: string;
+        lon: number;
+        lat: number;
+      }>;
+    }>;
+  } | null;
+  editorMode?: "segments" | "trails" | null;
+  snapEnabled?: boolean;
+  tracesVisible?: boolean;
+  onSegmentTap?: (seg: { trail_id: string; segment_sort_order: number; lon: number; lat: number }) => void;
+  onBoundaryDrag?: (b: { trail_id: string; boundary_sort_order: number; lon: number; lat: number }) => void;
+  onBoundaryLongPress?: (b: { trail_id: string; boundary_sort_order: number }) => void;
+  onTrailSplit?: (b: { trail_id: string; lon: number; lat: number }) => void;
+  onDrawSelect?: (sel: {
+    trace_id?: string | null;
+    trail_id?: string | null;
+    start_lon: number;
+    start_lat: number;
+    end_lon: number;
+    end_lat: number;
+    snapped: boolean;
+  }) => void;
 }

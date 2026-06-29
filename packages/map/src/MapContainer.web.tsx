@@ -9,6 +9,7 @@ import { LineString, Point } from "ol/geom.js";
 import { Fill, Stroke, Style, Circle } from "ol/style.js";
 import "ol/ol.css";
 import { fromLonLat, toLonLat, transformExtent } from "ol/proj.js";
+import Translate from "ol/interaction/Translate.js";
 import { defaultMapConfig, resolveBaseLayers, resolveDefaultBaseLayerId } from "./shared/config.js";
 import { extentFromGeoJSON } from "./shared/extent.js";
 import { createTrailsLayer } from "./layers/TrailsLayer.js";
@@ -22,6 +23,18 @@ import {
   rebuildShapeSource,
   SHAPE_VERTEX_RADIUS,
 } from "./layers/ShapeLayer.js";
+import {
+  createSegmentsOverlayLayer,
+  type SegmentData,
+} from "./layers/SegmentsLayer.js";
+import {
+  createAnnotationLayer,
+  type AnnotationData,
+} from "./layers/AnnotationLayer.js";
+import {
+  createBoundaryHandleLayer,
+  type BoundaryData,
+} from "./layers/BoundaryHandleLayer.js";
 import type { MapContainerProps } from "./types.js";
 import {
   type ShapeAction,
@@ -110,6 +123,15 @@ export default function MapContainer({
   featureTileVersion,
   superSystemTileVersion,
   liveRoute,
+  trailOverlay,
+  editorMode: _editorMode,
+  snapEnabled: _snapEnabled,
+  tracesVisible: _tracesVisible,
+  onSegmentTap,
+  onBoundaryDrag: _onBoundaryDrag,
+  onBoundaryLongPress,
+  onTrailSplit,
+  onDrawSelect: _onDrawSelect,
 }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -136,6 +158,14 @@ export default function MapContainer({
   onLineActionRef.current = onLineAction;
   lineRef.current = line;
   lineModeRef.current = lineMode;
+  const onSegmentTapRef = useRef(onSegmentTap);
+  const onBoundaryDragRef = useRef(_onBoundaryDrag);
+  const onBoundaryLongPressRef = useRef(onBoundaryLongPress);
+  const onTrailSplitRef = useRef(onTrailSplit);
+  onSegmentTapRef.current = onSegmentTap;
+  onBoundaryDragRef.current = _onBoundaryDrag;
+  onBoundaryLongPressRef.current = onBoundaryLongPress;
+  onTrailSplitRef.current = onTrailSplit;
 
   const merged = useMemo(() => ({ ...defaultMapConfig, ...config }), [config]);
   const baseLayerDefs = useMemo(() => resolveBaseLayers(merged), [merged]);
@@ -749,6 +779,187 @@ export default function MapContainer({
       src.addFeature(feat);
     }
   }, [traceSegments]);
+
+  // Trail overlay effect — per-segment styling, annotation pins, boundary handles.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const segL = (map as unknown as { __trailOverlaySegs?: VectorLayer }).__trailOverlaySegs;
+    const annL = (map as unknown as { __trailOverlayAnns?: VectorLayer }).__trailOverlayAnns;
+    const bndL = (map as unknown as { __trailOverlayBnds?: VectorLayer }).__trailOverlayBnds;
+
+    if (!trailOverlay) {
+      segL?.setVisible(false);
+      annL?.setVisible(false);
+      bndL?.setVisible(false);
+      return;
+    }
+
+    // Collect all segments, annotations, boundaries from the overlay data
+    const allSegments: SegmentData[] = [];
+    const allAnnotations: AnnotationData[] = [];
+    const allBoundaries: BoundaryData[] = [];
+    for (const trail of trailOverlay.trails) {
+      allSegments.push(...trail.segments);
+      for (const b of trail.boundaries) {
+        allBoundaries.push({ ...b, trail_id: trail.id });
+      }
+    }
+    allAnnotations.push(...trailOverlay.annotations);
+
+    // Segments layer
+    let segLayer: VectorLayer;
+    if (segL) { segLayer = segL; } else {
+      segLayer = createSegmentsOverlayLayer(allSegments);
+      (map as unknown as { __trailOverlaySegs: VectorLayer }).__trailOverlaySegs = segLayer;
+      map.addLayer(segLayer);
+    }
+    segLayer.getSource()!.clear();
+    segLayer.getSource()!.addFeatures(
+      allSegments.map((s) => {
+        const coords = s.coordinates.map(([lon, lat]) => fromLonLat([lon, lat]));
+        const feat = new Feature({ geometry: new LineString(coords) });
+        feat.setProperties({ segmentData: s });
+        return feat;
+      }),
+    );
+    segLayer.setVisible(true);
+
+    // Annotation pins layer
+    let annLayer: VectorLayer;
+    if (annL) { annLayer = annL; } else {
+      annLayer = createAnnotationLayer(allAnnotations);
+      (map as unknown as { __trailOverlayAnns: VectorLayer }).__trailOverlayAnns = annLayer;
+      map.addLayer(annLayer);
+    }
+    annLayer.getSource()!.clear();
+    annLayer.getSource()!.addFeatures(
+      allAnnotations.map((a) => {
+        const feat = new Feature({ geometry: new Point(fromLonLat([a.lon, a.lat])) });
+        feat.setProperties({ annotationData: a });
+        return feat;
+      }),
+    );
+    annLayer.setVisible(true);
+
+    // Boundary handles layer
+    let bndLayer: VectorLayer;
+    if (bndL) { bndLayer = bndL; } else {
+      bndLayer = createBoundaryHandleLayer(allBoundaries);
+      (map as unknown as { __trailOverlayBnds: VectorLayer }).__trailOverlayBnds = bndLayer;
+      map.addLayer(bndLayer);
+
+      // Boundary drag: Translate interaction on the boundary layer only.
+      const translate = new Translate({
+        layers: [bndLayer],
+        hitTolerance: 10,
+      });
+      translate.on("translateend", (evt) => {
+        for (const feat of (evt.features as unknown as { get: (k: string) => unknown; getGeometry: () => { getCoordinates: () => [number, number] } }[])) {
+          const bdata = feat.get("boundaryData") as BoundaryData | undefined;
+          const geom = feat.getGeometry();
+          if (bdata && geom) {
+            const [lon, lat] = toLonLat(geom.getCoordinates());
+            if (typeof lon === "number" && typeof lat === "number") {
+              onBoundaryDragRef.current?.({ trail_id: bdata.trail_id, boundary_sort_order: bdata.sort_order, lon, lat });
+            }
+          }
+        }
+      });
+      (map as unknown as { __trailOverlayBndDrag?: Translate }).__trailOverlayBndDrag = translate;
+      map.addInteraction(translate);
+    }
+    bndLayer.getSource()!.clear();
+    bndLayer.getSource()!.addFeatures(
+      allBoundaries.map((b) => {
+        const feat = new Feature({ geometry: new Point(fromLonLat([b.lon, b.lat])) });
+        feat.setProperties({ boundaryData: b });
+        return feat;
+      }),
+    );
+    bndLayer.setVisible(true);
+
+    // Trace lines layer (for trails mode)
+    const trcL = (map as unknown as { __trailOverlayTrcs?: VectorLayer }).__trailOverlayTrcs;
+    if (trailOverlay.traces && trailOverlay.traces.length > 0) {
+      let trcLayer: VectorLayer;
+      if (trcL) { trcLayer = trcL; } else {
+        trcLayer = new VectorLayer({
+          source: new VectorSource(),
+          style: (feature) => {
+            const color = (feature.get("color") as string) ?? "#3b82f6";
+            return new Style({ stroke: new Stroke({ color, width: 3, lineCap: "round" }) });
+          },
+          zIndex: 1003,
+        });
+        (map as unknown as { __trailOverlayTrcs: VectorLayer }).__trailOverlayTrcs = trcLayer;
+        map.addLayer(trcLayer);
+      }
+      trcLayer.getSource()!.clear();
+      for (const trace of trailOverlay.traces) {
+        const coords = trace.coordinates.map(([lon, lat]) => fromLonLat([lon, lat]));
+        const feat = new Feature({ geometry: new LineString(coords) });
+        feat.set("color", trace.color ?? null);
+        feat.set("traceData", { id: trace.id, transitions: trace.transitions });
+        trcLayer.getSource()!.addFeature(feat);
+      }
+      trcLayer.setVisible(true);
+    } else if (trcL) {
+      trcL.setVisible(false);
+    }
+  }, [trailOverlay]);
+
+  // Trail overlay click handler — fires on segment tap
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const handler = (evt: Parameters<NonNullable<Parameters<typeof map.on>[1]>>[0]) => {
+      if (!trailOverlay) return;
+      const segL = (map as unknown as { __trailOverlaySegs?: VectorLayer }).__trailOverlaySegs;
+      const bndL = (map as unknown as { __trailOverlayBnds?: VectorLayer }).__trailOverlayBnds;
+      if (!segL) return;
+      const evtAny = evt as unknown as { originalEvent: MouseEvent; coordinate: [number, number] };
+      const pixel = map.getEventPixel(evtAny.originalEvent);
+      const [lon, lat] = toLonLat(evtAny.coordinate);
+
+      // Check boundary handles first
+      if (bndL) {
+        const bndFeat = map.forEachFeatureAtPixel(pixel, (f, l) => l === bndL ? f : null);
+        if (bndFeat) {
+          const bdata = bndFeat.get("boundaryData") as BoundaryData | undefined;
+          if (bdata) {
+            onBoundaryLongPressRef.current?.({ trail_id: bdata.trail_id, boundary_sort_order: bdata.sort_order });
+            return true;
+          }
+        }
+      }
+
+      // Check segments
+      const feat = map.forEachFeatureAtPixel(pixel, (f, l) => l === segL ? f : null);
+      if (feat) {
+        const data = feat.get("segmentData") as SegmentData | undefined;
+        if (data && typeof lon === "number" && typeof lat === "number") {
+          onSegmentTapRef.current?.({
+            trail_id: "", segment_sort_order: data.sort_order,
+            lon, lat,
+          });
+          return true;
+        }
+      }
+
+      // Trail split: click near a trail line but not on a segment/boundary
+      const nearTrail = map.forEachFeatureAtPixel(pixel, (f, l) => l === segL ? f : null, { hitTolerance: 12 });
+      if (nearTrail && typeof lon === "number" && typeof lat === "number") {
+        onTrailSplitRef.current?.({ trail_id: "", lon, lat });
+        return true;
+      }
+
+      return false;
+    };
+    map.on("click", handler);
+    return () => { map.un("click", handler); };
+  }, [trailOverlay]);
 
   const lastFlyToRef = useRef<{ lon: number; lat: number; zoom?: number } | null>(null);
   useEffect(() => {

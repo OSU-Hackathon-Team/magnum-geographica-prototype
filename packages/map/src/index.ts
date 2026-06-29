@@ -26,7 +26,14 @@ export {
   trailStrokeFor,
   difficultyFillFor,
   featureLabelFor,
+  annotationPinColor,
   TRAIL_STROKE_WIDTH,
+  PSEUDO_TRAIL_LINE_WIDTH,
+  PSEUDO_TRAIL_DASH,
+  LOW_CONSENSUS_OPACITY,
+  BOUNDARY_HANDLE_RADIUS,
+  BOUNDARY_HANDLE_STROKE,
+  ANNOTATION_PIN_SIZE,
 } from "./shared/styles.js";
 export { extentFromGeoJSON } from "./shared/extent.js";
 export type { BridgeEvent, BridgeCommand, BridgeMethod } from "./bridge/types.js";
