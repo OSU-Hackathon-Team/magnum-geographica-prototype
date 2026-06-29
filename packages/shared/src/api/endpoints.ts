@@ -134,6 +134,10 @@ export function createMagnumClient(
         `/api/trails/${trailId}/segments/reorder`,
         body,
       ),
+    removeLowConsensus: (segmentId: string) =>
+      client.post<{ ok: boolean; consensus: number }>(
+        `/api/segments/${segmentId}/remove-low-consensus`,
+      ),
     splitSegment: (trailId: string, body: SplitSegmentInput) =>
       client.post<{ items: TrailSegment[]; total: number }>(
         `/api/trails/${trailId}/segments/split`,
@@ -420,7 +424,7 @@ export function createMagnumClient(
       ),
     rejectSynthesisProposal: (segmentId: string, body: { system_id: string }) =>
       client.post<{ ok: boolean }>(`/api/admin/synthesis-proposals/${segmentId}/reject`, body),
-    promoteTrail: (trailId: string, to: "elevated" | "premium") =>
+    promoteTrail: (trailId: string, to: "frozen" | "premium") =>
       client.post<{ id: string; tier: string }>(`/api/admin/trails/${trailId}/promote`, { to }),
     demoteTrail: (trailId: string) =>
       client.post<{ id: string; tier: string }>(`/api/admin/trails/${trailId}/demote`),

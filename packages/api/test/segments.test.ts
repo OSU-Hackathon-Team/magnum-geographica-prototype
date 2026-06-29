@@ -40,18 +40,20 @@ describe("GET /api/segments/:id", () => {
 
 describe("PUT /api/segments/:id", () => {
   test("rejects empty body with 400", async () => {
+    const token = await signToken(TEST_USER);
     const res = await buildApp().request("/api/segments/00000000-0000-0000-0000-000000000001", {
       method: "PUT",
-      headers: { "content-type": "application/json", ...IP_HEADERS },
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...IP_HEADERS },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
   });
 
   test("rejects unknown surface_type", async () => {
+    const token = await signToken(TEST_USER);
     const res = await buildApp().request("/api/segments/00000000-0000-0000-0000-000000000001", {
       method: "PUT",
-      headers: { "content-type": "application/json", ...IP_HEADERS },
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...IP_HEADERS },
       body: JSON.stringify({ surface_type: "moon-dust" }),
     });
     expect(res.status).toBe(400);
@@ -77,7 +79,7 @@ describe("POST /api/trails/:id/segments", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments",
       {
         method: "POST",
-        headers: { "content-type": "application/json", ...IP_HEADERS },
+        headers: { "content-type": "application/json", authorization: `Bearer ${await signToken(TEST_USER)}`, ...IP_HEADERS },
         body: JSON.stringify({
           geometry: {
             type: "LineString",
@@ -97,7 +99,7 @@ describe("POST /api/trails/:id/segments", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments",
       {
         method: "POST",
-        headers: { "content-type": "application/json", ...IP_HEADERS },
+        headers: { "content-type": "application/json", authorization: `Bearer ${await signToken(TEST_USER)}`, ...IP_HEADERS },
         body: JSON.stringify({
           surface_type: "lava",
           geometry: {
@@ -120,7 +122,7 @@ describe("POST /api/trails/:id/segments/reorder", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/reorder",
       {
         method: "POST",
-        headers: { "content-type": "application/json", ...IP_HEADERS },
+        headers: { "content-type": "application/json", authorization: `Bearer ${await signToken(TEST_USER)}`, ...IP_HEADERS },
         body: JSON.stringify({}),
       },
     );
@@ -134,7 +136,7 @@ describe("POST /api/trails/:id/segments/split", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/split",
       {
         method: "POST",
-        headers: { "content-type": "application/json", ...IP_HEADERS },
+        headers: { "content-type": "application/json", authorization: `Bearer ${await signToken(TEST_USER)}`, ...IP_HEADERS },
         body: JSON.stringify({ split_at: 0.5 }),
       },
     );
@@ -146,7 +148,7 @@ describe("POST /api/trails/:id/segments/split", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/split",
       {
         method: "POST",
-        headers: { "content-type": "application/json", ...IP_HEADERS },
+        headers: { "content-type": "application/json", authorization: `Bearer ${await signToken(TEST_USER)}`, ...IP_HEADERS },
         body: JSON.stringify({
           segment_id: "00000000-0000-0000-0000-000000000001",
           split_at: 1.5,
@@ -163,7 +165,7 @@ describe("POST /api/trails/:id/segments/merge", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/merge",
       {
         method: "POST",
-        headers: { "content-type": "application/json", ...IP_HEADERS },
+        headers: { "content-type": "application/json", authorization: `Bearer ${await signToken(TEST_USER)}`, ...IP_HEADERS },
         body: JSON.stringify({ segment_id_a: "00000000-0000-0000-0000-000000000001" }),
       },
     );
@@ -175,7 +177,7 @@ describe("POST /api/trails/:id/segments/merge", () => {
       "/api/trails/00000000-0000-0000-0000-000000000001/segments/merge",
       {
         method: "POST",
-        headers: { "content-type": "application/json", ...IP_HEADERS },
+        headers: { "content-type": "application/json", authorization: `Bearer ${await signToken(TEST_USER)}`, ...IP_HEADERS },
         body: JSON.stringify({
           segment_id_a: "00000000-0000-0000-0000-000000000001",
           segment_id_b: "00000000-0000-0000-0000-000000000001",

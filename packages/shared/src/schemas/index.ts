@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // ========== Trail tiers §21.6 ==========
 // (defined up top so trailSchema can reference it without a TDZ)
-const TRAIL_TIERS_VALUES = ["premium", "elevated", "synthesized"] as const;
+const TRAIL_TIERS_VALUES = ["premium", "frozen", "synthesized"] as const;
 const trailTierSchema = z.enum(TRAIL_TIERS_VALUES);
 
 import {
@@ -27,6 +27,7 @@ import {
   PROVENANCE_SOURCES,
   TRACE_SOURCES,
   TRACE_STATUSES,
+  TRACE_ANNOTATION_TYPES,
 } from "../constants.js";
 
 const uuidSchema = z.string().uuid();
@@ -163,9 +164,9 @@ export const trailSchema = z.object({
   length_meters: z.number().nonnegative().nullable().optional(),
   elevation_gain_meters: z.number().nonnegative().nullable().optional(),
   verified: z.boolean().optional(),
-  // §21.6 — trail tier (premium / elevated / synthesized).
+  // §21.6 — trail tier (premium / frozen / synthesized).
   tier: trailTierSchema.optional(),
-  // §21.6 — provenance for premium/elevated trails (mirrors systems).
+  // §21.6 — provenance for premium/frozen trails (mirrors systems).
   source: z.string().max(500).nullable().optional(),
   source_date: z.string().min(1).max(30).nullable().optional(),
   external_url: z.string().url().nullable().optional(),
@@ -187,10 +188,13 @@ export const trailSegmentSchema = z.object({
   surface_type: z.enum(SURFACE_TYPES).nullable().optional(),
   hazards: z.array(z.string()).default([]),
   is_road_connector: z.boolean(),
+  is_pseudo_trail: z.boolean().optional(),
   steep_grade: z.boolean(),
   one_way: z.boolean(),
   description: z.string().max(10_000).nullable().optional(),
   length_meters: z.number().nonnegative().nullable().optional(),
+  source: z.enum(["synthesis", "editor"]).nullable().optional(),
+  consensus: z.number().min(0).max(1).nullable().optional(),
   created_at: isoDateSchema,
   updated_at: isoDateSchema,
 });
@@ -422,6 +426,7 @@ export const createSegmentInputSchema = z
     surface_type: z.enum(SURFACE_TYPES).nullable().optional(),
     hazards: z.array(z.string().max(120)).max(20).optional(),
     is_road_connector: z.boolean().optional(),
+    is_pseudo_trail: z.boolean().optional(),
     steep_grade: z.boolean().optional(),
     one_way: z.boolean().optional(),
     description: z.string().max(10_000).nullable().optional(),
@@ -435,6 +440,7 @@ export const updateSegmentInputSchema = z
     surface_type: z.enum(SURFACE_TYPES).nullable().optional(),
     hazards: z.array(z.string().max(120)).max(20).optional(),
     is_road_connector: z.boolean().optional(),
+    is_pseudo_trail: z.boolean().optional(),
     steep_grade: z.boolean().optional(),
     one_way: z.boolean().optional(),
     description: z.string().max(10_000).nullable().optional(),
@@ -979,6 +985,22 @@ export const createTraceInputSchema = z
     // Server ignores this; the actual `gps_traces.contributor_name` is
     // resolved from auth context.
     contributor_name: z.string().min(1).max(120).optional(),
+    // §Phase 10 — inline annotations captured during recording
+    annotations: z
+      .array(
+        z
+          .object({
+            type: z.enum(TRACE_ANNOTATION_TYPES),
+            value: z.string().max(50).nullable().optional(),
+            index: z.number().int().nonnegative(),
+            lat: z.number().min(-90).max(90),
+            lon: z.number().min(-180).max(180),
+            captured_at: isoDateSchema,
+          })
+          .strict(),
+      )
+      .max(10_000)
+      .optional(),
   })
   .strict();
 
@@ -1016,3 +1038,16 @@ export const traceSegmentVoteInputSchema = z
     contributor_name: z.string().min(1).max(120).optional(),
   })
   .strict();
+
+export const traceAnnotationSchema = z.object({
+  id: uuidSchema,
+  trace_id: uuidSchema,
+  type: z.enum(TRACE_ANNOTATION_TYPES),
+  value: z.string().max(50).nullable(),
+  lat: z.number(),
+  lon: z.number(),
+  trace_index: z.number().int().nonnegative(),
+  captured_at: isoDateSchema,
+  contributor_name: z.string(),
+  created_at: isoDateSchema,
+});

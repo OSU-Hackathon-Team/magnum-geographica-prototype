@@ -111,7 +111,7 @@ test.describe("Moderator tier gating (§21.6 phase 2)", () => {
     const res = await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
       method: "POST",
       token: access_token,
-      body: { to: "elevated" },
+      body: { to: "frozen" },
     });
     expect(res.status).toBe(401);
   });

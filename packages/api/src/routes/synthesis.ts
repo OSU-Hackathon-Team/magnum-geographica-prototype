@@ -1,23 +1,10 @@
 /**
- * Synthesis routes (§21.6 phase 2).
+ * Synthesis routes (§21.6 phase 2 / Phase 10).
  *
- *  POST /api/systems/:id/synthesize                — moderator+: run a
- *                                                     synthesis pass
- *                                                     for a system
- *  GET  /api/admin/synthesis-proposals             — moderator+: list
- *                                                     "possible new
- *                                                     trail" proposals
- *                                                     for a system
- *  POST /api/admin/synthesis-proposals/:segId/approve
- *  POST /api/admin/synthesis-proposals/:segId/reject
- *  POST /api/admin/trails/:id/promote              — moderator+:
- *                                                     promote a
- *                                                     synthesized trail
- *                                                     to elevated
- *  POST /api/admin/trails/import                   — moderator+:
- *                                                     import a premium
- *                                                     trail from
- *                                                     GeoJSON
+ * Background synthesis runs automatically via the synthesis-worker
+ * (per-system debounce on trace submit). The routes below provide
+ * the moderator review surface for proposals, promote/demote,
+ * and premium import.
  */
 import { Hono } from "hono";
 import { z } from "zod";
@@ -32,48 +19,12 @@ import {
   listProposals,
   promoteTrail,
   rejectProposal,
-  runSynthesis,
 } from "../services/synthesis.js";
 import { recordRevision } from "../services/revisions.js";
 
 type Variables = { user?: AuthUser };
 
 export const synthesisRoute = new Hono<{ Variables: Variables }>();
-
-synthesisRoute.post("/systems/:id/synthesize", moderatorRequired(), async (c) => {
-  const systemId = String(c.req.param("id"));
-  const authUser = c.get("user");
-  if (!authUser) return c.json({ error: "unauthorized" }, 401);
-  try {
-    const result = await runSynthesis(systemId);
-    await recordRevision({
-      action: "update",
-      targetType: "system",
-      targetId: systemId,
-      actorId: authUser.id,
-      contributorName: authUser.username,
-      payloadAfter: {
-        synthesisRunId: result.run.id,
-        assigned: result.assigned,
-        proposed: result.proposed,
-      },
-    });
-    return c.json({
-      run: {
-        id: result.run.id,
-        status: result.run.status,
-        trails_updated: result.trailsUpdated,
-        trails_proposed: result.proposed,
-      },
-      clusters: result.clusters,
-      assigned: result.assigned,
-      proposed: result.proposed,
-      trails_updated: result.trailsUpdated,
-    });
-  } catch (err) {
-    return c.json({ error: (err as Error).message }, 500);
-  }
-});
 
 synthesisRoute.get("/admin/synthesis-proposals", moderatorRequired(), async (c) => {
   const systemId = c.req.query("system_id");
@@ -115,10 +66,10 @@ synthesisRoute.post(
   },
 );
 
-const promoteBody = z.object({ to: z.enum(["elevated", "premium"]) });
+const promoteBody = z.object({ to: z.enum(["frozen", "premium"]) });
 
 /**
- * Promote a synthesized trail → elevated (Trusted+ or moderator).
+ * Promote a synthesized trail → frozen (Trusted+ or moderator).
  * Promote to premium requires moderator.
  */
 synthesisRoute.post("/admin/trails/:id/promote", authRequired(), async (c) => {
@@ -129,7 +80,7 @@ synthesisRoute.post("/admin/trails/:id/promote", authRequired(), async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid body", details: parsed.error.flatten() }, 400);
   }
-  // Trusted+ can promote synthesized→elevated; moderator+ required for premium.
+  // Trusted+ can promote synthesized→frozen; moderator+ required for premium.
   const isMod = authUser.tier === "moderator";
   const isTrustedOrMod = authUser.tier === "trusted" || isMod;
   if (!isTrustedOrMod) {
@@ -157,7 +108,7 @@ synthesisRoute.post("/admin/trails/:id/promote", authRequired(), async (c) => {
 });
 
 /**
- * Demote an elevated trail back to synthesized (Trusted+).
+ * Demote a frozen trail back to synthesized (Trusted+).
  * Premium trails cannot be demoted.
  */
 synthesisRoute.post("/admin/trails/:id/demote", authRequired(), async (c) => {

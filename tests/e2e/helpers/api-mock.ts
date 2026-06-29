@@ -471,7 +471,7 @@ const SYNTHETIC_TRAILS: Array<{
   id: string;
   name: string;
   slug: string;
-  tier: "synthesized" | "elevated" | "premium";
+  tier: "synthesized" | "frozen" | "premium";
   system_id: string | null;
   difficulty: string | null;
 }> = [];
@@ -2307,9 +2307,9 @@ const handlers: Array<{ pattern: RegExp; handler: Handler }> = [
       if (err) return err;
       if (method !== "POST") return undefined;
       const trailId = url.pathname.split("/")[4];
-      const b = body as { to?: "elevated" | "premium" };
-      if (!b?.to || (b.to !== "elevated" && b.to !== "premium")) {
-        return { status: 400, body: { error: "to must be 'elevated' or 'premium'" } };
+      const b = body as { to?: "frozen" | "premium" };
+      if (!b?.to || (b.to !== "frozen" && b.to !== "premium")) {
+        return { status: 400, body: { error: "to must be 'frozen' or 'premium'" } };
       }
       const synth = SYNTHETIC_TRAILS.find((t) => t.id === trailId);
       if (synth) {

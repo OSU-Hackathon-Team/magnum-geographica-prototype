@@ -44,12 +44,12 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     const promote = await apiFetch(page, `/api/admin/trails/${FIXTURE_IDS.trail1}/promote`, {
       method: "POST",
       token: access_token,
-      body: { to: "elevated" },
+      body: { to: "frozen" },
     });
     expect(promote.status).toBe(200);
     await page.goto(`${BASE}/trail/buckeye-trail`);
     // After promotion, the badge shows the new tier.
-    await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
+    await expect(page.getByTestId("trail-tier-badge-frozen")).toBeVisible();
   });
 
   test("synthesized trail with derived_from_segments shows the derived-from text", async ({
@@ -83,7 +83,7 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     expect(synthDetail.status).toBe(200);
   });
 
-  test("promoting a synthesized trail to elevated swaps the badge", async ({ page }) => {
+  test("promoting a synthesized trail to frozen swaps the badge", async ({ page }) => {
     const reg = await apiFetch(page, "/api/__test/register", {
       method: "POST",
       body: {
@@ -116,12 +116,12 @@ test.describe("Trail tier badge on detail (§21.6 phase 2)", () => {
     const promote = await apiFetch(page, `/api/admin/trails/${newId}/promote`, {
       method: "POST",
       token: access_token,
-      body: { to: "elevated" },
+      body: { to: "frozen" },
     });
     expect(promote.status).toBe(200);
-    // Reload — the badge should now read "elevated".
+    // Reload — the badge should now read "frozen".
     await page.goto(`${BASE}/trail/${newSlug}`);
-    await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
-    await expect(page.getByTestId("trail-tier-label")).toHaveText("Elevated");
+    await expect(page.getByTestId("trail-tier-badge-frozen")).toBeVisible();
+    await expect(page.getByTestId("trail-tier-label")).toHaveText("Frozen");
   });
 });

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const OFFLINE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -196,4 +196,18 @@ CREATE TABLE IF NOT EXISTS trace_points (
 );
 
 CREATE INDEX IF NOT EXISTS idx_trace_points_session ON trace_points(session_id, seq);
+
+CREATE TABLE IF NOT EXISTS trace_annotations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  value TEXT,
+  lon REAL NOT NULL,
+  lat REAL NOT NULL,
+  captured_at TEXT NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES trace_sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_trace_annotations_session ON trace_annotations(session_id, seq);
 `;

@@ -28,6 +28,8 @@ export interface SegmentEditorProps {
   onSave: (id: string, body: UpdateSegmentInput) => void;
   onDelete: (id: string) => void;
   onSplit: (id: string, splitAt: number, nameA?: string, nameB?: string) => void;
+  onRemoveLowConsensus?: (id: string) => void;
+  isTrustedOrMod?: boolean;
   saving?: boolean;
   deleting?: boolean;
   testID?: string;
@@ -38,6 +40,8 @@ export function SegmentEditor({
   onSave,
   onDelete,
   onSplit,
+  onRemoveLowConsensus,
+  isTrustedOrMod,
   saving,
   deleting,
   testID,
@@ -50,6 +54,7 @@ export function SegmentEditor({
   const [hazards, setHazards] = useState<string[]>(segment.hazards ?? []);
   const [steepGrade, setSteepGrade] = useState(Boolean(segment.steep_grade));
   const [isRoadConnector, setIsRoadConnector] = useState(Boolean(segment.is_road_connector));
+  const [isPseudoTrail, setIsPseudoTrail] = useState(Boolean(segment.is_pseudo_trail));
   const [oneWay, setOneWay] = useState(Boolean(segment.one_way));
   const [description, setDescription] = useState(segment.description ?? "");
   const [showSplit, setShowSplit] = useState(false);
@@ -70,6 +75,7 @@ export function SegmentEditor({
       hazards,
       steep_grade: steepGrade,
       is_road_connector: isRoadConnector,
+      is_pseudo_trail: isPseudoTrail,
       one_way: oneWay,
       description: description.trim() || null,
     });
@@ -93,6 +99,48 @@ export function SegmentEditor({
             Segment {segment.sort_order + 1}
           </Text>
           {surfaceType ? <SegmentTypeBadge surface={surfaceType} /> : null}
+          {segment.source === "synthesis" ? (
+            <View
+              style={[styles.sourceBadge, { backgroundColor: colors.surfaceMuted }]}
+              testID={`segment-source-synthesis-${segment.id}`}
+            >
+              <Text style={[styles.sourceBadgeText, { color: colors.textSecondary }]}>Auto</Text>
+            </View>
+          ) : segment.source === "editor" ? (
+            <View
+              style={[styles.sourceBadge, { backgroundColor: colors.primaryMuted }]}
+              testID={`segment-source-editor-${segment.id}`}
+            >
+              <Text style={[styles.sourceBadgeText, { color: colors.primary }]}>Manual</Text>
+            </View>
+          ) : null}
+          {segment.consensus != null && segment.consensus < 0.4 ? (
+            <View style={styles.lowConsensusRow}>
+              <View
+                style={[styles.sourceBadge, { backgroundColor: colors.warningMuted }]}
+                testID={`segment-low-consensus-${segment.id}`}
+              >
+                <Text style={[styles.sourceBadgeText, { color: colors.warning }]}>
+                  Low conf.
+                </Text>
+              </View>
+              {isTrustedOrMod ? (
+                <Pressable
+                  onPress={() => onRemoveLowConsensus?.(segment.id)}
+                  style={({ pressed }) => [
+                    styles.clearConsensusBtn,
+                    { backgroundColor: colors.surfaceMuted },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  testID={`segment-clear-consensus-${segment.id}`}
+                >
+                  <Text style={[styles.clearConsensusBtnText, { color: colors.success }]}>
+                    Clear
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.field}>
@@ -188,6 +236,17 @@ export function SegmentEditor({
             value={isRoadConnector}
             onValueChange={setIsRoadConnector}
             testID={`segment-editor-road-${segment.id}`}
+            disabled={!canSave}
+          />
+        </View>
+        <View style={styles.toggleRow}>
+          <Text style={[styles.toggleLabel, { color: isPseudoTrail ? colors.danger : colors.text }]}>
+            Pseudo-trail
+          </Text>
+          <Switch
+            value={isPseudoTrail}
+            onValueChange={setIsPseudoTrail}
+            testID={`segment-editor-pseudo-${segment.id}`}
             disabled={!canSave}
           />
         </View>
@@ -337,6 +396,8 @@ export interface SegmentEditListProps {
   onMerge: (idA: string, idB: string) => void;
   onReorder: (orderedIds: string[]) => void;
   onExit: () => void;
+  onRemoveLowConsensus?: (id: string) => void;
+  isTrustedOrMod?: boolean;
   pendingId?: string | null;
   savingId?: string | null;
   deletingId?: string | null;
@@ -354,6 +415,8 @@ export function SegmentEditList({
   onMerge,
   onReorder,
   onExit,
+  onRemoveLowConsensus,
+  isTrustedOrMod,
   pendingId,
   savingId,
   deletingId,
@@ -472,6 +535,8 @@ export function SegmentEditList({
             onSave={onUpdate}
             onDelete={onDelete}
             onSplit={onSplit}
+            onRemoveLowConsensus={onRemoveLowConsensus}
+            isTrustedOrMod={isTrustedOrMod}
             saving={savingId === s.id}
             deleting={deletingId === s.id}
             testID={`segment-editor-${s.id}`}
@@ -591,4 +656,17 @@ const styles = StyleSheet.create({
     textAlign: "right",
     marginTop: spacing.xs,
   },
+  sourceBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  sourceBadgeText: { fontSize: 10, fontWeight: "700" },
+  lowConsensusRow: { flexDirection: "row", gap: 4, alignItems: "center" },
+  clearConsensusBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  clearConsensusBtnText: { fontSize: 10, fontWeight: "700" },
 });

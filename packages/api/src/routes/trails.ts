@@ -6,6 +6,7 @@ import { createTrailInputSchema, updateTrailInputSchema } from "@magnum/shared";
 import { optionalAuth, actorRequired, type AuthUser } from "../middleware/auth.js";
 import { resolveActor } from "../services/identity.js";
 import { recordRevision } from "../services/revisions.js";
+import { listAnnotationsForTrail } from "../services/traces.js";
 
 type Variables = { user?: AuthUser };
 
@@ -314,4 +315,16 @@ trailsRoute.delete("/:id", optionalAuth(), actorRequired(), async (c) => {
     editSummary: `Deleted trail "${trail.name}"`,
   });
   return c.json({ ok: true });
+});
+
+trailsRoute.get("/:id/annotations", async (c) => {
+  const id = c.req.param("id");
+  const [trail] = await db
+    .select({ id: trails.id })
+    .from(trails)
+    .where(eq(trails.id, id))
+    .limit(1);
+  if (!trail) return c.json({ error: "not_found", message: `trail ${id} not found` }, 404);
+  const items = await listAnnotationsForTrail(id);
+  return c.json({ items, total: items.length });
 });

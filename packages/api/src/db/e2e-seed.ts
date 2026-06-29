@@ -192,7 +192,7 @@ export async function seedFixtures(
       lengthMeters: 154500,
       elevationGainMeters: 200,
       verified: true,
-      tier: "elevated",
+      tier: "frozen",
       geometry: sql.raw(`ST_Multi(ST_GeomFromText('LINESTRING(-81.56 41.28, -81.57 41.27, -81.58 41.26)', 4326))`),
       createdByUserId: ids.user100,
     },

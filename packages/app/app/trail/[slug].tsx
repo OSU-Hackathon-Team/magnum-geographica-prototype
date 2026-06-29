@@ -75,6 +75,8 @@ export default function TrailDetail() {
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const contributorName = useAuthStore((s) => s.contributorName);
   const token = useAuthStore((s) => s.token);
+  const tier = useAuthStore((s) => s.tier);
+  const isTrustedOrMod = tier === "trusted" || tier === "moderator";
 
   const refreshSegments = useCallback(
     async (trailId: string) => {
@@ -234,8 +236,8 @@ export default function TrailDetail() {
       const client = createMagnumClient(API_URL, {
         getAuthToken: () => token ?? undefined,
       });
-      await client.promoteTrail(trailId, "elevated");
-      if (trail) setTrail({ ...trail, tier: "elevated" });
+      await client.promoteTrail(trailId, "frozen");
+      if (trail) setTrail({ ...trail, tier: "frozen" });
     } catch (e) {
       Alert.alert("Freeze failed", e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -497,6 +499,19 @@ export default function TrailDetail() {
     }
   };
 
+  const handleRemoveLowConsensus = async (id: string) => {
+    if (!isTrustedOrMod || !isOnline || !trail) return;
+    try {
+      const client = createMagnumClient(API_URL, {
+        getAuthToken: () => token ?? undefined,
+      });
+      await client.removeLowConsensus(id);
+      await refreshSegments(trail.id);
+    } catch (e) {
+      console.warn("[segments] remove-low-consensus failed", e);
+    }
+  };
+
   if (error) {
     return (
       <View style={styles.centered} testID="trail-detail-error">
@@ -524,6 +539,8 @@ export default function TrailDetail() {
           onMerge={handleSegmentMerge}
           onReorder={handleReorder}
           onExit={() => setEditMode(false)}
+          onRemoveLowConsensus={handleRemoveLowConsensus}
+          isTrustedOrMod={isTrustedOrMod}
           pendingId={pendingId}
           savingId={savingId}
           deletingId={deletingId}
@@ -570,7 +587,7 @@ export default function TrailDetail() {
               >
                 {freezing ? "Freezing…" : "Freeze"}
               </Button>
-            ) : trail.tier === "elevated" ? (
+            ) : trail.tier === "frozen" ? (
               <Button
                 variant="ghost"
                 size="small"

@@ -8,16 +8,19 @@ import {
   addPendingContribution,
   appendTracePoint,
   appendTracePointsBulk,
+  appendTraceAnnotation,
   createTraceSession,
   discardTraceSession,
   getActiveTraceSession,
   getPendingCount,
   getTraceSession,
   listTracePoints,
+  listTraceAnnotations,
   recomputeTraceDistance,
   updateTraceSessionStatus,
   type TracePoint,
   type TraceSession,
+  type TraceAnnotation,
 } from "./offlineDataService";
 
 /**
@@ -248,10 +251,23 @@ export async function submitTraceSession(sessionId: string): Promise<{
   }
   const totalMeters = await recomputeTraceDistance(sessionId);
   const coords: Array<[number, number]> = points.map((p) => [p.lon, p.lat]);
+  const annotations = await listTraceAnnotations(sessionId);
   const payload = {
     geometry: { type: "LineString" as const, coordinates: coords },
     source: "recorded" as const,
     recorded_at: session.started_at,
+    ...(annotations.length > 0
+      ? {
+          annotations: annotations.map((a) => ({
+            type: a.type,
+            value: a.value ?? undefined,
+            index: a.seq,
+            lat: a.lat,
+            lon: a.lon,
+            captured_at: a.captured_at,
+          })),
+        }
+      : {}),
   };
   const isOnline = useOfflineStore.getState().isOnline;
   if (!isOnline) {
@@ -360,6 +376,37 @@ async function persistLocation(sessionId: string, loc: BGGLocation): Promise<voi
     await appendTracePoint(sessionId, point);
   } catch (e) {
     console.warn("[trace] persistLocation failed", e);
+  }
+}
+
+/**
+ * Persist a user-tapped annotation during the recording. Writes to
+ * the local SQLite `trace_annotations` table immediately.
+ */
+export async function persistTraceAnnotation(
+  sessionId: string,
+  type: string,
+  value: string | null = null,
+): Promise<void> {
+  const store = useTraceStore.getState();
+  const pointCount = store.livePoints.length;
+  const lastPoint = store.livePoints[store.livePoints.length - 1];
+  const lon = lastPoint?.lon ?? 0;
+  const lat = lastPoint?.lat ?? 0;
+  const seq = pointCount > 0 ? pointCount : Math.floor(Date.now() / 1000);
+  const captured_at = new Date().toISOString();
+  try {
+    await appendTraceAnnotation(sessionId, {
+      seq,
+      type,
+      value,
+      lon,
+      lat,
+      captured_at,
+    });
+    store.appendAnnotation({ type, value, seq, lon, lat, captured_at });
+  } catch (e) {
+    console.warn("[trace] persistAnnotation failed", e);
   }
 }
 

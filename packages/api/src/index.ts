@@ -31,6 +31,7 @@ import {
 import { tracesRoute, traceSegmentsRoute } from "./routes/traces.js";
 import { synthesisRoute } from "./routes/synthesis.js";
 import { metroProxy } from "./middleware/metro-proxy.js";
+import { startSynthesisWorker } from "./services/synthesis-worker.js";
 
 const app = new Hono();
 
@@ -78,6 +79,8 @@ app.onError((err, c) => {
     500,
   );
 });
+
+startSynthesisWorker();
 
 const port = Number(process.env.API_PORT ?? 3000);
 

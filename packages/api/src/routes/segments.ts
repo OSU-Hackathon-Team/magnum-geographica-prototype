@@ -28,8 +28,11 @@ const baseSegmentSelect = {
   surface_type: trailSegments.surfaceType,
   hazards: trailSegments.hazards,
   is_road_connector: trailSegments.isRoadConnector,
+  is_pseudo_trail: trailSegments.isPseudoTrail,
   steep_grade: trailSegments.steepGrade,
   one_way: trailSegments.oneWay,
+  source: trailSegments.source,
+  consensus: trailSegments.consensus,
   description: trailSegments.description,
   length_meters: sql<number>`ST_Length(${trailSegments.geometry}::geography)`,
   created_at: trailSegments.createdAt,
@@ -89,7 +92,7 @@ segmentDetailRoute.get("/:id", async (c) => {
   return c.json(seg);
 });
 
-segmentDetailRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
+segmentDetailRoute.put("/:id", authRequired(), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = updateSegmentInputSchema.safeParse(body);
@@ -107,6 +110,8 @@ segmentDetailRoute.put("/:id", optionalAuth(), actorRequired(), async (c) => {
   if (parsed.data.hazards !== undefined) updates.hazards = parsed.data.hazards;
   if (parsed.data.is_road_connector !== undefined)
     updates.isRoadConnector = parsed.data.is_road_connector;
+  if (parsed.data.is_pseudo_trail !== undefined)
+    updates.isPseudoTrail = parsed.data.is_pseudo_trail;
   if (parsed.data.steep_grade !== undefined) updates.steepGrade = parsed.data.steep_grade;
   if (parsed.data.one_way !== undefined) updates.oneWay = parsed.data.one_way;
   if (parsed.data.description !== undefined) updates.description = parsed.data.description;
@@ -187,7 +192,28 @@ segmentDetailRoute.delete("/:id", authRequired(), async (c) => {
   return c.json({ ok: true });
 });
 
-trailSegmentsRoute.post("/:id/segments", optionalAuth(), actorRequired(), async (c) => {
+segmentDetailRoute.post("/:id/remove-low-consensus", authRequired(), async (c) => {
+  const id = c.req.param("id");
+  const authUser = c.get("user");
+  if (!authUser) return c.json({ error: "unauthorized" }, 401);
+  // Only trusted+ or moderators can clear low-consensus.
+  if (authUser.tier !== "trusted" && authUser.tier !== "moderator") {
+    return c.json({ error: "forbidden", message: "trusted tier or higher required" }, 403);
+  }
+  const [seg] = await db
+    .select({ id: trailSegments.id })
+    .from(trailSegments)
+    .where(eq(trailSegments.id, id))
+    .limit(1);
+  if (!seg) return c.json({ error: "not_found", message: `segment ${id} not found` }, 404);
+  await db
+    .update(trailSegments)
+    .set({ consensus: 1.0, updatedAt: sql`now()` })
+    .where(eq(trailSegments.id, id));
+  return c.json({ ok: true, consensus: 1.0 });
+});
+
+trailSegmentsRoute.post("/:id/segments", authRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = createSegmentInputSchema.safeParse(body);
@@ -222,13 +248,16 @@ trailSegmentsRoute.post("/:id/segments", optionalAuth(), actorRequired(), async 
     sortOrder?: number;
     surfaceType?: string | null;
     hazards?: string[];
+    source?: string;
     isRoadConnector?: boolean;
+    isPseudoTrail?: boolean;
     steepGrade?: boolean;
     oneWay?: boolean;
     description?: string | null;
   } = {
     trailId,
     geometry: sql`ST_SetSRID(ST_GeomFromText(${wkt}, 4326), 4326)`,
+    source: "editor",
   };
   if (parsed.data.name !== undefined) insertValues.name = parsed.data.name;
   if (parsed.data.sort_order !== undefined) insertValues.sortOrder = parsed.data.sort_order;
@@ -236,6 +265,8 @@ trailSegmentsRoute.post("/:id/segments", optionalAuth(), actorRequired(), async 
   if (parsed.data.hazards !== undefined) insertValues.hazards = parsed.data.hazards;
   if (parsed.data.is_road_connector !== undefined)
     insertValues.isRoadConnector = parsed.data.is_road_connector;
+  if (parsed.data.is_pseudo_trail !== undefined)
+    insertValues.isPseudoTrail = parsed.data.is_pseudo_trail;
   if (parsed.data.steep_grade !== undefined) insertValues.steepGrade = parsed.data.steep_grade;
   if (parsed.data.one_way !== undefined) insertValues.oneWay = parsed.data.one_way;
   if (parsed.data.description !== undefined) insertValues.description = parsed.data.description;
@@ -265,7 +296,7 @@ trailSegmentsRoute.post("/:id/segments", optionalAuth(), actorRequired(), async 
   return c.json(out[0] ?? seg, 201);
 });
 
-trailSegmentsRoute.post("/:id/segments/reorder", optionalAuth(), actorRequired(), async (c) => {
+trailSegmentsRoute.post("/:id/segments/reorder", authRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = reorderSegmentsInputSchema.safeParse(body);
@@ -321,7 +352,7 @@ trailSegmentsRoute.post("/:id/segments/reorder", optionalAuth(), actorRequired()
   return c.json({ items, total: items.length });
 });
 
-trailSegmentsRoute.post("/:id/segments/split", optionalAuth(), actorRequired(), async (c) => {
+trailSegmentsRoute.post("/:id/segments/split", authRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = splitSegmentInputSchema.safeParse(body);
@@ -421,7 +452,7 @@ trailSegmentsRoute.post("/:id/segments/split", optionalAuth(), actorRequired(), 
   return c.json({ items, total: items.length });
 });
 
-trailSegmentsRoute.post("/:id/segments/merge", optionalAuth(), actorRequired(), async (c) => {
+trailSegmentsRoute.post("/:id/segments/merge", authRequired(), async (c) => {
   const trailId = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = mergeSegmentsInputSchema.safeParse(body);

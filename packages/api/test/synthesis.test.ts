@@ -38,7 +38,7 @@ function seedSystem(id = traceUUID(1)) {
 
 function seedTrail(
   id: string,
-  tier: "synthesized" | "elevated" | "premium" = "synthesized",
+  tier: "synthesized" | "frozen" | "premium" = "synthesized",
 ) {
   state.trails.push({
     id,
@@ -99,12 +99,12 @@ beforeEach(() => {
 });
 
 describe("synthesis: promoteTrail()", () => {
-  test("upgrades a synthesized trail to elevated", async () => {
+  test("upgrades a synthesized trail to frozen", async () => {
     seedTrail(traceUUID(7), "synthesized");
-    const promoted = await synth.promoteTrail(traceUUID(7), "elevated");
-    expect(promoted?.tier).toBe("elevated");
+    const promoted = await synth.promoteTrail(traceUUID(7), "frozen");
+    expect(promoted?.tier).toBe("frozen");
     const stored = state.trails.find((t) => t.id === traceUUID(7));
-    expect(stored?.tier).toBe("elevated");
+    expect(stored?.tier).toBe("frozen");
   });
 
   test("upgrades synthesized to premium", async () => {
@@ -113,35 +113,35 @@ describe("synthesis: promoteTrail()", () => {
     expect(promoted?.tier).toBe("premium");
   });
 
-  test("upgrades elevated to premium", async () => {
-    seedTrail(traceUUID(9), "elevated");
+  test("upgrades frozen to premium", async () => {
+    seedTrail(traceUUID(9), "frozen");
     const promoted = await synth.promoteTrail(traceUUID(9), "premium");
     expect(promoted?.tier).toBe("premium");
   });
 
-  test("throws when promoting premium to elevated", async () => {
+  test("throws when promoting premium to frozen", async () => {
     seedTrail(traceUUID(10), "premium");
-    await expect(synth.promoteTrail(traceUUID(10), "elevated")).rejects.toThrow(
-      "cannot promote from premium to elevated",
+    await expect(synth.promoteTrail(traceUUID(10), "frozen")).rejects.toThrow(
+      "cannot promote from premium to frozen",
     );
   });
 
-  test("throws when promoting elevated to synthesized", async () => {
-    seedTrail(traceUUID(11), "elevated");
-    await expect(synth.promoteTrail(traceUUID(11), "elevated")).rejects.toThrow(
-      "cannot promote from elevated to elevated",
+  test("throws when promoting frozen to synthesized", async () => {
+    seedTrail(traceUUID(11), "frozen");
+    await expect(synth.promoteTrail(traceUUID(11), "frozen")).rejects.toThrow(
+      "cannot promote from frozen to frozen",
     );
   });
 
   test("returns null for unknown trail", async () => {
-    const result = await synth.promoteTrail("missing", "elevated");
+    const result = await synth.promoteTrail("missing", "frozen");
     expect(result).toBeNull();
   });
 });
 
 describe("synthesis: demoteTrail()", () => {
-  test("demotes elevated to synthesized", async () => {
-    seedTrail(traceUUID(12), "elevated");
+  test("demotes frozen to synthesized", async () => {
+    seedTrail(traceUUID(12), "frozen");
     const demoted = await synth.demoteTrail(traceUUID(12));
     expect(demoted?.tier).toBe("synthesized");
     const stored = state.trails.find((t) => t.id === traceUUID(12));
@@ -151,14 +151,14 @@ describe("synthesis: demoteTrail()", () => {
   test("throws on synthesized trail", async () => {
     seedTrail(traceUUID(13), "synthesized");
     await expect(synth.demoteTrail(traceUUID(13))).rejects.toThrow(
-      "can only demote elevated trails",
+      "can only demote frozen trails",
     );
   });
 
   test("throws on premium trail", async () => {
     seedTrail(traceUUID(14), "premium");
     await expect(synth.demoteTrail(traceUUID(14))).rejects.toThrow(
-      "can only demote elevated trails",
+      "can only demote frozen trails",
     );
   });
 

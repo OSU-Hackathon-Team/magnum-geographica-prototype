@@ -60,23 +60,23 @@ test.describe("Trail freeze / unfreeze (§21.6)", () => {
     await expect(page.getByTestId("trail-freeze")).toBeVisible();
   });
 
-  test("clicking Freeze promotes trail to elevated", async ({ page }) => {
+  test("clicking Freeze promotes trail to frozen", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/trail/buckeye-trail");
     await page.getByTestId("trail-freeze").click();
     await page.waitForTimeout(1000);
-    await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
+    await expect(page.getByTestId("trail-tier-badge-frozen")).toBeVisible();
     await expect(page.getByTestId("trail-unfreeze")).toBeVisible();
   });
 
   test("clicking Unfreeze demotes trail back to synthesized", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/trail/buckeye-trail");
-    // First freeze (synthesized → elevated)
+    // First freeze (synthesized → frozen)
     await page.getByTestId("trail-freeze").click();
     await page.waitForTimeout(1000);
-    await expect(page.getByTestId("trail-tier-badge-elevated")).toBeVisible();
-    // Then unfreeze (elevated → synthesized)
+    await expect(page.getByTestId("trail-tier-badge-frozen")).toBeVisible();
+    // Then unfreeze (frozen → synthesized)
     await page.getByTestId("trail-unfreeze").click();
     await page.waitForTimeout(1000);
     await expect(page.getByTestId("trail-tier-badge-synthesized")).toBeVisible();
@@ -90,7 +90,7 @@ test.describe("Trail freeze / unfreeze (§21.6)", () => {
     await expect(page.getByTestId("trail-unfreeze")).not.toBeVisible();
   });
 
-  test("elevated trail shows Unfreeze button", async ({ page }) => {
+  test("frozen trail shows Unfreeze button", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/trail/towpath-trail");
     await expect(page.getByTestId("trail-unfreeze")).toBeVisible();

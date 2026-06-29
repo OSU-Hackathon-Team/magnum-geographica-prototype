@@ -172,8 +172,8 @@ describe("DELETE /api/trails/:id", () => {
     expect(stored.length).toBe(0);
   });
 
-  test("deletes an elevated trail", async () => {
-    const t = await seedTrail({ tier: "elevated" });
+  test("deletes a frozen trail", async () => {
+    const t = await seedTrail({ tier: "frozen" });
     const res = await buildApp().request(`/api/trails/${t.id}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${authToken}` },
@@ -226,12 +226,12 @@ describe("GET endpoints emit tier and provenance", () => {
 
   test("GET /api/trails returns tier in list items", async () => {
     await seedTrail({ tier: "premium" });
-    await seedTrail({ slug: "other", tier: "elevated" });
+    await seedTrail({ slug: "other", tier: "frozen" });
     const res = await buildApp().request("/api/trails");
     const body = (await res.json()) as { items: Array<{ tier: string }>; total: number };
     expect(body.total).toBe(2);
     const tiers = body.items.map((i) => i.tier);
     expect(tiers).toContain("premium");
-    expect(tiers).toContain("elevated");
+    expect(tiers).toContain("frozen");
   });
 });

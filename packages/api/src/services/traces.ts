@@ -26,6 +26,7 @@ import {
   gpsTraceSegments,
   systems,
   traceSystems,
+  traceAnnotations,
   type GpsTrace,
   type GpsTraceSegment,
   type NewGpsTraceSegment,
@@ -48,12 +49,22 @@ import { castVote, retractVote } from "./votes.js";
  */
 export const TRACE_WEIGHT_IGNORED_FLOOR = 0.3;
 
+export interface TraceAnnotationInput {
+  type: string;
+  value?: string | null;
+  index: number;
+  lat: number;
+  lon: number;
+  capturedAt: string;
+}
+
 export interface CreateTraceInput {
   coordinates: Array<[number, number]>;
   source: TraceSource;
   contributorName: string;
   userId: string | null;
   recordedAt?: string;
+  annotations?: TraceAnnotationInput[];
 }
 
 export interface TraceListOptions {
@@ -94,6 +105,21 @@ export async function createTrace(
   if (!trace) throw new Error("failed to insert trace");
 
   const tagged = await autoTagTrace(trace.id);
+
+  // Insert inline annotations if provided
+  if (input.annotations && input.annotations.length > 0) {
+    const values = input.annotations.map((a) => ({
+      traceId: trace.id,
+      type: a.type,
+      value: a.value ?? null,
+      point: sql`ST_SetSRID(ST_MakePoint(${a.lon}, ${a.lat}), 4326)`,
+      traceIndex: a.index,
+      capturedAt: new Date(a.capturedAt),
+      userId: input.userId,
+      contributorName: input.contributorName,
+    }));
+    await db.insert(traceAnnotations).values(values);
+  }
 
   return { trace, taggedSystemIds: tagged };
 }
@@ -451,4 +477,101 @@ export async function getHeatmapPoints(
     return { type: "FeatureCollection", features: [] };
   }
   return JSON.parse(raw) as HeatmapPointsResult;
+}
+
+/* ------------------------------------------------------------------ */
+/* Trace annotations (§Phase 10)                                      */
+/* ------------------------------------------------------------------ */
+
+export async function listAnnotationsForTrace(
+  traceId: string,
+): Promise<Array<{ id: string; type: string; value: string | null; index: number; lat: number; lon: number; captured_at: Date; contributor_name: string }>> {
+  const rows = await db.execute<{
+    id: string;
+    type: string;
+    value: string | null;
+    index: number;
+    lon: number;
+    lat: number;
+    captured_at: string;
+    contributor_name: string;
+  }>(
+    sql`SELECT
+          a.id::text AS id,
+          a.type,
+          a.value,
+          a.trace_index AS index,
+          ST_X(a.point)::float8 AS lon,
+          ST_Y(a.point)::float8 AS lat,
+          a.captured_at::text AS captured_at,
+          a.contributor_name
+        FROM trace_annotations a
+        WHERE a.trace_id = ${traceId}
+        ORDER BY a.trace_index`,
+  );
+  return (rows.rows as Array<{
+    id: string; type: string; value: string | null; index: number; lon: number; lat: number; captured_at: string; contributor_name: string;
+  }>).map((r) => ({
+    id: r.id,
+    type: r.type,
+    value: r.value,
+    index: r.index,
+    lat: r.lat,
+    lon: r.lon,
+    captured_at: new Date(r.captured_at),
+    contributor_name: r.contributor_name,
+  }));
+}
+
+export async function listAnnotationsForTrail(
+  trailId: string,
+): Promise<Array<{ id: string; type: string; value: string | null; index: number; lat: number; lon: number; captured_at: Date; contributor_name: string; trace_id: string; location: number | null }>> {
+  // Get all annotations from traces whose segments are assigned to this trail,
+  // plus snap each annotation to the trail geometry for the editor overlay.
+  const rows = await db.execute<{
+    id: string;
+    type: string;
+    value: string | null;
+    index: number;
+    lon: number;
+    lat: number;
+    captured_at: string;
+    contributor_name: string;
+    trace_id: string;
+    location: number | null;
+  }>(
+    sql`SELECT
+          a.id::text AS id,
+          a.type,
+          a.value,
+          a.trace_index AS index,
+          ST_X(a.point)::float8 AS lon,
+          ST_Y(a.point)::float8 AS lat,
+          a.captured_at::text AS captured_at,
+          a.contributor_name,
+          a.trace_id::text AS trace_id,
+          NULL::float8 AS location
+        FROM trace_annotations a
+        WHERE a.trace_id IN (
+          SELECT DISTINCT s.trace_id
+          FROM gps_trace_segments s
+          INNER JOIN trace_segment_votes v ON v.segment_id = s.id
+          WHERE v.trail_id = ${trailId} AND v.vote = 1
+        )
+        ORDER BY a.trace_id, a.trace_index`,
+  );
+  return (rows.rows as Array<{
+    id: string; type: string; value: string | null; index: number; lon: number; lat: number; captured_at: string; contributor_name: string; trace_id: string; location: number | null;
+  }>).map((r) => ({
+    id: r.id,
+    type: r.type,
+    value: r.value,
+    index: r.index,
+    lat: r.lat,
+    lon: r.lon,
+    captured_at: new Date(r.captured_at),
+    contributor_name: r.contributor_name,
+    trace_id: r.trace_id,
+    location: r.location,
+  }));
 }

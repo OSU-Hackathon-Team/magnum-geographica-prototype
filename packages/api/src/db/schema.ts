@@ -127,10 +127,10 @@ export const trails = pgTable(
     lengthMeters: doublePrecision("length_meters"),
     elevationGainMeters: doublePrecision("elevation_gain_meters"),
     verified: boolean("verified").notNull().default(false),
-    // §21.6 trail trust tier: premium (official import), elevated (frozen from
-    // synthesized), or synthesized (built/maintained from GPS traces).
+    // §21.6 trail trust tier: premium (official import), frozen (promoted,
+    // geometry locked), or synthesized (built/maintained from GPS traces).
     tier: text("tier").notNull().default("synthesized"),
-    // §21.6 — provenance for premium/elevated trails (mirrors systems).
+    // §21.6 — provenance for premium/frozen trails (mirrors systems).
     source: text("source"),
     sourceDate: date("source_date"),
     externalUrl: text("external_url"),
@@ -194,6 +194,14 @@ export const trailSegments = pgTable(
     steepGrade: boolean("steep_grade").notNull().default(false),
     oneWay: boolean("one_way").notNull().default(false),
     description: text("description"),
+    // §21.6 — synthesis vs editor provenance
+    source: text("source").notNull().default("synthesis"),
+    // §21.6 — consensus score (0..1) from annotation algorithm
+    consensus: doublePrecision("consensus"),
+    // §21.6 — when this segment was last synthesized
+    lastSynthesizedAt: timestamp("last_synthesized_at", { withTimezone: true }),
+    // §21.6 — orthogonal to surface_type; a paved bike detour can be pseudo
+    isPseudoTrail: boolean("is_pseudo_trail").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -491,10 +499,59 @@ export const synthesisRuns = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     trailsUpdated: integer("trails_updated").notNull().default(0),
     trailsProposed: integer("trails_proposed").notNull().default(0),
+    segmentsEmitted: integer("segments_emitted").notNull().default(0),
     status: text("status").notNull().default("running"),
   },
   (t) => ({
     systemIdx: index("idx_synthesis_system").on(t.systemId, t.startedAt),
+  }),
+);
+
+// §21.6 — inline tap annotations captured during trace recording
+export const traceAnnotations = pgTable(
+  "trace_annotations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    traceId: uuid("trace_id")
+      .notNull()
+      .references(() => gpsTraces.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    value: text("value"),
+    point: point("point").notNull(),
+    traceIndex: integer("trace_index").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    userId: uuid("user_id").references(() => users.id),
+    contributorName: text("contributor_name").notNull().default("anonymous"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    traceIdx: index("idx_trace_annotations_trace").on(t.traceId, t.traceIndex),
+    pointIdx: index("idx_trace_annotations_point").using("gist", t.point),
+  }),
+);
+
+// §21.6 — debounced per-system synthesis queue
+export const synthesisJobs = pgTable(
+  "synthesis_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    systemId: uuid("system_id")
+      .notNull()
+      .references(() => systems.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull().default("incremental"),
+    triggerTraceId: uuid("trigger_trace_id").references(() => gpsTraces.id, {
+      onDelete: "set null",
+    }),
+    status: text("status").notNull().default("queued"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    error: text("error"),
+    trailsUpdated: integer("trails_updated").notNull().default(0),
+    segmentsEmitted: integer("segments_emitted").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pendingIdx: index("idx_synthesis_jobs_pending").on(t.status, t.createdAt),
   }),
 );
 
@@ -580,3 +637,7 @@ export type TraceSegmentVote = typeof traceSegmentVotes.$inferSelect;
 export type NewTraceSegmentVote = typeof traceSegmentVotes.$inferInsert;
 export type SynthesisRun = typeof synthesisRuns.$inferSelect;
 export type NewSynthesisRun = typeof synthesisRuns.$inferInsert;
+export type TraceAnnotation = typeof traceAnnotations.$inferSelect;
+export type NewTraceAnnotation = typeof traceAnnotations.$inferInsert;
+export type SynthesisJob = typeof synthesisJobs.$inferSelect;
+export type NewSynthesisJob = typeof synthesisJobs.$inferInsert;

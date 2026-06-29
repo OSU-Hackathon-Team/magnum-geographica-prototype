@@ -262,20 +262,41 @@ export type VoteValue = (typeof VOTE_VALUES)[number];
 
 // ========== Trail tiers (§21.6) ==========
 
-export const TRAIL_TIERS = ["premium", "elevated", "synthesized"] as const;
+export const TRAIL_TIERS = ["premium", "frozen", "synthesized"] as const;
 export type TrailTier = (typeof TRAIL_TIERS)[number];
 
 export const TRAIL_TIER_LABELS: Record<TrailTier, string> = {
   premium: "Premium",
-  elevated: "Elevated",
+  frozen: "Frozen",
   synthesized: "Synthesized",
 };
 
 export const TRAIL_TIER_COLORS: Record<TrailTier, string> = {
   premium: "#a855f7",
-  elevated: "#22c55e",
+  frozen: "#22c55e",
   synthesized: "#3b82f6",
 };
+
+// ========== Trace annotations (§21.6 / Phase 10) ==========
+
+export const TRACE_ANNOTATION_TYPES = [
+  "surface_change",
+  "road_crossing",
+  "pseudo_trail_start",
+  "pseudo_trail_end",
+] as const;
+export type TraceAnnotationType = (typeof TRACE_ANNOTATION_TYPES)[number];
+
+// ========== Synthesis (§21.6 / Phase 10) ==========
+
+export const SYNTHESIS_SCOPES = ["incremental", "full"] as const;
+export type SynthesisScope = (typeof SYNTHESIS_SCOPES)[number];
+
+export const SYNTHESIS_JOB_STATUSES = ["queued", "running", "complete", "failed"] as const;
+export type SynthesisJobStatus = (typeof SYNTHESIS_JOB_STATUSES)[number];
+
+export const SYNTHESIS_DEBOUNCE_MS = 60_000;
+export const SYNTHESIS_LOW_CONSENSUS_THRESHOLD = 0.4;
 
 // ========== Hierarchy actions (§21.5) ==========
 

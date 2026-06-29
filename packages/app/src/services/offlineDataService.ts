@@ -663,6 +663,38 @@ export async function listTracePoints(sessionId: string): Promise<TracePoint[]> 
   return rows;
 }
 
+export interface TraceAnnotation {
+  id?: number;
+  session_id: string;
+  seq: number;
+  type: string;
+  value?: string | null;
+  lon: number;
+  lat: number;
+  captured_at: string;
+}
+
+export async function appendTraceAnnotation(
+  sessionId: string,
+  annotation: Omit<TraceAnnotation, "id" | "session_id">,
+): Promise<void> {
+  const db = await getOfflineDb();
+  await db.execRaw(
+    `INSERT INTO trace_annotations (session_id, seq, type, value, lon, lat, captured_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [sessionId, annotation.seq, annotation.type, annotation.value ?? null, annotation.lon, annotation.lat, annotation.captured_at],
+  );
+}
+
+export async function listTraceAnnotations(sessionId: string): Promise<TraceAnnotation[]> {
+  const db = await getOfflineDb();
+  const rows = (await db.exec(
+    "SELECT * FROM trace_annotations WHERE session_id = ? ORDER BY seq",
+    [sessionId],
+  )) as unknown as TraceAnnotation[];
+  return rows;
+}
+
 export async function getTraceSession(id: string): Promise<TraceSession | null> {
   const db = await getOfflineDb();
   const rows = (await db.exec("SELECT * FROM trace_sessions WHERE id = ?", [id])) as unknown as

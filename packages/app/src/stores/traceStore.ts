@@ -13,6 +13,15 @@ export interface LivePoint {
   heading?: number | null;
 }
 
+export interface LiveAnnotation {
+  type: string;
+  value: string | null;
+  seq: number;
+  lon: number;
+  lat: number;
+  captured_at: string;
+}
+
 export interface TraceState {
   status: TraceStatus;
   activeSessionId: string | null;
@@ -20,8 +29,10 @@ export interface TraceState {
   pausedAt: number | null;
   totalPausedMs: number;
   livePoints: LivePoint[];
+  annotations: LiveAnnotation[];
   totalMeters: number;
   error: string | null;
+  isPseudoActive: boolean;
 
   /**
    * Set on app launch when an unfinished session is found in SQLite.
@@ -32,12 +43,14 @@ export interface TraceState {
   setStatus: (status: TraceStatus) => void;
   beginSession: (session: TraceSession) => void;
   appendPoint: (point: LivePoint) => void;
+  appendAnnotation: (annotation: LiveAnnotation) => void;
   setPaused: (paused: boolean) => void;
   endSession: () => void;
   setError: (msg: string | null) => void;
   setTotalMeters: (m: number) => void;
   setRecoveryCandidate: (session: TraceSession | null) => void;
   clearRecovery: () => void;
+  setPseudoActive: (active: boolean) => void;
   /**
    * Drop live in-memory state without touching the SQLite session.
    * Used after the user explicitly discards or after a successful
@@ -48,13 +61,14 @@ export interface TraceState {
 
 const EMPTY: Pick<
   TraceState,
-  "activeSessionId" | "startedAt" | "pausedAt" | "totalPausedMs" | "livePoints" | "totalMeters" | "error"
+  "activeSessionId" | "startedAt" | "pausedAt" | "totalPausedMs" | "livePoints" | "annotations" | "totalMeters" | "error"
 > = {
   activeSessionId: null,
   startedAt: null,
   pausedAt: null,
   totalPausedMs: 0,
   livePoints: [],
+  annotations: [],
   totalMeters: 0,
   error: null,
 };
@@ -62,6 +76,7 @@ const EMPTY: Pick<
 export const useTraceStore = create<TraceState>((set) => ({
   status: "idle",
   recoveryCandidate: null,
+  isPseudoActive: false,
   ...EMPTY,
 
   setStatus: (status) => set({ status }),
@@ -74,8 +89,10 @@ export const useTraceStore = create<TraceState>((set) => ({
       pausedAt: null,
       totalPausedMs: 0,
       livePoints: [],
+      annotations: [],
       totalMeters: 0,
       error: null,
+      isPseudoActive: false,
     }),
 
   appendPoint: (point) =>
@@ -86,6 +103,9 @@ export const useTraceStore = create<TraceState>((set) => ({
       const next = s.livePoints.length >= 5_000 ? s.livePoints.slice(-4_999) : s.livePoints;
       return { livePoints: [...next, point] };
     }),
+
+  appendAnnotation: (annotation) =>
+    set((s) => ({ annotations: [...s.annotations, annotation] })),
 
   setPaused: (paused) =>
     set((s) => {
@@ -113,6 +133,7 @@ export const useTraceStore = create<TraceState>((set) => ({
 
   setRecoveryCandidate: (session) => set({ recoveryCandidate: session }),
   clearRecovery: () => set({ recoveryCandidate: null }),
+  setPseudoActive: (active) => set({ isPseudoActive: active }),
 
   resetLive: () => set({ ...EMPTY, status: "idle" }),
 }));

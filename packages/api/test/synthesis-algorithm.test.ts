@@ -76,9 +76,9 @@ async function seedTrace(sysId: string, status: string = "active", coords?: stri
 }
 
 describe("demoteTrail via route", () => {
-  test("demotes elevated → synthesized", async () => {
+  test("demotes frozen → synthesized", async () => {
     const sys = await seedSystem();
-    const trail = await seedTrail(sys.id, "elevated");
+    const trail = await seedTrail(sys.id, "frozen");
     const res = await buildApp().request(`/api/admin/trails/${trail.id}/demote`, {
       method: "POST",
       headers: { authorization: `Bearer ${modToken}` },
@@ -110,17 +110,17 @@ describe("demoteTrail via route", () => {
 });
 
 describe("promoteTrail via route", () => {
-  test("promotes synthesized → elevated", async () => {
+  test("promotes synthesized → frozen", async () => {
     const sys = await seedSystem();
     const trail = await seedTrail(sys.id, "synthesized");
     const res = await buildApp().request(`/api/admin/trails/${trail.id}/promote`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${modToken}` },
-      body: JSON.stringify({ to: "elevated" }),
+      body: JSON.stringify({ to: "frozen" }),
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { tier: string };
-    expect(body.tier).toBe("elevated");
+    expect(body.tier).toBe("frozen");
   });
 
   test("rejects invalid transition", async () => {
@@ -129,7 +129,7 @@ describe("promoteTrail via route", () => {
     const res = await buildApp().request(`/api/admin/trails/${trail.id}/promote`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${modToken}` },
-      body: JSON.stringify({ to: "elevated" }),
+      body: JSON.stringify({ to: "frozen" }),
     });
     expect(res.status).toBe(400);
   });
@@ -172,72 +172,15 @@ describe("importPremiumTrail via route", () => {
 });
 
 describe("runSynthesis basic flow", () => {
-  test("inserts a synthesis_runs row and completes", async () => {
+  test("synthesize route was removed — synthesis is background-only", async () => {
     const sys = await seedSystem();
-    // Need at least one trace for the algorithm to process.
     await seedTrace(sys.id);
     const res = await buildApp().request(`/api/systems/${sys.id}/synthesize`, {
       method: "POST",
       headers: { authorization: `Bearer ${modToken}` },
     });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      run: { id: string; status: string };
-    };
-    expect(body.run.status).toBe("complete");
-
-    const stored = await db
-      .select()
-      .from(synthesisRuns)
-      .where(eq(synthesisRuns.systemId, sys.id));
-    expect(stored.length).toBeGreaterThanOrEqual(1);
-    expect(stored[0]?.status).toBe("complete");
+    expect(res.status).toBe(404);
   });
 
-  test("processes trace and assigns to nearest synthesized trail", async () => {
-    const sys = await seedSystem();
-    // Create a synthesized trail near where the trace goes.
-    await seedTrail(sys.id, "synthesized");
-    await seedTrace(sys.id, "active",
-      "SRID=4326;MULTILINESTRING((-82.5 39.4, -82.55 39.45, -82.59 39.49))");
-    const res = await buildApp().request(`/api/systems/${sys.id}/synthesize`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${modToken}` },
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      assigned: number; proposed: number; trails_updated: number;
-    };
-    expect(typeof body.assigned).toBe("number");
-    expect(typeof body.proposed).toBe("number");
-  });
-
-  test("ignored traces are excluded", async () => {
-    const sys = await seedSystem();
-    await seedTrace(sys.id, "ignored");
-    const res = await buildApp().request(`/api/systems/${sys.id}/synthesize`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${modToken}` },
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { assigned: number };
-    expect(body.assigned).toBe(0);
-  });
-
-  test("returns 403 for non-moderator users", async () => {
-    const sys = await seedSystem();
-    const userToken = await signToken({
-      id: "00000000-0000-4000-a000-000000000099",
-      username: "regular",
-      email: "reg@test.com",
-      role: "contributor",
-      karma: 100,
-      tier: "established" as const,
-    });
-    const res = await buildApp().request(`/api/systems/${sys.id}/synthesize`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${userToken}` },
-    });
-    expect(res.status).toBe(403);
-  });
 });
+

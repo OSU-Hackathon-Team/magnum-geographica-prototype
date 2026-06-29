@@ -85,6 +85,13 @@
       "when": 1783000000000,
       "tag": "0011_auth_restructure",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783210000000,
+      "tag": "0012_synthesis_redesign",
+      "breakpoints": true
     }
   ]
 }

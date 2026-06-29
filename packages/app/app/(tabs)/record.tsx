@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { MapContainer } from "@magnum/map";
 import { useTraceStore, sessionElapsedMs } from "../../src/stores/traceStore";
 import { useOfflineStore } from "../../src/stores/offlineStore";
+import { AnnotationDock } from "../../src/components/trace/AnnotationDock";
 import {
   startTraceRecording,
   pauseTraceRecording,
@@ -587,6 +588,8 @@ function ActiveView({
           <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
         </View>
       ) : null}
+
+      <AnnotationDock />
 
       <View style={styles.actionsRow}>
         <Pressable

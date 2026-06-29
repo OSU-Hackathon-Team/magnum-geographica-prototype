@@ -20,6 +20,8 @@ import {
   setTraceStatus,
   voteOnTrace,
   getHeatmapPoints,
+  listAnnotationsForTrace,
+  listAnnotationsForTrail,
 } from "../services/traces.js";
 import {
   authRequired,
@@ -111,6 +113,14 @@ tracesRoute.get("/:id", async (c) => {
   return c.json(trace);
 });
 
+tracesRoute.get("/:id/annotations", async (c) => {
+  const id = c.req.param("id");
+  const trace = await getTraceById(id);
+  if (!trace) return c.json({ error: "not_found" }, 404);
+  const items = await listAnnotationsForTrace(id);
+  return c.json({ items, total: items.length });
+});
+
 /**
  * Create a trace from raw coordinates (the recorder path). The route
  * runs auto-tag synchronously so the response can include tagged
@@ -133,15 +143,30 @@ tracesRoute.post("/", optionalAuth(), actorRequired(), async (c) => {
     contributorName: actor.contributorName,
     userId: actor.userId ?? null,
     recordedAt: parsed.data.recorded_at,
+    annotations: (parsed.data.annotations ?? []).map((a) => ({
+      type: a.type,
+      value: a.value ?? null,
+      index: a.index,
+      lat: a.lat,
+      lon: a.lon,
+      capturedAt: a.captured_at,
+    })),
   });
+  // Enqueue background synthesis for each tagged system
+  if (taggedSystemIds.length > 0) {
+    const { enqueueSynthesis } = await import("../services/synthesis-worker.js");
+    for (const systemId of taggedSystemIds) {
+      await enqueueSynthesis(systemId, { scope: "incremental", triggerTraceId: trace.id });
+    }
+  }
   await recordRevision({
     targetType: "trace",
     targetId: trace.id,
     action: "create",
     actorId: actor.userId ?? null,
     contributorName: actor.contributorName,
-    editSummary: `Recorded trace (${coords.length} pts)`,
-    payloadAfter: { source: parsed.data.source, points: coords.length, tagged: taggedSystemIds },
+    editSummary: `Recorded trace (${coords.length} pts${parsed.data.annotations?.length ? `, ${parsed.data.annotations.length} annotations` : ""})`,
+    payloadAfter: { source: parsed.data.source, points: coords.length, tagged: taggedSystemIds, annotations: parsed.data.annotations?.length ?? 0 },
   });
   return c.json({ trace, tagged_system_ids: taggedSystemIds }, 201);
 });

@@ -33,6 +33,8 @@ import {
   systems,
   trails,
   trailSystems,
+  trailSegments,
+  traceAnnotations,
   traceSegmentVotes,
   traceSystems,
   type SynthesisRun,
@@ -62,6 +64,7 @@ export interface SynthesisResult {
   assigned: number;
   proposed: number;
   trailsUpdated: number;
+  segmentsEmitted: number;
 }
 
 /**
@@ -121,8 +124,17 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
     )`));
   const { assigned, proposed } = await assignOrPropose(systemId, synthTrails);
 
-  // 4. Recompute centerlines.
+  // 4. Recompute centerlines (synthesized tier only).
   const trailsUpdated = await recomputeCenterlines(systemId, synthTrails);
+
+  // 5. Emit canonical segments from annotation consensus (all tiers).
+  const allTrails = await db
+    .select()
+    .from(trails)
+    .where(sql`${trails.id} IN (
+      SELECT trail_id FROM trail_systems WHERE system_id = ${systemId}
+    )`);
+  const segmentsEmitted = await emitCanonicalSegments(systemId, allTrails);
 
   await db
     .update(synthesisRuns)
@@ -130,6 +142,7 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
       finishedAt: new Date(),
       trailsUpdated,
       trailsProposed: proposed,
+      segmentsEmitted,
       status: "complete",
     })
     .where(eq(synthesisRuns.id, runId));
@@ -146,6 +159,7 @@ export async function runSynthesis(systemId: string): Promise<SynthesisResult> {
     assigned,
     proposed,
     trailsUpdated,
+    segmentsEmitted,
   };
 }
 
@@ -340,22 +354,179 @@ async function recomputeCenterlines(
 }
 
 /* ------------------------------------------------------------------ */
+/* Step 5 — emit canonical segments from annotation consensus         */
+/* ------------------------------------------------------------------ */
+
+const SEGMENT_SNAP_TOLERANCE_M = 15;
+
+/**
+ * For each trail in the system, read annotations from traces assigned
+ * to that trail, snap them to the trail geometry, derive segment
+ * boundaries from surface-change and pseudo-trail events, and upsert
+ * `trail_segments` rows with source='synthesis'.
+ */
+async function emitCanonicalSegments(
+  systemId: string,
+  allTrails: Trail[],
+): Promise<number> {
+  let totalEmitted = 0;
+
+  for (const trail of allTrails) {
+    if (!trail.id) continue;
+
+    // Find annotations attached to traces whose segments are voted to this trail.
+    const annRows = await db.execute<{
+      id: string;
+      type: string;
+      value: string | null;
+      lon: number;
+      lat: number;
+      trace_index: number;
+      trace_id: string;
+      trace_weight: number;
+    }>(
+      sql`SELECT
+            a.id::text AS id,
+            a.type,
+            a.value,
+            ST_X(a.point)::float8 AS lon,
+            ST_Y(a.point)::float8 AS lat,
+            a.trace_index,
+            a.trace_id::text AS trace_id,
+            t.weight::float8 AS trace_weight
+          FROM trace_annotations a
+          INNER JOIN gps_traces t ON t.id = a.trace_id
+          WHERE a.trace_id IN (
+            SELECT DISTINCT s.trace_id
+            FROM gps_trace_segments s
+            INNER JOIN trace_segment_votes v ON v.segment_id = s.id
+            WHERE v.trail_id = ${trail.id} AND v.vote = 1
+          )
+            AND t.status = 'active'
+          ORDER BY a.trace_id, a.trace_index`,
+    );
+
+    const annotations = (annRows.rows as Array<{
+      id: string; type: string; value: string | null; lon: number; lat: number;
+      trace_index: number; trace_id: string; trace_weight: number;
+    }>);
+
+    if (annotations.length === 0) continue;
+
+    // Snap each annotation to the trail geometry using ST_LineLocatePoint.
+    const snapped: Array<{
+      type: string;
+      value: string | null;
+      position: number;
+      traceWeight: number;
+    }> = [];
+
+    for (const a of annotations) {
+      const locRow = await db.execute<{ pos: number }>(
+        sql`SELECT ST_LineLocatePoint(geometry, ST_SetSRID(ST_MakePoint(${a.lon}, ${a.lat}), 4326))::float8 AS pos
+            FROM trails
+            WHERE id = ${trail.id}`,
+      );
+      const pos = Number((locRow.rows[0] as { pos?: number })?.pos ?? 0);
+      if (Number.isFinite(pos) && pos >= 0 && pos <= 1) {
+        snapped.push({
+          type: a.type,
+          value: a.value,
+          position: pos,
+          traceWeight: a.trace_weight,
+        });
+      }
+    }
+
+    if (snapped.length === 0) continue;
+
+    // Build segment boundaries from surface_change events and pseudo-trail spans.
+    // We emit one segment between each consecutive boundary.
+    snapped.sort((a, b) => a.position - b.position);
+
+    // Collect boundaries: positions where surface or pseudo changes.
+    const boundaries: Array<{ position: number; surface?: string; isPseudoTrail?: boolean }> = [];
+    let currentSurface: string | null = null;
+    let isPseudoSpan = false;
+
+    for (const s of snapped) {
+      if (s.type === "surface_change" && s.value) {
+        currentSurface = s.value;
+        boundaries.push({ position: s.position, surface: s.value, isPseudoTrail: isPseudoSpan });
+      } else if (s.type === "pseudo_trail_start") {
+        isPseudoSpan = true;
+        boundaries.push({ position: s.position, surface: currentSurface ?? undefined, isPseudoTrail: true });
+      } else if (s.type === "pseudo_trail_end") {
+        isPseudoSpan = false;
+        boundaries.push({ position: s.position, surface: currentSurface ?? undefined, isPseudoTrail: false });
+      }
+      // road_crossing annotations are informational — don't create new segment boundaries
+    }
+
+    if (boundaries.length === 0) continue;
+
+    // Delete existing synthesis segments for this trail.
+    await db
+      .delete(trailSegments)
+      .where(
+        sql`trail_id = ${trail.id} AND source = 'synthesis'`,
+      );
+
+    // Emit one segment between each consecutive boundary pair.
+    // The segment starts at boundaries[i].position and ends at boundaries[i+1].position.
+    for (let i = 0; i < boundaries.length; i++) {
+      const b = boundaries[i]!;
+      const next = boundaries[i + 1] ?? null;
+      const start = i === 0 ? 0 : b.position;
+      const end = next ? next.position : 1;
+
+      if (end <= start) continue;
+
+      // Slice the trail geometry.
+      const geomSlice = await db.execute<{ wkt: string }>(
+        sql`SELECT ST_AsText(ST_LineSubstring(geometry, ${start}, ${end})) AS wkt
+            FROM trails
+            WHERE id = ${trail.id}`,
+      );
+      const wkt = (geomSlice.rows[0] as { wkt?: string })?.wkt;
+      if (!wkt || wkt === "LINESTRING EMPTY") continue;
+
+      const consensusScore = annotations.length === 1 ? 0.3 : 0.6; // rough heuristic
+
+      await db.insert(trailSegments).values({
+        trailId: trail.id,
+        geometry: sql`ST_Multi(ST_GeomFromText(${wkt}, 4326))`,
+        sortOrder: i,
+        surfaceType: b.surface ?? null,
+        isPseudoTrail: b.isPseudoTrail ?? false,
+        source: "synthesis",
+        consensus: consensusScore,
+        lastSynthesizedAt: new Date(),
+      });
+      totalEmitted++;
+    }
+  }
+
+  return totalEmitted;
+}
+
+/* ------------------------------------------------------------------ */
 /* Moderator actions                                                   */
 /* ------------------------------------------------------------------ */
 
 /**
- * Promote a synthesized trail to "elevated" — the moderator is
+ * Promote a synthesized trail to "frozen" — the trusted+ user is
  * certifying the geometry as canonical. After this point the trail
  * is frozen: the synthesis loop won't re-derive its geometry.
  *
  * Allowed transitions:
- *   synthesized → elevated (Trusted+)
+ *   synthesized → frozen   (Trusted+)
  *   synthesized → premium   (moderator only)
- *   elevated    → premium   (moderator only)
+ *   frozen      → premium   (moderator only)
  */
 export async function promoteTrail(
   trailId: string,
-  to: "elevated" | "premium",
+  to: "frozen" | "premium",
 ): Promise<Trail | null> {
   const [current] = await db
     .select({ tier: trails.tier })
@@ -365,8 +536,8 @@ export async function promoteTrail(
   if (!current) return null;
 
   const allowed: Record<string, string[]> = {
-    synthesized: ["elevated", "premium"],
-    elevated: ["premium"],
+    synthesized: ["frozen", "premium"],
+    frozen: ["premium"],
     premium: [],
   };
   if (!allowed[current.tier ?? "synthesized"]?.includes(to)) {
@@ -382,7 +553,7 @@ export async function promoteTrail(
 }
 
 /**
- * Demote a trail from elevated → synthesized, re-arming it for
+ * Demote a trail from frozen → synthesized, re-arming it for
  * synthesis. Premium trails cannot be demoted.
  */
 export async function demoteTrail(trailId: string): Promise<Trail | null> {
@@ -392,8 +563,8 @@ export async function demoteTrail(trailId: string): Promise<Trail | null> {
     .where(eq(trails.id, trailId))
     .limit(1);
   if (!current) return null;
-  if (current.tier !== "elevated") {
-    throw new Error(`can only demote elevated trails, not ${current.tier}`);
+  if (current.tier !== "frozen") {
+    throw new Error(`can only demote frozen trails, not ${current.tier}`);
   }
   const rows = await db
     .update(trails)

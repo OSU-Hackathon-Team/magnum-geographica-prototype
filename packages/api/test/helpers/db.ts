@@ -75,9 +75,11 @@ async function ensureMigrated(): Promise<void> {
 }
 
 const APP_TABLES = [
+  "trace_annotations",
   "trace_segment_votes",
   "gps_trace_segments",
   "trace_systems",
+  "synthesis_jobs",
   "synthesis_runs",
   "gps_traces",
   "patrol_flags",
